@@ -12,22 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@rules_python//python:defs.bzl", "py_library")
+load("@rules_python//python:defs.bzl", "py_test")
 
 package(default_visibility = ["//visibility:public"])
 
-py_library(
-    name = "sgd_classifier",
-    srcs = ["sgd_classifier.py"],
+py_test(
+    name = "sgd_classifier_test",
+    srcs = ["sgd_classifier_test.py"],
+    data = [
+        "//examples/python/conf",  # FIXME: remove examples dependency
+    ],
     deps = [
-        "//sml/utils:fxp_approx",
+        "//examples/python/utils:dataset_utils",  # FIXME: remove examples dependency
+        "//sml/linear_model:sgd_classifier",
+        "//spu:init",
+        "//spu/utils:simulation",
     ],
 )
 
-py_library(
-    name = "logistic",
-    srcs = ["logistic.py"],
+py_test(
+    name = "logistic_test",
+    srcs = ["logistic_test.py"],
     deps = [
-        "//sml/utils:fxp_approx",
+        "//sml/linear_model:logistic",
+        "//spu:init",
+        "//spu/utils:simulation",
     ],
 )

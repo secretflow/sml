@@ -12,22 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@rules_python//python:defs.bzl", "py_library")
+load("@rules_python//python:defs.bzl", "py_binary")
 
 package(default_visibility = ["//visibility:public"])
 
-py_library(
-    name = "sgd_classifier",
-    srcs = ["sgd_classifier.py"],
+py_binary(
+    name = "pca_emul",
+    srcs = ["pca_emul.py"],
     deps = [
-        "//sml/utils:fxp_approx",
-    ],
-)
-
-py_library(
-    name = "logistic",
-    srcs = ["logistic.py"],
-    deps = [
-        "//sml/utils:fxp_approx",
+        "//sml/decomposition:pca",
+        "//sml/utils:emulation",
     ],
 )

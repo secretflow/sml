@@ -17,17 +17,6 @@ load("@rules_python//python:defs.bzl", "py_library")
 package(default_visibility = ["//visibility:public"])
 
 py_library(
-    name = "sgd_classifier",
-    srcs = ["sgd_classifier.py"],
-    deps = [
-        "//sml/utils:fxp_approx",
-    ],
-)
-
-py_library(
-    name = "logistic",
-    srcs = ["logistic.py"],
-    deps = [
-        "//sml/utils:fxp_approx",
-    ],
+    name = "kmeans",
+    srcs = ["kmeans.py"],
 )
