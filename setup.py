@@ -26,9 +26,9 @@ this_directory = os.path.abspath(os.path.dirname(__file__))
 
 def get_commit_id() -> str:
     commit_id = (
-        subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
+        subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("ascii").strip()
     )
-    dirty = subprocess.check_output(['git', 'diff', '--stat']).decode('ascii').strip()
+    dirty = subprocess.check_output(["git", "diff", "--stat"]).decode("ascii").strip()
 
     if dirty:
         commit_id = f"{commit_id}-dirty"
@@ -92,10 +92,6 @@ def read_requirements():
 
 
 if __name__ == "__main__":
-    if os.getcwd() != this_directory:
-        print("You must run setup.py from the `sml` dir")
-        exit(-1)
-
     pkg_exclude_list = [
         "emulations",
         "emulations.*",
@@ -116,7 +112,7 @@ if __name__ == "__main__":
         description="Secretflow Secure Machine Learning",
         long_description=long_description,
         long_description_content_type="text/markdown",
-        url="https://github.com/secretflow/spu",
+        url="https://github.com/secretflow/sml",
         packages=find_packages(exclude=pkg_exclude_list),
         install_requires=install_requires,
         extras_require={"dev": ["pylint"]},
