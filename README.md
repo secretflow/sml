@@ -53,25 +53,31 @@ and you should test the **efficiency** using `emulator`.
 
 ## Installation
 
-Pip install is the easiest way to install sml:
+You can install SML in two ways:
 
+**Option 1: Install from PyPI (Recommended)**
 ```bash
 pip install sf-sml
 ```
 
-After all these installed, you can run any test like:
+**Option 2: Install from source**
+```bash
+git clone https://github.com/secretflow/sml.git
+cd sml
+pip install -e .
+```
+
+After installation, you can run any test like:
 
 ```bash
-# run kmeans simulation
-# simulation: run program in single process
-# used for correctness test
-pytest -n auto sml/cluster/tests/kmeans_test.py
+# run unit tests
+pytest tests/cluster/kmeans_test.py  # run kmeans simulation
 
-# run kmeans emulation
-# emulation: run program with multiple processes(LAN setting)
-# or multiple dockers(WAN setting, will come soon)
-# used for efficiency test.
-python3 sml/cluster/emulations/kmeans_emul.py
+# run emulation tests
+python emulations/run_emulation.py emulations.cluster.kmeans_emul  # run kmeans emulation
+
+# list all available emulations
+python emulations/run_emulation.py --list
 ```
 
 ## Algorithm Support lists
