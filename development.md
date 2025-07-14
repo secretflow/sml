@@ -40,12 +40,11 @@ When finishing your coding work, you are supposed to do some extra work before p
 1. **Make sure your code is up-to-date**: It is often helpful to keep your local feature branch **synchronized** with
 the latest changes of the main sml repository.
 2. **Place your codes properly**: Generally speaking, for every algorithm, at least 3 files are needed
-(e.g. for kmeans, check [PR](https://github.com/secretflow/sml/pull/277/files) as an example).
-   - `kmeans.py`: implementation of algorithm or new features, it should be a **"jit-able"** program which run correctly in plaintext
+   - `<algorithm>.py`: implementation of algorithm or new features, it should be a **"jit-able"** program which run correctly in plaintext
    (same or near to output from scikit-learn).
-   - `kmeans_test.py`: a unittest python file, in which you test your program with **simulator**, then you should report the behavior
+   - `<algorithm>_test.py`: a unittest python file, in which you test your program with **simulator**, then you should report the behavior
    (like correctness or error rate) under MPC setting.
-   - `kmeans_emul.py`: similar to the above file, except you will test program with **emulator**,
+   - `<algorithm>_emul.py`: similar to the above file, except you will test program with **emulator**,
    then you can get sense of efficiency under different MPC protocols.
 3. **Other things**: there are still some small fixes to do.
    - **Add necessary doc**: your implementation may only have part features, or some changes have been made for limitation of both JAX and SPU,
