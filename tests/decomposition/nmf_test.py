@@ -14,9 +14,9 @@
 
 import os
 import sys
-import unittest
 
 import numpy as np
+import pytest
 from sklearn.decomposition import NMF as SklearnNMF
 
 import spu.libspu as libspu
@@ -28,117 +28,132 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
 from sml.decomposition.nmf import NMF
 
 
-class UnitTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        print(" ========= start test of NMF package ========= \n")
-        cls.random_seed = 0
-        np.random.seed(cls.random_seed)
-        # NMF must use FM128 now, for heavy use of non-linear & matrix operations
-        config = libspu.RuntimeConfig(
-            protocol=libspu.ProtocolKind.ABY3,
-            field=libspu.FieldType.FM128,
-            fxp_fraction_bits=30,
+@pytest.fixture(scope="module")
+def setup_test_data():
+    print(" ========= start test of NMF package ========= \n")
+    random_seed = 0
+    np.random.seed(random_seed)
+    # NMF must use FM128 now, for heavy use of non-linear & matrix operations
+    config = libspu.RuntimeConfig(
+        protocol=libspu.ProtocolKind.ABY3,
+        field=libspu.FieldType.FM128,
+        fxp_fraction_bits=30,
+    )
+    sim = spsim.Simulator(3, config)
+
+    # generate some dummy test datas
+    test_data = np.random.randint(1, 100, (100, 10)) * 1.0
+    n_samples, n_features = test_data.shape
+
+    # random matrix should be generated in plaintext.
+    n_components = 5
+    random_state = np.random.RandomState(random_seed)
+    random_A = random_state.standard_normal(size=(n_components, n_features))
+    random_B = random_state.standard_normal(size=(n_samples, n_components))
+
+    # test hyper-parameters settings
+    l1_ratio = 0.1
+    alpha_W = 0.01
+
+    yield (
+        sim,
+        test_data,
+        n_components,
+        random_seed,
+        l1_ratio,
+        alpha_W,
+        random_A,
+        random_B,
+    )
+
+    print(" ========= test of NMF package end ========= \n")
+
+
+def _nmf_test_main(
+    sim,
+    test_data,
+    n_components,
+    random_seed,
+    l1_ratio,
+    alpha_W,
+    random_A,
+    random_B,
+    plaintext=True,
+    mode="uniform",
+):
+    # uniform means model is fitted by fit_transform method
+    # seperate means model is fitted by first fit then transform
+    assert mode in ["uniform", "seperate"]
+
+    # must define here, because test may run simultaneously
+    model = (
+        SklearnNMF(
+            n_components=n_components,
+            init='random',
+            random_state=random_seed,
+            l1_ratio=l1_ratio,
+            solver="mu",  # sml only implement this solver now.
+            alpha_W=alpha_W,
         )
-        cls.sim = spsim.Simulator(3, config)
-
-        # generate some dummy test datas
-        cls.test_data = np.random.randint(1, 100, (100, 10)) * 1.0
-        n_samples, n_features = cls.test_data.shape
-
-        # random matrix should be generated in plaintext.
-        cls.n_components = 5
-        random_state = np.random.RandomState(cls.random_seed)
-        cls.random_A = random_state.standard_normal(size=(cls.n_components, n_features))
-        cls.random_B = random_state.standard_normal(size=(n_samples, cls.n_components))
-
-        # test hyper-parameters settings
-        cls.l1_ratio = 0.1
-        cls.alpha_W = 0.01
-
-    @classmethod
-    def tearDownClass(cls):
-        print(" ========= test of NMF package end ========= \n")
-
-    def _nmf_test_main(self, plaintext=True, mode="uniform"):
-        # uniform means model is fitted by fit_transform method
-        # seperate means model is fitted by first fit then transform
-        assert mode in ["uniform", "seperate"]
-
-        # must define here, because test may run simultaneously
-        model = (
-            SklearnNMF(
-                n_components=self.n_components,
-                init='random',
-                random_state=self.random_seed,
-                l1_ratio=self.l1_ratio,
-                solver="mu",  # sml only implement this solver now.
-                alpha_W=self.alpha_W,
-            )
-            if plaintext
-            else NMF(
-                n_components=self.n_components,
-                l1_ratio=self.l1_ratio,
-                alpha_W=self.alpha_W,
-                random_matrixA=self.random_A,
-                random_matrixB=self.random_B,
-            )
+        if plaintext
+        else NMF(
+            n_components=n_components,
+            l1_ratio=l1_ratio,
+            alpha_W=alpha_W,
+            random_matrixA=random_A,
+            random_matrixB=random_B,
         )
+    )
 
-        def proc(x):
-            if mode == "uniform":
-                W = model.fit_transform(x)
-            else:
-                model.fit(x)
-                W = model.transform(x)
+    def proc(x):
+        if mode == "uniform":
+            W = model.fit_transform(x)
+        else:
+            model.fit(x)
+            W = model.transform(x)
 
-            H = model.components_
-            X_reconstructed = model.inverse_transform(W)
-            err = model.reconstruction_err_
+        H = model.components_
+        X_reconstructed = model.inverse_transform(W)
+        err = model.reconstruction_err_
 
-            return W, H, X_reconstructed, err
+        return W, H, X_reconstructed, err
 
-        run_func = (
-            proc
-            if plaintext
-            else spsim.sim_jax(
-                self.sim,
-                proc,
-            )
-        )
+    run_func = proc if plaintext else spsim.sim_jax(sim, proc)
 
-        return run_func(self.test_data)
-
-    def test_nmf_uniform(self):
-        print("==============  start test of nmf uniform ==============\n")
-
-        W, H, X_reconstructed, err = self._nmf_test_main(False, "uniform")
-        W_sk, H_sk, X_reconstructed_sk, err_sk = self._nmf_test_main(True, "uniform")
-
-        np.testing.assert_allclose(err, err_sk, rtol=1, atol=1e-1)
-        np.testing.assert_allclose(W, W_sk, rtol=1, atol=1e-1)
-        np.testing.assert_allclose(H, H_sk, rtol=1, atol=1e-1)
-        np.testing.assert_allclose(
-            X_reconstructed, X_reconstructed_sk, rtol=1, atol=1e-1
-        )
-
-        print("==============  nmf uniform test pass  ==============\n")
-
-    def test_nmf_seperate(self):
-        print("==============  start test of nmf seperate ==============\n")
-
-        W, H, X_reconstructed, err = self._nmf_test_main(False, "seperate")
-        W_sk, H_sk, X_reconstructed_sk, err_sk = self._nmf_test_main(True, "seperate")
-
-        np.testing.assert_allclose(err, err_sk, rtol=1, atol=1e-1)
-        np.testing.assert_allclose(W, W_sk, rtol=1, atol=1e-1)
-        np.testing.assert_allclose(H, H_sk, rtol=1, atol=1e-1)
-        np.testing.assert_allclose(
-            X_reconstructed, X_reconstructed_sk, rtol=1, atol=1e-1
-        )
-
-        print("==============  nmf seperate test pass ==============\n")
+    return run_func(test_data)
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_nmf_uniform(setup_test_data):
+    print("==============  start test of nmf uniform ==============\n")
+
+    W, H, X_reconstructed, err = _nmf_test_main(
+        *setup_test_data, plaintext=False, mode="uniform"
+    )
+    W_sk, H_sk, X_reconstructed_sk, err_sk = _nmf_test_main(
+        *setup_test_data, plaintext=True, mode="uniform"
+    )
+
+    assert np.allclose(err, err_sk, rtol=1, atol=1e-1)
+    assert np.allclose(W, W_sk, rtol=1, atol=1e-1)
+    assert np.allclose(H, H_sk, rtol=1, atol=1e-1)
+    assert np.allclose(X_reconstructed, X_reconstructed_sk, rtol=1, atol=1e-1)
+
+    print("==============  nmf uniform test pass  ==============\n")
+
+
+def test_nmf_seperate(setup_test_data):
+    print("==============  start test of nmf seperate ==============\n")
+
+    W, H, X_reconstructed, err = _nmf_test_main(
+        *setup_test_data, plaintext=False, mode="seperate"
+    )
+    W_sk, H_sk, X_reconstructed_sk, err_sk = _nmf_test_main(
+        *setup_test_data, plaintext=True, mode="seperate"
+    )
+
+    assert np.allclose(err, err_sk, rtol=1, atol=1e-1)
+    assert np.allclose(W, W_sk, rtol=1, atol=1e-1)
+    assert np.allclose(H, H_sk, rtol=1, atol=1e-1)
+    assert np.allclose(X_reconstructed, X_reconstructed_sk, rtol=1, atol=1e-1)
+
+    print("==============  nmf seperate test pass ==============\n")
