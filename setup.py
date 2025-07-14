@@ -92,6 +92,10 @@ def read_requirements():
 
 
 if __name__ == "__main__":
+    if os.getcwd() != this_directory:
+        print("You must run setup.py from the `sml` dir")
+        exit(-1)
+
     pkg_exclude_list = [
         "emulations",
         "emulations.*",
