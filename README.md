@@ -53,26 +53,25 @@ and you should test the **efficiency** using `emulator`.
 
 ## Installation
 
-First, you should clone the spu repo to your local disk:
+Pip install is the easiest way to install sml:
 
 ```bash
-git clone https://github.com/secretflow/spu.git
+pip install sf-sml
 ```
 
-Some [Prerequisites](../CONTRIBUTING.md#build) are required according to your system.
 After all these installed, you can run any test like:
 
 ```bash
 # run kmeans simulation
 # simulation: run program in single process
 # used for correctness test
-pytest -n auto sml/sml/cluster/tests/kmeans_test.py
+pytest -n auto sml/cluster/tests/kmeans_test.py
 
 # run kmeans emulation
 # emulation: run program with multiple processes(LAN setting)
 # or multiple dockers(WAN setting, will come soon)
 # used for efficiency test.
-python3 sml/sml/cluster/emulations/kmeans_emul.py
+python3 sml/cluster/emulations/kmeans_emul.py
 ```
 
 ## Algorithm Support lists
