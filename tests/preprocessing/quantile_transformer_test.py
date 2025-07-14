@@ -18,10 +18,10 @@ import warnings
 import jax.numpy as jnp
 import jax.random as random
 import numpy as np
-from sklearn.preprocessing import QuantileTransformer as SklearnQuantileTransformer
-
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
+from sklearn.preprocessing import QuantileTransformer as SklearnQuantileTransformer
+
 from sml.preprocessing.quantile_transformer import QuantileTransformer
 
 
@@ -43,7 +43,7 @@ class UnitTests(unittest.TestCase):
 
         def proc(X):
             transformer = QuantileTransformer(
-                n_quantiles=50, output_distribution='uniform'
+                n_quantiles=50, output_distribution="uniform"
             )
             transformer.fit(X)
             X_transformed = transformer.transform(X)
@@ -52,7 +52,7 @@ class UnitTests(unittest.TestCase):
 
         X_transformed_spu, X_inversed_spu = spsim.sim_jax(self.sim, proc)(X_plain)
         sklearn_transformer = SklearnQuantileTransformer(
-            n_quantiles=50, output_distribution='uniform', random_state=42
+            n_quantiles=50, output_distribution="uniform", random_state=42
         )
         X_transformed_sklearn = sklearn_transformer.fit_transform(np.array(X_plain))
         X_inversed_sklearn = sklearn_transformer.inverse_transform(
@@ -80,7 +80,7 @@ class UnitTests(unittest.TestCase):
 
         def proc(X):
             transformer = QuantileTransformer(
-                n_quantiles=50, output_distribution='uniform'
+                n_quantiles=50, output_distribution="uniform"
             )
             X_transformed = transformer.fit_transform(X)
             X_inversed = transformer.inverse_transform(X_transformed)
