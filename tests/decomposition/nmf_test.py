@@ -133,7 +133,7 @@ def test_nmf_uniform(setup_test_data):
         *setup_test_data, plaintext=True, mode="uniform"
     )
 
-    assert np.allclose(err, err_sk, rtol=1, atol=1e-1)
+    np.testing.assert_allclose(err, err_sk, rtol=1, atol=1e-1)
     assert np.allclose(W, W_sk, rtol=1, atol=1e-1)
     assert np.allclose(H, H_sk, rtol=1, atol=1e-1)
     assert np.allclose(X_reconstructed, X_reconstructed_sk, rtol=1, atol=1e-1)
