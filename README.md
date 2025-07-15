@@ -86,7 +86,7 @@ See [support lists](./support_lists.md) for all our algorithms and features we s
 
 ## Development
 
-See [development](./development.md) if you would like to contribute to SML.
+See [development](./CONTRIBUTING.md) if you would like to contribute to SML.
 
 ## FAQ
 

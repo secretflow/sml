@@ -65,7 +65,7 @@ def emul_quantile(mode=emulation.Mode.MULTIPROCESS):
 
         # compare with sklearn
         quantile_sklearn = SklearnQuantileRegressor(
-            quantile=0.2, alpha=0.1, fit_intercept=True, solver='highs'
+            quantile=0.2, alpha=0.1, fit_intercept=True, solver="highs"
         )
         start = time.time()
         quantile_sklearn_fit = quantile_sklearn.fit(X, y)

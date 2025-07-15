@@ -28,7 +28,7 @@ CONFIG_FILE = emulation.CLUSTER_ABY3_3PC
 def emul_tree(mode=emulation.Mode.MULTIPROCESS):
     def proc_wrapper(max_depth=2, n_labels=3):
         dt = sml_dtc(
-            max_depth=max_depth, criterion='gini', splitter='best', n_labels=n_labels
+            max_depth=max_depth, criterion="gini", splitter="best", n_labels=n_labels
         )
 
         def proc(X, y):
@@ -66,7 +66,7 @@ def emul_tree(mode=emulation.Mode.MULTIPROCESS):
 
         # compare with sklearn
         clf = DecisionTreeClassifier(
-            max_depth=MAX_DEPTH, criterion='gini', splitter='best', random_state=None
+            max_depth=MAX_DEPTH, criterion="gini", splitter="best", random_state=None
         )
         start = time.time()
         clf = clf.fit(X, y)
@@ -82,7 +82,7 @@ def emul_tree(mode=emulation.Mode.MULTIPROCESS):
         start = time.time()
         result = emulator.run(proc)(X_spu, y_spu)
         end = time.time()
-        score_encrpted = jnp.sum((result == y)) / n_samples
+        score_encrpted = jnp.sum(result == y) / n_samples
         print(f"Running time in SPU: {end - start:.2f}s")
 
         # print acc

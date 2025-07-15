@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import jax.numpy as jnp
+import spu.libspu as libspu
+import spu.utils.simulation as spsim
 from sklearn.datasets import load_iris
 from sklearn.ensemble import RandomForestClassifier
 
-import spu.libspu as libspu
-import spu.utils.simulation as spsim
 from sml.ensemble.forest import RandomForestClassifier as sml_rfc
 
 MAX_DEPTH = 3
@@ -78,7 +78,7 @@ def test_forest():
     rf = RandomForestClassifier(
         n_estimators=3,
         max_features="log2",
-        criterion='gini',
+        criterion="gini",
         max_depth=MAX_DEPTH,
         bootstrap=True,
         max_samples=0.7,
@@ -91,8 +91,8 @@ def test_forest():
     proc = proc_wrapper(
         n_estimators=3,
         max_features="log2",
-        criterion='gini',
-        splitter='best',
+        criterion="gini",
+        splitter="best",
         max_depth=3,
         bootstrap=True,
         max_samples=0.7,
@@ -101,7 +101,7 @@ def test_forest():
 
     result = spsim.sim_jax(sim, proc)(X, y)
 
-    score_encrpted = jnp.mean((result == y))
+    score_encrpted = jnp.mean(result == y)
 
     # print acc
     print(f"Accuracy in SKlearn: {score_plain}")

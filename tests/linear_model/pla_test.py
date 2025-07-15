@@ -16,10 +16,10 @@
 import jax.numpy as jnp
 import pandas as pd
 import sklearn.linear_model as sk
-from sklearn.datasets import load_iris
-
 import spu.libspu as libspu  # type: ignore
 import spu.utils.simulation as spsim
+from sklearn.datasets import load_iris
+
 from sml.linear_model.pla import Perceptron
 
 
@@ -30,7 +30,7 @@ def test_pla():
         model = Perceptron(
             max_iter=20,
             eta0=1.0,
-            penalty='elasticnet',
+            penalty="elasticnet",
             alpha=0.001,
             fit_intercept=True,
             l1_ratio=0.7,
@@ -45,9 +45,9 @@ def test_pla():
         iris = load_iris()
         df = pd.DataFrame(
             iris.data,
-            columns=['sepal length', 'sepal width', 'petal length', 'petal width'],
+            columns=["sepal length", "sepal width", "petal length", "petal width"],
         )
-        df['label'] = iris.target
+        df["label"] = iris.target
 
         # only use sepal length and sepal width features
         # 100 samples
@@ -69,19 +69,19 @@ def test_pla():
     sk_pla = sk.Perceptron(
         max_iter=20,
         eta0=1.0,
-        penalty='elasticnet',
+        penalty="elasticnet",
         alpha=0.001,
         l1_ratio=0.7,
         fit_intercept=True,
     )
     result_sk = sk_pla.fit(x, y).predict(x)
     result_sk = result_sk.reshape(result_sk.shape[0], 1)
-    acc_sk = jnp.sum((result_sk == y)) / n_samples * 100
+    acc_sk = jnp.sum(result_sk == y) / n_samples * 100
 
     # run with spu
     result = spsim.sim_jax(sim, proc)(x, y)
     result = result.reshape(result.shape[0], 1)
-    acc_ = jnp.sum((result == y)) / n_samples * 100
+    acc_ = jnp.sum(result == y) / n_samples * 100
 
     # print acc
     print(f"Accuracy in SKlearn: {acc_sk:.2f}%")

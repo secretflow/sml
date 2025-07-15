@@ -16,10 +16,10 @@ import time
 import jax
 import jax.numpy as jnp
 import numpy as np
-from sklearn.neighbors import kneighbors_graph
-
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
+from sklearn.neighbors import kneighbors_graph
+
 from sml.manifold.kneighbors import mpc_kneighbors_graph
 
 

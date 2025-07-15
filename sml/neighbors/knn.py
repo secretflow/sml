@@ -24,7 +24,7 @@ class KNNClassifer:
     def __init__(
         self,
         n_neighbors=5,
-        weights='uniform',
+        weights="uniform",
         n_classes=None,
         metric=None,
         metric_params={},
@@ -54,7 +54,7 @@ class KNNClassifer:
             raise ValueError("n_neighbors should be a positive integer.")
 
         # Validate weights
-        if weights not in ['uniform', 'distance']:
+        if weights not in ["uniform", "distance"]:
             raise ValueError("weights should be either 'uniform' or 'distance'.")
 
         # Validate n_classes
@@ -72,7 +72,7 @@ class KNNClassifer:
         if metric is None:
             self.metric_func = jnp.linalg.norm
             if metric_params is None:
-                metric_params = {'ord': 2}
+                metric_params = {"ord": 2}
         else:
             # Check if the metric is callable
             if metric not in metic_func_map:
@@ -134,9 +134,9 @@ class KNNClassifer:
         Returns:
         - array-like: Weights for each neighbor.
         """
-        if self.weights == 'uniform':
+        if self.weights == "uniform":
             return jnp.ones_like(distances)
-        elif self.weights == 'distance':
+        elif self.weights == "distance":
             return 1.0 / (distances + 1e-5)
         else:
             raise ValueError(
@@ -173,7 +173,7 @@ class KNNClassifer:
             return prediction
 
         return lax.cond(
-            self.weights == 'uniform', predict_uniform, predict_distance, operand=None
+            self.weights == "uniform", predict_uniform, predict_distance, operand=None
         )
 
     def predict(self, X):

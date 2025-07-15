@@ -12,16 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import jax.numpy as jnp
-from sklearn.linear_model import Ridge as skRidge
-
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
+from sklearn.linear_model import Ridge as skRidge
+
 from sml.linear_model.ridge import Ridge
 from sml.utils.dataset_utils import load_open_source_datasets
 
 
 def test_ridge():
-    solver_list = ['cholesky', 'svd']
+    solver_list = ["cholesky", "svd"]
     print(f"solver_list={solver_list}")
 
     sim = spsim.Simulator.simple(3, libspu.ProtocolKind.ABY3, libspu.FieldType.FM64)

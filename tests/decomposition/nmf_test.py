@@ -17,13 +17,12 @@ import sys
 
 import numpy as np
 import pytest
-from sklearn.decomposition import NMF as SklearnNMF
-
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
+from sklearn.decomposition import NMF as SklearnNMF
 
 # Add the sml directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
 from sml.decomposition.nmf import NMF
 
@@ -89,7 +88,7 @@ def _nmf_test_main(
     model = (
         SklearnNMF(
             n_components=n_components,
-            init='random',
+            init="random",
             random_state=random_seed,
             l1_ratio=l1_ratio,
             solver="mu",  # sml only implement this solver now.

@@ -15,13 +15,13 @@
 import time
 
 import jax.numpy as jnp
+import spu.libspu as libspu  # type: ignore
+import spu.utils.simulation as spsim
 from sklearn import datasets
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 
-import spu.libspu as libspu  # type: ignore
-import spu.utils.simulation as spsim
 from sml.svm.svm import SVM
 
 
@@ -62,7 +62,7 @@ def test_svm():
 
     # Compare with sklearn
     print("sklearn")
-    clf_svc = SVC(C=1.0, kernel="rbf", gamma='scale', tol=1e-3)
+    clf_svc = SVC(C=1.0, kernel="rbf", gamma="scale", tol=1e-3)
     result2 = clf_svc.fit(X_train, y_train).predict(X_test)
     print("result\n", (result2 > 0).astype(int))
     print("accuracy score", accuracy_score((result2 > 0).astype(int), y_test))

@@ -21,7 +21,7 @@ import jax.random as random
 import numpy as np
 from sklearn.preprocessing import QuantileTransformer as SklearnQuantileTransformer
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 import sml.utils.emulation as emulation
 from sml.preprocessing.quantile_transformer import QuantileTransformer
 
@@ -85,7 +85,7 @@ def test_quantile_transformer(mode: emulation.Mode = emulation.Mode.MULTIPROCESS
         )
         print(f"Sklearn transform comparison ({output_dist}) PASSED.")
 
-        if output_dist == 'uniform':
+        if output_dist == "uniform":
             assert jnp.all(
                 (X_transformed_spu >= -1e-6) & (X_transformed_spu <= 1 + 1e-6)
             ), "Uniform output out of [0, 1] range"
@@ -106,7 +106,7 @@ def test_quantile_transformer(mode: emulation.Mode = emulation.Mode.MULTIPROCESS
     def emul_uniform_test(emulator, X_plaintext):
         """Runs the emulation test specifically for the 'uniform' distribution."""
         print("\n===== Running Test: Uniform Distribution =====")
-        output_dist = 'uniform'
+        output_dist = "uniform"
 
         print("Sealing data for uniform test...")
         X_spu = emulator.seal(X_plaintext)

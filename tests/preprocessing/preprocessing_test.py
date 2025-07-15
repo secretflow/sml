@@ -18,6 +18,7 @@ import pytest
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
 from sklearn import preprocessing
+
 from sml.preprocessing.preprocessing import (
     Binarizer,
     KBinsDiscretizer,
@@ -147,9 +148,7 @@ def test_robustscaler(sim):
     param_combinations = [(True, True), (True, False), (False, True)]
 
     for with_centering, with_scaling in param_combinations:
-        print(
-            f"\nTesting with_centering={with_centering}, with_scaling={with_scaling}"
-        )
+        print(f"\nTesting with_centering={with_centering}, with_scaling={with_scaling}")
 
         def robustscale(X, Y):
             transformer = RobustScaler(
@@ -328,9 +327,7 @@ def test_kbinsdiscretizer_uniform(sim):
         inv_transformed = transformer.inverse_transform(transformed)
         return transformed, inv_transformed
 
-    X = jnp.array(
-        [[-2, 1, -4, -1], [-1, 2, -3, -0.5], [0, 3, -2, 0.5], [1, 4, -1, 2]]
-    )
+    X = jnp.array([[-2, 1, -4, -1], [-1, 2, -3, -0.5], [0, 3, -2, 0.5], [1, 4, -1, 2]])
 
     transformer = preprocessing.KBinsDiscretizer(
         n_bins=5, encode="ordinal", strategy="uniform", subsample=None

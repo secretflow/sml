@@ -19,7 +19,6 @@ import pandas as pd
 from sklearn import datasets as sk_datasets
 from sklearn.model_selection import train_test_split
 
-
 from sml.utils.utils import get_logger
 
 logger = get_logger(__name__)
@@ -103,7 +102,7 @@ def preprocess_dataframe(
         if nan_count == 0:
             continue
         if nan_count >= nrows * 0.3:
-            df[column + '_is_nan'] = df[column].isna().astype(int)
+            df[column + "_is_nan"] = df[column].isna().astype(int)
         elif nan_count > 0:
             mode_value = df[column].mode()[0]
             df[column] = df[column].fillna(mode_value)
@@ -131,14 +130,14 @@ def preprocess_dataframe(
             df[column] = pd.cut(df[column], bins=bin_nums[ix], labels=False)
             continue
 
-        if df[column].dtype == 'O':
+        if df[column].dtype == "O":
             if un > categ_drop_thres:  # if too many categories, drop directly
                 df = df.drop(columns=[column])
             else:
                 df = pd.get_dummies(df, columns=[column], drop_first=True, dtype=int)
-        elif df[column].dtype == 'float':
+        elif df[column].dtype == "float":
             pass  # leave float columns
-        elif df[column].dtype == 'int':
+        elif df[column].dtype == "int":
             # if unique values = 2, map to 0,1
             if un == 2:
                 uni = np.sort(df[column].unique())
@@ -642,7 +641,7 @@ def fetch_and_preprocess_breast_cancer(
     test_size=0.2, random_state=107, need_split_train_test=True
 ):
     ds = sk_datasets.load_breast_cancer()
-    x, y = ds['data'], ds['target']
+    x, y = ds["data"], ds["target"]
     x = (x - np.min(x)) / (np.max(x) - np.min(x))
 
     if need_split_train_test:

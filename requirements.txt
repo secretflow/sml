@@ -1,3 +1,0 @@
-spu==0.9.4.dev20250618
-pandas==1.5.3
-scikit-learn==1.5.2

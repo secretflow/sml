@@ -19,7 +19,7 @@ import numpy as np
 from sklearn.decomposition import NMF as SklearnNMF
 
 # Add the sml directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 import sml.utils.emulation as emulation
 
 from ..nmf import NMF
@@ -67,7 +67,7 @@ def test_nmf(mode: emulation.Mode.MULTIPROCESS):
         # sklearn
         model = SklearnNMF(
             n_components=n_components,
-            init='random',
+            init="random",
             random_state=random_seed,
             l1_ratio=l1_ratio,
             solver="mu",
@@ -125,7 +125,7 @@ def test_nmf(mode: emulation.Mode.MULTIPROCESS):
         # sklearn_seperate
         model = SklearnNMF(
             n_components=n_components,
-            init='random',
+            init="random",
             random_state=random_seed,
             l1_ratio=l1_ratio,
             solver="mu",

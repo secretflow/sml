@@ -22,10 +22,11 @@ import pytest
 from sklearn.datasets import make_classification, make_regression
 from sklearn.model_selection import KFold, StratifiedKFold
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
+
 from sml.ensemble.adaboost import AdaBoostClassifier
 from sml.ensemble.forest import RandomForestClassifier
 from sml.gaussian_process._gpc import GaussianProcessClassifier
@@ -80,7 +81,7 @@ def setup_data():
 
     from sml.preprocessing.preprocessing import KBinsDiscretizer
 
-    binner = KBinsDiscretizer(n_bins=2, strategy='uniform')
+    binner = KBinsDiscretizer(n_bins=2, strategy="uniform")
     X_clf_bin_binary_features = binner.fit_transform(X_clf_bin)
 
     X_reg, y_reg = make_regression(
@@ -125,15 +126,15 @@ def _run_test(
     scoring,
     task_type,
     refit=False,
-    cv_type='iterable',
+    cv_type="iterable",
 ):
     print(f"\n--- Testing GridSearchCV with {model_name} ---")
 
     sim = setup_data["sim"]
     cv_folds = setup_data["cv_folds"]
 
-    if cv_type == 'iterable':
-        if task_type == 'classification':
+    if cv_type == "iterable":
+        if task_type == "classification":
             skf = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=42)
             cv_splits = [
                 (jnp.array(train_idx), jnp.array(test_idx))
@@ -146,7 +147,7 @@ def _run_test(
                 for train_idx, test_idx in kf.split(X)
             ]
         cv = cv_splits
-    elif cv_type == 'int':
+    elif cv_type == "int":
         cv = cv_folds
     else:
         raise ValueError("cv_type must be 'iterable' or 'int'")
@@ -194,102 +195,102 @@ def _run_test(
 
 def test_gridsearch_logistic(setup_data):
     estimator = LogisticRegression(epochs=3, batch_size=16, class_labels=[0, 1])
-    param_grid = {'learning_rate': [0.01, 0.1, 0.05], 'C': [1.0, 2.0, 5.0]}
+    param_grid = {"learning_rate": [0.01, 0.1, 0.05], "C": [1.0, 2.0, 5.0]}
     _run_test(
         setup_data,
         "LogisticRegression with cv",
         estimator,
         param_grid,
-        setup_data['X_clf_bin'],
-        setup_data['y_clf_bin_reshaped'],
-        'accuracy',
-        'classification',
+        setup_data["X_clf_bin"],
+        setup_data["y_clf_bin_reshaped"],
+        "accuracy",
+        "classification",
         refit=True,
     )
 
 
 def test_gridsearch_knn(setup_data):
-    estimator = KNNClassifer(n_classes=setup_data['n_classes_binary'])
-    param_grid = {'n_neighbors': [2, 3, 4, 5]}
+    estimator = KNNClassifer(n_classes=setup_data["n_classes_binary"])
+    param_grid = {"n_neighbors": [2, 3, 4, 5]}
     _run_test(
         setup_data,
         "KNNClassifier with cv as iterable",
         estimator,
         param_grid,
-        setup_data['X_clf_bin'],
-        setup_data['y_clf_bin'],
-        'accuracy',
-        'classification',
+        setup_data["X_clf_bin"],
+        setup_data["y_clf_bin"],
+        "accuracy",
+        "classification",
         refit=True,
     )
 
 
 def test_gridsearch_gnb(setup_data):
-    classes = jnp.unique(setup_data['y_clf_bin'])
+    classes = jnp.unique(setup_data["y_clf_bin"])
     estimator = GaussianNB(classes_=classes, var_smoothing=1e-7)
-    param_grid = {'var_smoothing': [1e-6, 2e-6, 1e-5]}
+    param_grid = {"var_smoothing": [1e-6, 2e-6, 1e-5]}
     _run_test(
         setup_data,
         "GaussianNB with cv as int",
         estimator,
         param_grid,
-        setup_data['X_clf_bin'],
-        setup_data['y_clf_bin'],
-        'accuracy',
-        'classification',
+        setup_data["X_clf_bin"],
+        setup_data["y_clf_bin"],
+        "accuracy",
+        "classification",
         refit=True,
-        cv_type='int',
+        cv_type="int",
     )
 
 
 def test_gridsearch_perceptron(setup_data):
     estimator = Perceptron(max_iter=10)
-    param_grid = {'alpha': [0.0001, 0.001], 'eta0': [0.01, 0.1, 1.0]}
+    param_grid = {"alpha": [0.0001, 0.001], "eta0": [0.01, 0.1, 1.0]}
     _run_test(
         setup_data,
         "Perceptron with cv as iterable",
         estimator,
         param_grid,
-        setup_data['X_clf_bin'],
-        setup_data['y_clf_bin_negpos_reshaped'],
-        'accuracy',
-        'classification',
+        setup_data["X_clf_bin"],
+        setup_data["y_clf_bin_negpos_reshaped"],
+        "accuracy",
+        "classification",
         refit=True,
     )
 
 
 def test_gridsearch_svm(setup_data):
     estimator = SVM(max_iter=10, C=1.0)
-    param_grid = {'C': [0.5, 1.0, 5.0]}
+    param_grid = {"C": [0.5, 1.0, 5.0]}
     _run_test(
         setup_data,
         "SVM with cv as int",
         estimator,
         param_grid,
-        setup_data['X_clf_bin'],
-        setup_data['y_clf_bin_negpos'],
-        'accuracy',
-        'classification',
+        setup_data["X_clf_bin"],
+        setup_data["y_clf_bin_negpos"],
+        "accuracy",
+        "classification",
         refit=True,
-        cv_type='int',
+        cv_type="int",
     )
 
 
 @pytest.mark.skip("GPC is often slow to settings")
 def test_gridsearch_gpc(setup_data):
     estimator = GaussianProcessClassifier(
-        max_iter_predict=5, n_classes_=setup_data['n_classes_binary']
+        max_iter_predict=5, n_classes_=setup_data["n_classes_binary"]
     )
-    param_grid = {'max_iter_predict': [1, 3, 5]}
+    param_grid = {"max_iter_predict": [1, 3, 5]}
     _run_test(
         setup_data,
         "GaussianProcessClassifier with cv as iterable",
         estimator,
         param_grid,
-        setup_data['X_clf_bin'],
-        setup_data['y_clf_bin'],
-        'accuracy',
-        'classification',
+        setup_data["X_clf_bin"],
+        setup_data["y_clf_bin"],
+        "accuracy",
+        "classification",
         refit=True,
     )
 
@@ -300,21 +301,21 @@ def test_gridsearch_sgdclassifier(setup_data):
         epochs=3,
         learning_rate=0.1,
         batch_size=16,
-        reg_type='logistic',
-        penalty='l2',
+        reg_type="logistic",
+        penalty="l2",
     )
-    param_grid = {'learning_rate': [0.1, 0.05], 'l2_norm': [0.01, 0.1]}
+    param_grid = {"learning_rate": [0.1, 0.05], "l2_norm": [0.01, 0.1]}
     _run_test(
         setup_data,
         "SGDClassifier with cv as int",
         estimator,
         param_grid,
-        setup_data['X_clf_bin'],
-        setup_data['y_clf_bin_reshaped'],
-        'accuracy',
-        'classification',
+        setup_data["X_clf_bin"],
+        setup_data["y_clf_bin_reshaped"],
+        "accuracy",
+        "classification",
         refit=True,
-        cv_type='int',
+        cv_type="int",
     )
 
 
@@ -324,20 +325,20 @@ def test_gridsearch_sgdclassifier(setup_data):
 def test_gridsearch_decisiontree(setup_data):
     estimator = DecisionTreeClassifier(
         max_depth=3,
-        n_labels=setup_data['n_classes_binary'],
-        criterion='gini',
-        splitter='best',
+        n_labels=setup_data["n_classes_binary"],
+        criterion="gini",
+        splitter="best",
     )
-    param_grid = {'max_depth': [2, 3, 4]}
+    param_grid = {"max_depth": [2, 3, 4]}
     _run_test(
         setup_data,
         "DecisionTreeClassifier with cv as iterable",
         estimator,
         param_grid,
-        setup_data['X_clf_bin_binary_features'],
-        setup_data['y_clf_bin'],
-        'accuracy',
-        'classification',
+        setup_data["X_clf_bin_binary_features"],
+        setup_data["y_clf_bin"],
+        "accuracy",
+        "classification",
         refit=True,
     )
 
@@ -349,23 +350,23 @@ def test_gridsearch_randomforest(setup_data):
     estimator = RandomForestClassifier(
         n_estimators=3,
         max_depth=3,
-        n_labels=setup_data['n_classes_binary'],
-        criterion='gini',
-        splitter='best',
+        n_labels=setup_data["n_classes_binary"],
+        criterion="gini",
+        splitter="best",
         max_features=0.5,
         bootstrap=False,
         max_samples=None,
     )
-    param_grid = {'max_depth': [2, 3], 'n_estimators': [2, 4]}
+    param_grid = {"max_depth": [2, 3], "n_estimators": [2, 4]}
     _run_test(
         setup_data,
         "RandomForestClassifier with cv",
         estimator,
         param_grid,
-        setup_data['X_clf_bin_binary_features'],
-        setup_data['y_clf_bin'],
-        'accuracy',
-        'classification',
+        setup_data["X_clf_bin_binary_features"],
+        setup_data["y_clf_bin"],
+        "accuracy",
+        "classification",
         refit=True,
     )
 
@@ -376,59 +377,59 @@ def test_gridsearch_randomforest(setup_data):
 def test_gridsearch_adaboost(setup_data):
     base_estimator = DecisionTreeClassifier(
         max_depth=1,
-        n_labels=setup_data['n_classes_binary'],
-        criterion='gini',
-        splitter='best',
+        n_labels=setup_data["n_classes_binary"],
+        criterion="gini",
+        splitter="best",
     )
     estimator = AdaBoostClassifier(
         estimator=base_estimator,
         n_estimators=3,
         learning_rate=1.0,
-        algorithm='discrete',
+        algorithm="discrete",
     )
-    param_grid = {'n_estimators': [2, 4]}
+    param_grid = {"n_estimators": [2, 4]}
     _run_test(
         setup_data,
         "AdaBoostClassifier with cv as iterable",
         estimator,
         param_grid,
-        setup_data['X_clf_bin_binary_features'],
-        setup_data['y_clf_bin'],
-        'accuracy',
-        'classification',
+        setup_data["X_clf_bin_binary_features"],
+        setup_data["y_clf_bin"],
+        "accuracy",
+        "classification",
         refit=True,
     )
 
 
 def test_gridsearch_ridge(setup_data):
-    estimator = Ridge(solver='cholesky')
-    param_grid = {'alpha': [0.1, 1.0, 10.0]}
+    estimator = Ridge(solver="cholesky")
+    param_grid = {"alpha": [0.1, 1.0, 10.0]}
     _run_test(
         setup_data,
         "Ridge with cv as int",
         estimator,
         param_grid,
-        setup_data['X_reg'],
-        setup_data['y_reg_reshaped'],
-        'r2',
-        'regression',
+        setup_data["X_reg"],
+        setup_data["y_reg_reshaped"],
+        "r2",
+        "regression",
         refit=True,
-        cv_type='int',
+        cv_type="int",
     )
 
 
 def test_gridsearch_glm(setup_data):
     estimator = _GeneralizedLinearRegressor(max_iter=10)
-    param_grid = {'alpha': [0.0, 0.1, 0.2]}
+    param_grid = {"alpha": [0.0, 0.1, 0.2]}
     _run_test(
         setup_data,
         "GeneralizedLinearRegressor with cv as iterable",
         estimator,
         param_grid,
-        setup_data['X_reg'],
-        setup_data['y_reg'],
-        'neg_mean_squared_error',
-        'regression',
+        setup_data["X_reg"],
+        setup_data["y_reg"],
+        "neg_mean_squared_error",
+        "regression",
         refit=True,
     )
 
@@ -438,16 +439,16 @@ def test_gridsearch_glm(setup_data):
 )
 def test_gridsearch_quantile(setup_data):
     estimator = QuantileRegressor(max_iter=20, lr=0.05)
-    param_grid = {'quantile': [0.25, 0.5, 0.75], 'alpha': [0.1, 0.5]}
+    param_grid = {"quantile": [0.25, 0.5, 0.75], "alpha": [0.1, 0.5]}
     _run_test(
         setup_data,
         "QuantileRegressor with cv as int",
         estimator,
         param_grid,
-        setup_data['X_reg'],
-        setup_data['y_reg'],
-        'r2',
-        'regression',
+        setup_data["X_reg"],
+        setup_data["y_reg"],
+        "r2",
+        "regression",
         refit=True,
-        cv_type='int',
+        cv_type="int",
     )

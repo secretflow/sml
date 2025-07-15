@@ -17,7 +17,7 @@ import jax.numpy as jnp
 
 
 class DecisionTreeClassifier:
-    """A decision tree classifier based on [GTree](https://arxiv.org/abs/2305.00645).
+    r"""A decision tree classifier based on [GTree](https://arxiv.org/abs/2305.00645).
 
     Adopting a MPC-based linear scan method (i.e. oblivious_array_access), GTree
     designs a new GPU-friendly oblivious decision tree training protocol, which is
@@ -62,13 +62,13 @@ class DecisionTreeClassifier:
         return odti(X, self.T, self.max_depth)
 
 
-'''
+"""
 The protocols of GTree.
-'''
+"""
 
 
 def oblivious_array_access(array, index):
-    '''
+    """
     Extract elements from array according to index.
 
     If array is 1D, then output [array[i] for i in index].
@@ -76,7 +76,7 @@ def oblivious_array_access(array, index):
 
     If array is 2D, then output [[array[j, i] for i in index] for j in range(array.shape[0])].
     e.g. array = [[1, 2, 3], [4, 5, 6]], index_array = [0, 2], output = [[1, 3], [4, 6]].
-    '''
+    """
     # (n_array)
     count_array = jnp.arange(0, array.shape[-1])
     # (n_array, n_index)
@@ -98,11 +98,11 @@ def oblivious_array_access(array, index):
 
 
 def oaa_elementwise(array, index_array):
-    '''
+    """
     Given index_array, output [array[i, index[i]] for i in range(len(array))].
 
     e.g.: array = [[1, 2, 3], [4, 5, 6]], index = [0, 2], output = [1, 6].
-    '''
+    """
     assert index_array.shape[0] == array.shape[0], "n_arrays must be equal to n_index."
     assert len(array.shape) == 2, "OAAE protocol only supports 2D array."
     count_array = jnp.arange(0, array.shape[-1])
@@ -116,7 +116,7 @@ def oaa_elementwise(array, index_array):
 
 # def oblivious_learning(X, y, T, F, M, Cn, h):
 def oblivious_learning(X, y, T, F, M, h, Cn, n_labels, sample_weight=None):
-    '''partition the data and count the number of data samples.
+    """partition the data and count the number of data samples.
 
     params:
         D:  data samples, which is splitted into X, y.  X: (n_samples, n_features), y: (n_samples, 1).
@@ -126,7 +126,7 @@ def oblivious_learning(X, y, T, F, M, h, Cn, n_labels, sample_weight=None):
         M:  which leave node does D[i] belongs to (for level h-1).  (n_samples)
         Cn: statical information of the data samples. (n_leaves, n_labels+1, 2*n_features)
         h:  int, current depth of the tree.
-    '''
+    """
     # line 1-5, partition the datas into new leaves.
     n_d, n_f = X.shape
     n_h = 2**h
@@ -204,7 +204,7 @@ def oblivious_learning(X, y, T, F, M, h, Cn, n_labels, sample_weight=None):
 
 
 def oblivious_heuristic_computation(Cn, gamma, F, h, n_labels):
-    '''Compute gini index, find the best feature, and update F.
+    """Compute gini index, find the best feature, and update F.
 
     params:
         Cn:         statical information of the data samples. (n_leaves, n_labels+1, 2*n_features)
@@ -213,7 +213,7 @@ def oblivious_heuristic_computation(Cn, gamma, F, h, n_labels):
                     0 for internal, 1 for leaf, 2 for dummy.
         h:          int, current depth of the tree.
         n_labels:   int, number of labels.
-    '''
+    """
     n_leaves = Cn.shape[0]
     n_features = gamma.shape[1]
     Ds0 = Cn[:, 0, 0::2]
@@ -253,7 +253,7 @@ def oblivious_heuristic_computation(Cn, gamma, F, h, n_labels):
 
 
 def oblivious_node_split(SD, T, F, Cn, h, max_depth):
-    '''Convert each node into its internal node and generates new leaves at the next level.'''
+    """Convert each node into its internal node and generates new leaves at the next level."""
 
     T = T.at[2**h - 1 : 2 ** (h + 1) - 1].set(SD)
     return T, Cn
@@ -261,8 +261,8 @@ def oblivious_node_split(SD, T, F, Cn, h, max_depth):
 
 def oblivious_DT_training(X, y, max_depth, n_labels, sample_weight=None):
     n_samples, n_features = X.shape
-    T = jnp.zeros((2 ** (max_depth + 1) - 1))
-    F = jnp.ones((2**max_depth - 1))
+    T = jnp.zeros(2 ** (max_depth + 1) - 1)
+    F = jnp.ones(2**max_depth - 1)
     M = jnp.zeros(n_samples)
     gamma = jnp.ones((1, n_features))
     Cn = jnp.zeros((1, n_labels + 1, 2 * n_features))
@@ -293,7 +293,7 @@ def oblivious_DT_training(X, y, max_depth, n_labels, sample_weight=None):
 
 def oblivious_DT_inference(X, T, max_height):
     n_samples, n_features = X.shape
-    Tidx = jnp.zeros((n_samples))
+    Tidx = jnp.zeros(n_samples)
     i = 0
     while i < max_height:
         Tval = oaa(T, Tidx)

@@ -15,9 +15,9 @@
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
+
 from sml.utils.extmath import serial_jacobi_evd
 
 

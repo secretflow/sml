@@ -14,11 +14,11 @@
 
 
 import jax.numpy as jnp
+import spu.libspu as libspu  # type: ignore
+import spu.utils.simulation as spsim
 from sklearn.datasets import load_iris
 from sklearn.tree import DecisionTreeClassifier
 
-import spu.libspu as libspu  # type: ignore
-import spu.utils.simulation as spsim
 from sml.tree.tree import DecisionTreeClassifier as sml_dtc
 
 MAX_DEPTH = 3
@@ -61,7 +61,7 @@ def test_tree():
 
     # compare with sklearn
     clf = DecisionTreeClassifier(
-        max_depth=MAX_DEPTH, criterion='gini', splitter='best', random_state=None
+        max_depth=MAX_DEPTH, criterion="gini", splitter="best", random_state=None
     )
     clf = clf.fit(X, y)
     score_plain = clf.score(X, y)
@@ -69,7 +69,7 @@ def test_tree():
     # run
     proc = proc_wrapper(MAX_DEPTH, n_labels)
     result = spsim.sim_jax(sim, proc)(X, y)
-    score_encrpted = jnp.sum((result == y)) / n_samples
+    score_encrpted = jnp.sum(result == y) / n_samples
 
     # print acc
     print(f"Accuracy in SKlearn: {score_plain:.2f}")

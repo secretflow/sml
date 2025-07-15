@@ -11,20 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import logging.config
 import os
 import sys
 from collections import defaultdict
 
 import jax.numpy as jnp
 import numpy as np
-from sklearn.neighbors import KNeighborsClassifier
-
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
+from sklearn.neighbors import KNeighborsClassifier
 
 # Add the sml directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
 from sml.neighbors.knn import KNNClassifer
 
@@ -34,7 +32,7 @@ def test_knn():
 
     # Test fit_predict
     def proc_predict(
-        X_train, y_train, X_test, n_classes, n_neighbors=5, weights='uniform'
+        X_train, y_train, X_test, n_classes, n_neighbors=5, weights="uniform"
     ):
         knn_model = KNNClassifer(
             n_neighbors=n_neighbors, weights=weights, n_classes=n_classes
@@ -59,19 +57,17 @@ def test_knn():
 
     # 运行模拟器
     result_uniform = spsim.sim_jax(sim, proc_predict, static_argnums=(3, 4, 5))(
-        X_train, y_train_new, X_test, n_classes, 3, 'uniform'
+        X_train, y_train_new, X_test, n_classes, 3, "uniform"
     )
     result_distance = spsim.sim_jax(sim, proc_predict, static_argnums=(3, 4, 5))(
-        X_train, y_train_new, X_test, n_classes, 3, 'distance'
+        X_train, y_train_new, X_test, n_classes, 3, "distance"
     )
 
     # 再从连续数组映射回原来的标签
     int_to_label = {i: label for label, i in label_to_int.items()}
     result_uniform_np = np.array(result_uniform)
     result_distance_np = np.array(result_distance)
-    predictions_uniform = [
-        int_to_label[prediction] for prediction in result_uniform_np
-    ]
+    predictions_uniform = [int_to_label[prediction] for prediction in result_uniform_np]
     predictions_distance = [
         int_to_label[prediction] for prediction in result_distance_np
     ]
@@ -81,14 +77,14 @@ def test_knn():
     y_train = np.array(y_train)
     X_test = np.array(X_test)
 
-    neigh_uni = KNeighborsClassifier(n_neighbors=3, weights='uniform')
+    neigh_uni = KNeighborsClassifier(n_neighbors=3, weights="uniform")
     neigh_uni.fit(X_train, y_train)
 
     sklearn_predictions = neigh_uni.predict(X_test)
 
     assert predictions_uniform == sklearn_predictions.tolist()
 
-    neigh_dis = KNeighborsClassifier(n_neighbors=3, weights='distance')
+    neigh_dis = KNeighborsClassifier(n_neighbors=3, weights="distance")
     neigh_dis.fit(X_train, y_train)
 
     sklearn_predictions = neigh_dis.predict(X_test)
@@ -124,14 +120,12 @@ def test_knn_sep():
     y_train_new = jnp.array([label_to_int[label] for label in y_train.tolist()])
 
     # 运行模拟器
-    uniform_model = KNNClassifer(
-        n_neighbors=3, weights='uniform', n_classes=n_classes
-    )
+    uniform_model = KNNClassifer(n_neighbors=3, weights="uniform", n_classes=n_classes)
     uniform_model = spsim.sim_jax(sim, fit)(X_train, y_train_new, uniform_model)
     result_uniform = spsim.sim_jax(sim, predict)(X_test, uniform_model)
 
     distance_model = KNNClassifer(
-        n_neighbors=3, weights='distance', n_classes=n_classes
+        n_neighbors=3, weights="distance", n_classes=n_classes
     )
     distance_model = spsim.sim_jax(sim, fit)(X_train, y_train_new, distance_model)
     result_distance = spsim.sim_jax(sim, predict)(X_test, distance_model)
@@ -144,9 +138,7 @@ def test_knn_sep():
     int_to_label = {i: label for label, i in label_to_int.items()}
     result_uniform_np = np.array(result_uniform)
     result_distance_np = np.array(result_distance)
-    predictions_uniform = [
-        int_to_label[prediction] for prediction in result_uniform_np
-    ]
+    predictions_uniform = [int_to_label[prediction] for prediction in result_uniform_np]
     predictions_distance = [
         int_to_label[prediction] for prediction in result_distance_np
     ]
@@ -156,7 +148,7 @@ def test_knn_sep():
     y_train = np.array(y_train)
     X_test = np.array(X_test)
 
-    neigh_uni = KNeighborsClassifier(n_neighbors=3, weights='uniform')
+    neigh_uni = KNeighborsClassifier(n_neighbors=3, weights="uniform")
     neigh_uni.fit(X_train, y_train)
 
     sklearn_predictions = neigh_uni.predict(X_test)
@@ -165,7 +157,7 @@ def test_knn_sep():
 
     assert predictions_uniform == sklearn_predictions.tolist()
 
-    neigh_dis = KNeighborsClassifier(n_neighbors=3, weights='distance')
+    neigh_dis = KNeighborsClassifier(n_neighbors=3, weights="distance")
     neigh_dis.fit(X_train, y_train)
 
     sklearn_predictions = neigh_dis.predict(X_test)

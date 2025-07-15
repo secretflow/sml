@@ -13,10 +13,10 @@
 # limitations under the License.
 
 import jax.numpy as jnp
-from sklearn.linear_model import QuantileRegressor as SklearnQuantileRegressor
-
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
+from sklearn.linear_model import QuantileRegressor as SklearnQuantileRegressor
+
 from sml.linear_model.quantile import QuantileRegressor as SmlQuantileRegressor
 
 
@@ -61,7 +61,7 @@ def test_quantile():
 
     # compare with sklearn
     quantile_sklearn = SklearnQuantileRegressor(
-        quantile=0.2, alpha=0.1, fit_intercept=True, solver='revised simplex'
+        quantile=0.2, alpha=0.1, fit_intercept=True, solver="revised simplex"
     )
     quantile_sklearn_fit = quantile_sklearn.fit(X, y)
     y_pred_plain = quantile_sklearn_fit.predict(X)

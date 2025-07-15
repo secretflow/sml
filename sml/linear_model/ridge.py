@@ -20,8 +20,8 @@ from ..utils import svd
 
 
 class Solver(Enum):
-    SVD = 'svd'
-    CHOLESKY = 'cholesky'
+    SVD = "svd"
+    CHOLESKY = "cholesky"
 
 
 class Ridge:

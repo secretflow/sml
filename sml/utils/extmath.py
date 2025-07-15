@@ -217,7 +217,7 @@ def serial_jacobi_evd(A, max_jacobi_iter=5):
             mask = jnp.not_equal(A[k_list, l_list], 0)
             diff = A[l_list, l_list] - A[k_list, k_list]
 
-            '''
+            """
             # fitting the rotate matrix elements by sqrt & rsqrt (derived from the trigonometric functions)
             # But the fitting accuracy is lower than the trigonometric method.
 
@@ -228,7 +228,7 @@ def serial_jacobi_evd(A, max_jacobi_iter=5):
             # sqrt_combined = jnp.sqrt(combined_squares)
             # c = sqrt_combined[0]
             # s = sqrt_combined[1] * jnp.sign(A[k_list, l_list])
-            '''
+            """
 
             # trigonometric method
             theta = jnp.where(mask, 0.5 * jnp.arctan2(2 * A[k_list, l_list], diff), 0)
@@ -250,7 +250,7 @@ def serial_jacobi_evd(A, max_jacobi_iter=5):
             A = jnp.dot(J_combined.T, jnp.dot(A, J_combined))
             eigenvectors = jnp.dot(eigenvectors, J_combined)
 
-            '''
+            """
             # Update the Matrix A with the mapping of the chosen rotation matrix and using the hardmard product instead of matrix multiplication
 
             # r = np.arange(n)
@@ -270,7 +270,7 @@ def serial_jacobi_evd(A, max_jacobi_iter=5):
             # A_row = (c_list * s_list[:,None]) * A[r,:]
             # A = (c_list * c_list[:,None]) * A + A_row + A_row.T + (s_list * s_list[:,None]) * A[r,:][:,r]
             # eigenvectors = c_list * eigenvectors + s_list * eigenvectors[:,r]
-            '''
+            """
 
     eigenvalues = jnp.diag(A)
     return eigenvalues, eigenvectors

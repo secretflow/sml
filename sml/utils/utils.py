@@ -14,8 +14,8 @@
 
 import logging
 from typing import List, Tuple, Union
-import numpy as np
 
+import numpy as np
 from spu.experimental import reveal as spu_reveal
 
 
@@ -24,7 +24,7 @@ def get_logger(name):
     logger.setLevel(logging.INFO)
     syslog = logging.StreamHandler()
     formatter = logging.Formatter(
-        '[%(asctime)s]-[%(levelname)s]-[%(filename)s:%(lineno)d]: %(message)s'
+        "[%(asctime)s]-[%(levelname)s]-[%(filename)s:%(lineno)d]: %(message)s"
     )
     syslog.setFormatter(formatter)
     logger.addHandler(syslog)

@@ -18,14 +18,13 @@ import sys
 import jax.numpy as jnp
 import numpy as np
 import pytest
+import spu.libspu as libspu
+import spu.utils.simulation as spsim
 from sklearn import datasets
 from sklearn.naive_bayes import GaussianNB as SklearnGaussianNB
 
-import spu.libspu as libspu
-import spu.utils.simulation as spsim
-
 # Add the sml directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
 from sml.naive_bayes.gnb import GaussianNB
 
@@ -33,9 +32,7 @@ from sml.naive_bayes.gnb import GaussianNB
 @pytest.fixture(scope="module")
 def setup_sim():
     print(" ========= start test of gnb package ========= \n")
-    sim64 = spsim.Simulator.simple(
-        3, libspu.ProtocolKind.ABY3, libspu.FieldType.FM64
-    )
+    sim64 = spsim.Simulator.simple(3, libspu.ProtocolKind.ABY3, libspu.FieldType.FM64)
     config128 = libspu.RuntimeConfig(
         protocol=libspu.ProtocolKind.ABY3,
         field=libspu.FieldType.FM128,
@@ -76,7 +73,7 @@ def test_gnb(setup_sim):
         n_samples=n_samples, n_features=n_features, centers=centers
     )
     classes = jnp.unique(y)
-    assert len(classes) == centers, f'Retry or increase partial.'
+    assert len(classes) == centers, f"Retry or increase partial."
     total_samples = len(y)
     split_idx = int(partial * len(y))
     X1, y1 = X[:split_idx], y[:split_idx]
@@ -143,7 +140,7 @@ def test_gnb_sep(setup_sim):
         n_samples=n_samples, n_features=n_features, centers=centers
     )
     classes = jnp.unique(y)
-    assert len(classes) == centers, f'Retry or increase partial.'
+    assert len(classes) == centers, f"Retry or increase partial."
     total_samples = len(y)
     split_idx = int(partial * len(y))
     X1, y1 = X[:split_idx], y[:split_idx]

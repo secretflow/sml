@@ -21,14 +21,14 @@ from ..utils.fxp_approx import sigmoid_sr
 
 
 class RegType(Enum):
-    Linear = 'linear'
-    Logistic = 'logistic'
+    Linear = "linear"
+    Logistic = "logistic"
 
 
 class Penalty(Enum):
-    NONE = 'None'
-    L1 = 'l1'  # not supported
-    L2 = 'l2'
+    NONE = "None"
+    L1 = "l1"  # not supported
+    L2 = "l2"
 
 
 class SGDClassifier:
@@ -45,7 +45,7 @@ class SGDClassifier:
         assert epochs > 0, f"epochs should >0"
         assert learning_rate > 0, f"learning_rate should >0"
         assert batch_size > 0, f"batch_size should >0"
-        assert penalty != 'l1', "not support L1 penalty for now"
+        assert penalty != "l1", "not support L1 penalty for now"
         if penalty == Penalty.L2:
             assert l2_norm > 0, f"l2_norm should >0 if use L2 penalty"
         assert reg_type in [

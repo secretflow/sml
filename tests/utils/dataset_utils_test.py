@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import numpy as np
-import pytest
 
 from sml.utils.dataset_utils import (
     BI_CLASSIFICATION_OPEN_DATASETS,

@@ -15,9 +15,7 @@
 import math
 import random
 
-import jax
 import jax.numpy as jnp
-from jax import lax
 
 from ..tree.tree import DecisionTreeClassifier as sml_dtc
 
@@ -142,9 +140,9 @@ class RandomForestClassifier:
             return int(max_features * n_features)
 
         elif isinstance(max_features, str):
-            if max_features == 'sqrt':
+            if max_features == "sqrt":
                 return int(math.sqrt(n_features))
-            elif max_features == 'log2':
+            elif max_features == "log2":
                 return int(math.log2(n_features))
             else:
                 return n_features

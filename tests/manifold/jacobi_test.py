@@ -14,10 +14,10 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
-from scipy.linalg import eigh
-
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
+from scipy.linalg import eigh
+
 from sml.manifold.jacobi import Jacobi
 
 
@@ -52,6 +52,4 @@ def test_jacobi():
     values = jnp.diag(values)
     values = jax.lax.sort(values)
     # As num_samples become larger, the accuracy decreases, and it cannot reach 1e-3
-    np.testing.assert_allclose(
-        jnp.abs(values), jnp.abs(eigenvalues), rtol=0, atol=1e-3
-    )
+    np.testing.assert_allclose(jnp.abs(values), jnp.abs(eigenvalues), rtol=0, atol=1e-3)

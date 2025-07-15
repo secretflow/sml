@@ -17,12 +17,11 @@ import sys
 import time
 import pytest
 import numpy as np
-from sklearn.feature_selection import f_classif as f_classif_sklearn
-
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
+from sklearn.feature_selection import f_classif as f_classif_sklearn
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 from sml.feature_selection.anova_f import f_classif
 
 

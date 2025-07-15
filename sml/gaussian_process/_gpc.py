@@ -14,7 +14,6 @@
 
 import jax
 import jax.numpy as jnp
-from jax import grad
 from jax.lax.linalg import cholesky
 from jax.scipy.linalg import cho_solve, solve
 from jax.scipy.special import erf, expit

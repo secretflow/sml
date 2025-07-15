@@ -28,7 +28,7 @@ The preferred way to contribute to SML is to fork the main repository, then subm
 your can refer to [this](https://docs.github.com/en/get-started/quickstart/fork-a-repo) for more details.
 3. Develop the feature on **your feature branch** on your computer,
 using [Git](https://docs.github.com/en/get-started/quickstart/set-up-git) to do the version control.
-4. Following [Before Pull Request](<./development.md#Before Pull Request>) to place or test your codes,
+4. Following [Before Pull Request](<./CONTRIBUTING.md#Before Pull Request>) to place or test your codes,
 [these](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork)
 to create a pull request from your fork.
 5. Committers do code review and then merge.
@@ -42,14 +42,35 @@ the latest changes of the main sml repository.
 2. **Place your codes properly**: Generally speaking, for every algorithm, at least 3 files are needed
    - `<algorithm>.py`: implementation of algorithm or new features, it should be a **"jit-able"** program which run correctly in plaintext
    (same or near to output from scikit-learn).
-   - `<algorithm>_test.py`: a unittest python file, in which you test your program with **simulator**, then you should report the behavior
+   - `<algorithm>_test.py`: a pytest test file, in which you test your program with **simulator**, then you should report the behavior
    (like correctness or error rate) under MPC setting.
    - `<algorithm>_emul.py`: similar to the above file, except you will test program with **emulator**,
    then you can get sense of efficiency under different MPC protocols.
 3. **Other things**: there are still some small fixes to do.
    - **Add necessary doc**: your implementation may only have part features, or some changes have been made for limitation of both JAX and SPU,
     you **MUST** describe these things explicitly!
-   - **Format all your files**: using [black](https://github.com/psf/black) to format python file, [isort](https://github.com/PyCQA/isort) to sort the python imports.
+   - **Code quality and formatting**: The project uses pre-commit hooks to automatically maintain code quality:
+     - **Pre-commit hooks**: Run automatically on each commit to check and fix common issues
+     - **Black**: Automatically formats Python code for consistent style
+     - **isort**: Sorts and organizes import statements
+     - **autoflake**: Removes unused imports and variables
+     - **Other checks**: Trailing whitespace, file endings, YAML/TOML syntax, debug statements
+     - Manual formatting: If needed, you can also run `black` and `isort` manually on your files
+     - Run all checks: `pre-commit run --all-files` to check all files at once
+
+## Code Quality Automation
+
+The project includes pre-commit hooks that automatically run code quality checks and formatting on every commit:
+
+- **Automatic setup**: Pre-commit hooks are already installed and configured in the repository
+- **What it does**: Automatically formats code (Black, isort), removes unused imports (autoflake), checks file quality, and detects common issues
+- **Usage**:
+  - Hooks run automatically on `git commit`
+  - Manual run: `pre-commit run --all-files`
+  - Skip hooks (not recommended): `git commit --no-verify`
+- **Benefits**: Ensures consistent code style, catches issues early, reduces manual formatting work
+
+If hooks fail during commit, fix the reported issues, stage the changes (`git add .`), and commit again.
 
 ## Advanced Topics
 

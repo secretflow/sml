@@ -20,7 +20,7 @@ import numpy as np
 from sklearn.datasets import load_iris
 from sklearn.feature_selection import f_classif as f_classif_sklearn
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 import sml.utils.emulation as emulation
 from sml.feature_selection.anova_f import f_classif
 

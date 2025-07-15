@@ -16,10 +16,10 @@ import time
 import jax
 import jax.numpy as jnp
 import numpy as np
-from sklearn.manifold import Isomap
-
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
+from sklearn.manifold import Isomap
+
 from sml.manifold.isomap import ISOMAP
 
 
@@ -72,6 +72,4 @@ def test_isomap():
     X_transformed = embedding.fit_transform(X)
 
     # Since the final calculation result is calculated by the eigenvector, the accuracy cannot reach 1e-3
-    np.testing.assert_allclose(
-        jnp.abs(X_transformed), jnp.abs(ans), rtol=0, atol=1e-1
-    )
+    np.testing.assert_allclose(jnp.abs(X_transformed), jnp.abs(ans), rtol=0, atol=1e-1)

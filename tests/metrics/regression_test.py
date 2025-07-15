@@ -17,13 +17,12 @@ import sys
 
 import jax.numpy as jnp
 import numpy as np
-from sklearn import metrics
-
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
+from sklearn import metrics
 
 # add ops dir to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
 from sml.metrics.regression.regression import (
     d2_tweedie_score,
@@ -78,9 +77,9 @@ def test_explained_variance_score():
             multioutput="variance_weighted",
             force_finite=True,
         )
-        spu_result = spsim.sim_jax(
-            sim, explained_variance_score, static_argnums=(3,)
-        )(y_true, y_pred, weight, "variance_weighted")
+        spu_result = spsim.sim_jax(sim, explained_variance_score, static_argnums=(3,))(
+            y_true, y_pred, weight, "variance_weighted"
+        )
         np.testing.assert_allclose(sk_result, spu_result, rtol=0, atol=1e-4)
 
 
@@ -119,12 +118,8 @@ def test_mean_poisson_deviance():
     y_true = jnp.array([2, 0, 1, 4])
     y_pred = jnp.array([0.5, 0.5, 2.0, 2.0])
     for weight in weight_list:
-        sk_result = metrics.mean_poisson_deviance(
-            y_true, y_pred, sample_weight=weight
-        )
-        spu_result = spsim.sim_jax(sim, mean_poisson_deviance)(
-            y_true, y_pred, weight
-        )
+        sk_result = metrics.mean_poisson_deviance(y_true, y_pred, sample_weight=weight)
+        spu_result = spsim.sim_jax(sim, mean_poisson_deviance)(y_true, y_pred, weight)
         np.testing.assert_allclose(sk_result, spu_result, rtol=0, atol=1e-4)
 
 
@@ -141,8 +136,6 @@ def test_mean_gamma_deviance():
     y_true = jnp.array([2, 0.5, 1, 4])
     y_pred = jnp.array([0.5, 0.5, 2.0, 2.0])
     for weight in weight_list:
-        sk_result = metrics.mean_gamma_deviance(
-            y_true, y_pred, sample_weight=weight
-        )
+        sk_result = metrics.mean_gamma_deviance(y_true, y_pred, sample_weight=weight)
         spu_result = spsim.sim_jax(sim, mean_gamma_deviance)(y_true, y_pred, weight)
         np.testing.assert_allclose(sk_result, spu_result, rtol=0, atol=1e-4)

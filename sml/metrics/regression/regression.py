@@ -30,7 +30,7 @@ def _mean_tweedie_deviance(y_true, y_pred, sample_weight, power, d2_score=False)
         dev = (y_true - y_pred) ** 2
     elif p == 1:
         # Poisson distribution
-        dev = 2 * (y_true * jnp.log((y_true / y_pred)) - y_true + y_pred)
+        dev = 2 * (y_true * jnp.log(y_true / y_pred) - y_true + y_pred)
     elif p == 2:
         # Gamma distribution
         dev = 2 * (jnp.log(y_pred / y_true) + y_true / y_pred - 1)
