@@ -86,11 +86,6 @@ jobs:
     steps:
       - checkout
       - build_and_test
-      - save_cache:
-          key: *pip-cache
-          paths:
-            - /root/miniconda3/lib/python3.10/site-packages
-          when: always
   macOS_ut:
     macos:
       xcode: 16.0.0
