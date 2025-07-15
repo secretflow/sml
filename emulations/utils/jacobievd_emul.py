@@ -98,7 +98,7 @@ def emul_jacobievd(emulator: emulation.Emulator):
 
 
 def main(
-    cluster_config: str = "sml/utils/emulations/3pc_128.json",
+    cluster_config: str = "emulations/utils/3pc_128.json",
     mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
     bandwidth: int = 300,
     latency: int = 20,
@@ -113,8 +113,8 @@ def main(
 
 
 if __name__ == "__main__":
-    cluster_config = "sml/utils/emulations/3pc_128.json"
+    cluster_config = "emulations/utils/3pc_128.json"
     mode = emulation.Mode.MULTIPROCESS
     bandwidth = 300
-    latency = 20
+    latency = 10
     main(cluster_config, mode, bandwidth, latency)
