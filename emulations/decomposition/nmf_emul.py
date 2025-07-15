@@ -111,7 +111,7 @@ def evaluate_nmf_quality(X, W, H, reconstruction_err=None):
         metrics["pearson_correlation"] = pearson_corr
         metrics["pearson_p_value"] = pearson_p
         print(f"Pearson correlation: {pearson_corr:.4f} (p-value: {pearson_p:.4f})")
-    except:
+    except ValueError:
         metrics["pearson_correlation"] = np.nan
         metrics["pearson_p_value"] = np.nan
         print("✗ Cannot compute Pearson correlation")
