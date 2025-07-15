@@ -144,7 +144,7 @@ def evaluate_nmf_quality(X, W, H, reconstruction_err=None):
     return metrics
 
 
-def test_nmf(mode=emulation.Mode.MULTIPROCESS):
+def emul_nmf(emulator: emulation.Emulator):
     """
     Improved NMF test function using quality metrics evaluation instead of hard comparison
     """
@@ -160,7 +160,7 @@ def test_nmf(mode=emulation.Mode.MULTIPROCESS):
     l1_ratio = 0.1
     alpha_W = 0.01
 
-    def emul_nmf():
+    def nmf_unified():
         def proc1(X):
             model = NMF(
                 n_components=n_components,
@@ -215,7 +215,7 @@ def test_nmf(mode=emulation.Mode.MULTIPROCESS):
 
         return W, H, X_reconstructed, err, metrics, metrics_sklearn
 
-    def emul_nmf_seperate():
+    def nmf_seperate():
         def proc2(X):
             model = NMF(
                 n_components=n_components,
@@ -273,66 +273,70 @@ def test_nmf(mode=emulation.Mode.MULTIPROCESS):
             metrics_sklearn,
         )
 
-    try:
-        conf_path = "sml/decomposition/emulations/3pc.json"
-        emulator = emulation.Emulator(conf_path, mode, bandwidth=300, latency=20)
-        emulator.up()
+    # Run tests
+    _, _, _, _, metrics_unified, metrics_sklearn_unified = nmf_unified()
+    _, _, _, metrics_separate, metrics_sklearn_separate = nmf_seperate()
 
-        # Run tests
-        _, _, _, _, metrics_unified, metrics_sklearn_unified = emul_nmf()
-        _, _, _, metrics_separate, metrics_sklearn_separate = emul_nmf_seperate()
+    # Final summary
+    print("\n" + "=" * 80)
+    print("Final Evaluation Summary")
+    print("=" * 80)
+    print("SML NMF Test Result:")
+    print(f"Unified method R²: {metrics_unified['r2_score']:.4f}")
+    print(f"Separate method R²: {metrics_separate['r2_score']:.4f}")
+    print(f"Unified method Frobenius norm: {metrics_unified['frobenius_norm']:.4f}")
+    print(f"Separate method Frobenius norm: {metrics_separate['frobenius_norm']:.4f}")
+    print("Sklearn NMF Test Result:")
+    print(f"Unified method R²: {metrics_sklearn_unified['r2_score']:.4f}")
+    print(f"Separate method R²: {metrics_sklearn_separate['r2_score']:.4f}")
+    print(
+        f"Unified method Frobenius norm: {metrics_sklearn_unified['frobenius_norm']:.4f}"
+    )
+    print(
+        f"Separate method Frobenius norm: {metrics_sklearn_separate['frobenius_norm']:.4f}"
+    )
 
-        # Final summary
-        print("\n" + "=" * 80)
-        print("Final Evaluation Summary")
-        print("=" * 80)
-        print("SML NMF Test Result:")
-        print(f"Unified method R²: {metrics_unified['r2_score']:.4f}")
-        print(f"Separate method R²: {metrics_separate['r2_score']:.4f}")
-        print(f"Unified method Frobenius norm: {metrics_unified['frobenius_norm']:.4f}")
-        print(
-            f"Separate method Frobenius norm: {metrics_separate['frobenius_norm']:.4f}"
-        )
-        print("Sklearn NMF Test Result:")
-        print(f"Unified method R²: {metrics_sklearn_unified['r2_score']:.4f}")
-        print(f"Separate method R²: {metrics_sklearn_separate['r2_score']:.4f}")
-        print(
-            f"Unified method Frobenius norm: {metrics_sklearn_unified['frobenius_norm']:.4f}"
-        )
-        print(
-            f"Separate method Frobenius norm: {metrics_sklearn_separate['frobenius_norm']:.4f}"
-        )
+    np.testing.assert_allclose(
+        metrics_unified["r2_score"],
+        metrics_sklearn_unified["r2_score"],
+        atol=1e-2,
+        rtol=1e-2,
+    )
+    np.testing.assert_allclose(
+        metrics_separate["r2_score"],
+        metrics_sklearn_separate["r2_score"],
+        atol=1e-2,
+        rtol=1e-2,
+    )
+    np.testing.assert_allclose(
+        metrics_unified["frobenius_norm"],
+        metrics_sklearn_unified["frobenius_norm"],
+        atol=1e-2,
+        rtol=1e-2,
+    )
+    np.testing.assert_allclose(
+        metrics_separate["frobenius_norm"],
+        metrics_sklearn_separate["frobenius_norm"],
+        atol=1e-2,
+        rtol=1e-2,
+    )
 
-        np.testing.assert_allclose(
-            metrics_unified["r2_score"],
-            metrics_sklearn_unified["r2_score"],
-            atol=1e-2,
-            rtol=1e-2,
-        )
-        np.testing.assert_allclose(
-            metrics_separate["r2_score"],
-            metrics_sklearn_separate["r2_score"],
-            atol=1e-2,
-            rtol=1e-2,
-        )
-        np.testing.assert_allclose(
-            metrics_unified["frobenius_norm"],
-            metrics_sklearn_unified["frobenius_norm"],
-            atol=1e-2,
-            rtol=1e-2,
-        )
-        np.testing.assert_allclose(
-            metrics_separate["frobenius_norm"],
-            metrics_sklearn_separate["frobenius_norm"],
-            atol=1e-2,
-            rtol=1e-2,
-        )
+    print("=" * 80)
 
-        print("=" * 80)
 
-    finally:
-        emulator.down()
+def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_nmf(emulator)
 
 
 if __name__ == "__main__":
-    test_nmf(emulation.Mode.MULTIPROCESS)
+    cluster_config = "emulations/decomposition/3pc.json"
+    mode = emulation.Mode.MULTIPROCESS
+    bandwidth = 300
+    latency = 20
+    main(cluster_config, mode, bandwidth, latency)

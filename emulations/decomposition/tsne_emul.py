@@ -26,11 +26,9 @@ import emulations.utils.emulation as emulation
 from sml.decomposition.tsne import TSNE
 
 
-def test_tsne(mode: emulation.Mode = emulation.Mode.MULTIPROCESS):
-    conf_path = "sml/decomposition/emulations/3pc.json"
-    emulator = emulation.Emulator(conf_path, mode, bandwidth=300, latency=20)
+def emul_tsne(emulator: emulation.Emulator):
 
-    def emul_tsne_random():
+    def tsne_random():
         print("Start t-SNE emulation...")
 
         def load_data():
@@ -98,7 +96,7 @@ def test_tsne(mode: emulation.Mode = emulation.Mode.MULTIPROCESS):
 
             traceback.print_exc()
 
-    def emul_tsne_pca():
+    def tsne_pca():
         print("Start t-SNE emulation...")
 
         def load_data():
@@ -163,13 +161,23 @@ def test_tsne(mode: emulation.Mode = emulation.Mode.MULTIPROCESS):
 
             traceback.print_exc()
 
-    try:
-        emulator.up()
-        emul_tsne_random()
-        emul_tsne_pca()
-    finally:
-        emulator.down()
+    tsne_random()
+    tsne_pca()
+
+
+def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_tsne(emulator)
 
 
 if __name__ == "__main__":
-    test_tsne(emulation.Mode.MULTIPROCESS)
+    cluster_config = "emulations/decomposition/3pc.json"
+    mode = emulation.Mode.MULTIPROCESS
+    bandwidth = 300
+    latency = 20
+    main(cluster_config, mode, bandwidth, latency)

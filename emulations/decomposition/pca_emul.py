@@ -27,8 +27,8 @@ import emulations.utils.emulation as emulation
 from sml.decomposition.pca import PCA
 
 
-def test_pca(mode: emulation.Mode):
-    def emul_powerPCA():
+def emul_pca(emulator: emulation.Emulator):
+    def powerPCA():
         print("start power method emulation.")
 
         def proc_transform(X):
@@ -73,7 +73,7 @@ def test_pca(mode: emulation.Mode):
 
         np.testing.assert_allclose(X_reconstructed, result[2], atol=1e-2, rtol=1e-2)
 
-    def emul_jacobi_PCA():
+    def jacobi_PCA():
         print("start jacobi method emulation.")
 
         def proc_transform(X):
@@ -116,17 +116,23 @@ def test_pca(mode: emulation.Mode):
 
         np.testing.assert_allclose(X_reconstructed, result[2], atol=0.1)
 
-    try:
-        # bandwidth and latency only work for docker mode
-        emulator = emulation.Emulator(
-            emulation.CLUSTER_ABY3_3PC, mode, bandwidth=300, latency=20
-        )
-        emulator.up()
-        emul_powerPCA()
-        emul_jacobi_PCA()
-    finally:
-        emulator.down()
+    powerPCA()
+    jacobi_PCA()
+
+
+def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_pca(emulator)
 
 
 if __name__ == "__main__":
-    test_pca(emulation.Mode.MULTIPROCESS)
+    cluster_config = emulation.CLUSTER_ABY3_3PC
+    mode = emulation.Mode.MULTIPROCESS
+    bandwidth = 300
+    latency = 20
+    main(cluster_config, mode, bandwidth, latency)
