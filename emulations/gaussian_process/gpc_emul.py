@@ -24,7 +24,7 @@ import emulations.utils.emulation as emulation
 from sml.gaussian_process._gpc import GaussianProcessClassifier
 
 
-def emul_gpc(mode: emulation.Mode):
+def emul_gpc(emulator: emulation.Emulator):
     def proc(x, y, x_pred):
         model = GaussianProcessClassifier(max_iter_predict=10, n_classes=3)
         model.fit(x, y)
@@ -32,34 +32,38 @@ def emul_gpc(mode: emulation.Mode):
         pred = model.predict(x_pred)
         return pred
 
-    try:
-        # bandwidth and latency only work for docker mode
-        emulator = emulation.Emulator(
-            "emulations/gaussian_process/3pc.json", mode, bandwidth=300, latency=20
-        )
-        emulator.up()
+    # Create dataset
+    x, y = load_iris(return_X_y=True)
 
-        # Create dataset
-        x, y = load_iris(return_X_y=True)
+    idx = list(range(45, 55)) + list(range(100, 105))
+    prd_idx = list(range(0, 5)) + list(range(55, 60)) + list(range(110, 115))
+    x_pred = x[jnp.array(prd_idx), :]
+    y_pred = y[jnp.array(prd_idx)]
+    x = x[jnp.array(idx), :]
+    y = y[jnp.array(idx)]
 
-        idx = list(range(45, 55)) + list(range(100, 105))
-        prd_idx = list(range(0, 5)) + list(range(55, 60)) + list(range(110, 115))
-        x_pred = x[prd_idx, :]
-        y_pred = y[prd_idx]
-        x = x[idx, :]
-        y = y[idx]
+    # mark these data to be protected in SPU
+    x, y, x_pred = emulator.seal(x, y, x_pred)
+    result = emulator.run(proc)(x, y, x_pred)
 
-        # mark these data to be protected in SPU
-        x, y, x_pred = emulator.seal(x, y, x_pred)
-        result = emulator.run(proc)(x, y, x_pred)
+    print(result)
+    print(y_pred)
+    print("Accuracy: ", jnp.sum(result == y_pred) / len(y_pred))
 
-        print(result)
-        print(y_pred)
-        print("Accuracy: ", jnp.sum(result == y_pred) / len(y_pred))
 
-    finally:
-        emulator.down()
+def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_gpc(emulator)
 
 
 if __name__ == "__main__":
-    emul_gpc(emulation.Mode.MULTIPROCESS)
+    cluster_config = "emulations/gaussian_process/3pc.json"
+    mode = emulation.Mode.MULTIPROCESS
+    bandwidth = 300
+    latency = 20
+    main(cluster_config, mode, bandwidth, latency)

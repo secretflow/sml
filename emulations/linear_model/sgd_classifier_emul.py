@@ -17,7 +17,7 @@ from sml.linear_model.sgd_classifier import SGDClassifier
 from sml.utils.dataset_utils import load_mock_datasets
 
 
-def emul_SGDClassifier(mode=emulation.Mode.MULTIPROCESS):
+def emul_SGDClassifier(emulator: emulation.Emulator):
 
     def proc(x, y):
         model = SGDClassifier(
@@ -33,30 +33,35 @@ def emul_SGDClassifier(mode=emulation.Mode.MULTIPROCESS):
 
         return model.fit(x, y).predict_proba(x)
 
-    try:
-        # bandwidth and latency only work for docker mode
-        emulator = emulation.Emulator(
-            emulation.CLUSTER_ABY3_3PC, mode, bandwidth=300, latency=20
-        )
-        emulator.up()
+    # load mock data
+    x, y = load_mock_datasets(
+        n_samples=50000,
+        n_features=100,
+        task_type="bi_classification",
+        need_split_train_test=False,
+    )
 
-        # load mock data
-        x, y = load_mock_datasets(
-            n_samples=50000,
-            n_features=100,
-            task_type="bi_classification",
-            need_split_train_test=False,
-        )
+    # mark these data to be protected in SPU
+    x, y = emulator.seal(x, y)
 
-        # mark these data to be protected in SPU
-        x, y = emulator.seal(x, y)
+    # run
+    result = emulator.run(proc)(x, y)
+    print(result)
 
-        # run
-        result = emulator.run(proc)(x, y)
-        print(result)
-    finally:
-        emulator.down()
+
+def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_SGDClassifier(emulator)
 
 
 if __name__ == "__main__":
-    emul_SGDClassifier(emulation.Mode.MULTIPROCESS)
+    cluster_config = emulation.CLUSTER_ABY3_3PC
+    mode = emulation.Mode.MULTIPROCESS
+    bandwidth = 300
+    latency = 20
+    main(cluster_config, mode, bandwidth, latency)

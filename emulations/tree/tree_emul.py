@@ -22,10 +22,9 @@ import emulations.utils.emulation as emulation
 from sml.tree.tree import DecisionTreeClassifier as sml_dtc
 
 MAX_DEPTH = 3
-CONFIG_FILE = emulation.CLUSTER_ABY3_3PC
 
 
-def emul_tree(mode=emulation.Mode.MULTIPROCESS):
+def emul_tree(emulator: emulation.Emulator):
     def proc_wrapper(max_depth=2, n_labels=3):
         dt = sml_dtc(
             max_depth=max_depth, criterion="gini", splitter="best", n_labels=n_labels
@@ -54,44 +53,50 @@ def emul_tree(mode=emulation.Mode.MULTIPROCESS):
         X, y = new_features[:, ::3], iris_label[:]
         return X, y
 
-    try:
-        # bandwidth and latency only work for docker mode
-        emulator = emulation.Emulator(CONFIG_FILE, mode, bandwidth=300, latency=20)
-        emulator.up()
+    # load mock data
+    X, y = load_data()
+    n_samples = y.shape[0]
+    n_labels = jnp.unique(y).shape[0]
 
-        # load mock data
-        X, y = load_data()
-        n_samples = y.shape[0]
-        n_labels = jnp.unique(y).shape[0]
+    # compare with sklearn
+    clf = DecisionTreeClassifier(
+        max_depth=MAX_DEPTH, criterion="gini", splitter="best", random_state=None
+    )
+    start = time.time()
+    clf = clf.fit(X, y)
+    score_plain = clf.score(X, y)
+    end = time.time()
+    print(f"Running time in SKlearn: {end - start:.2f}s")
 
-        # compare with sklearn
-        clf = DecisionTreeClassifier(
-            max_depth=MAX_DEPTH, criterion="gini", splitter="best", random_state=None
-        )
-        start = time.time()
-        clf = clf.fit(X, y)
-        score_plain = clf.score(X, y)
-        end = time.time()
-        print(f"Running time in SKlearn: {end - start:.2f}s")
+    # mark these data to be protected in SPU
+    X_spu, y_spu = emulator.seal(X, y)
 
-        # mark these data to be protected in SPU
-        X_spu, y_spu = emulator.seal(X, y)
+    # run
+    proc = proc_wrapper(MAX_DEPTH, n_labels)
+    start = time.time()
+    result = emulator.run(proc)(X_spu, y_spu)
+    end = time.time()
+    score_encrpted = jnp.sum((result == y)) / n_samples
+    print(f"Running time in SPU: {end - start:.2f}s")
 
-        # run
-        proc = proc_wrapper(MAX_DEPTH, n_labels)
-        start = time.time()
-        result = emulator.run(proc)(X_spu, y_spu)
-        end = time.time()
-        score_encrpted = jnp.sum((result == y)) / n_samples
-        print(f"Running time in SPU: {end - start:.2f}s")
+    # print acc
+    print(f"Accuracy in SKlearn: {score_plain:.2f}")
+    print(f"Accuracy in SPU: {score_encrpted:.2f}")
 
-        # print acc
-        print(f"Accuracy in SKlearn: {score_plain:.2f}")
-        print(f"Accuracy in SPU: {score_encrpted:.2f}")
 
-    finally:
-        emulator.down()
+def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_tree(emulator)
 
 
 if __name__ == "__main__":
-    emul_tree(emulation.Mode.MULTIPROCESS)
+    cluster_config = emulation.CLUSTER_ABY3_3PC
+    mode = emulation.Mode.MULTIPROCESS
+    bandwidth = 300
+    latency = 20
+    main(cluster_config, mode, bandwidth, latency)

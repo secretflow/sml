@@ -21,10 +21,9 @@ import emulations.utils.emulation as emulation
 from sml.ensemble.forest import RandomForestClassifier as sml_rfc
 
 MAX_DEPTH = 3
-CONFIG_FILE = emulation.CLUSTER_ABY3_3PC
 
 
-def emul_forest(mode=emulation.Mode.MULTIPROCESS):
+def emul_forest(emulator: emulation.Emulator):
     def proc_wrapper(
         n_estimators,
         max_features,
@@ -69,57 +68,63 @@ def emul_forest(mode=emulation.Mode.MULTIPROCESS):
         X, y = new_features[:, ::3], iris_label[:]
         return X, y
 
-    try:
-        # bandwidth and latency only work for docker mode
-        emulator = emulation.Emulator(CONFIG_FILE, mode, bandwidth=300, latency=20)
-        emulator.up()
+    # load mock data
+    X, y = load_data()
+    n_labels = jnp.unique(y).shape[0]
 
-        # load mock data
-        X, y = load_data()
-        n_labels = jnp.unique(y).shape[0]
+    # compare with sklearn
+    rf = RandomForestClassifier(
+        n_estimators=3,
+        max_features=None,
+        criterion="gini",
+        max_depth=MAX_DEPTH,
+        bootstrap=False,
+        max_samples=None,
+    )
+    start = time.time()
+    rf = rf.fit(X, y)
+    score_plain = rf.score(X, y)
+    end = time.time()
+    print(f"Running time in SKlearn: {end - start:.2f}s")
 
-        # compare with sklearn
-        rf = RandomForestClassifier(
-            n_estimators=3,
-            max_features=None,
-            criterion="gini",
-            max_depth=MAX_DEPTH,
-            bootstrap=False,
-            max_samples=None,
-        )
-        start = time.time()
-        rf = rf.fit(X, y)
-        score_plain = rf.score(X, y)
-        end = time.time()
-        print(f"Running time in SKlearn: {end - start:.2f}s")
+    # mark these data to be protected in SPU
+    X_spu, y_spu = emulator.seal(X, y)
 
-        # mark these data to be protected in SPU
-        X_spu, y_spu = emulator.seal(X, y)
+    # run
+    proc = proc_wrapper(
+        n_estimators=3,
+        max_features=0.7,
+        criterion="gini",
+        splitter="best",
+        max_depth=3,
+        bootstrap=False,
+        max_samples=None,
+        n_labels=n_labels,
+    )
+    start = time.time()
+    result = emulator.run(proc)(X_spu, y_spu)
+    end = time.time()
+    score_encrpted = jnp.mean((result == y))
+    print(f"Running time in SPU: {end - start:.2f}s")
 
-        # run
-        proc = proc_wrapper(
-            n_estimators=3,
-            max_features=0.7,
-            criterion="gini",
-            splitter="best",
-            max_depth=3,
-            bootstrap=False,
-            max_samples=None,
-            n_labels=n_labels,
-        )
-        start = time.time()
-        result = emulator.run(proc)(X_spu, y_spu)
-        end = time.time()
-        score_encrpted = jnp.mean((result == y))
-        print(f"Running time in SPU: {end - start:.2f}s")
+    # print acc
+    print(f"Accuracy in SKlearn: {score_plain:.2f}")
+    print(f"Accuracy in SPU: {score_encrpted:.2f}")
 
-        # print acc
-        print(f"Accuracy in SKlearn: {score_plain:.2f}")
-        print(f"Accuracy in SPU: {score_encrpted:.2f}")
 
-    finally:
-        emulator.down()
+def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_forest(emulator)
 
 
 if __name__ == "__main__":
-    emul_forest(emulation.Mode.MULTIPROCESS)
+    cluster_config = emulation.CLUSTER_ABY3_3PC
+    mode = emulation.Mode.MULTIPROCESS
+    bandwidth = 300
+    latency = 20
+    main(cluster_config, mode, bandwidth, latency)

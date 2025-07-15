@@ -19,7 +19,7 @@ import emulations.utils.emulation as emulation
 from sml.utils.extmath import svd
 
 
-def emul_svd(mode: emulation.Mode):
+def emul_svd(emulator: emulation.Emulator):
     print("start svd emulation.")
     np.random.seed(0)
 
@@ -48,19 +48,24 @@ def emul_svd(mode: emulation.Mode):
             np.dot(jax_u, jax_vt), np.dot(u, vt), rtol=0.1, atol=0.1
         )
 
-    try:
-        conf_path = "sml/utils/emulations/3pc_128.json"
-        emulator = emulation.Emulator(conf_path, mode, bandwidth=300, latency=20)
-        emulator.up()
+    _check_svd_single(mat1)
+    _check_svd_single(mat2)
+    print("svd emulation pass.")
 
-        _check_svd_single(mat1)
-        _check_svd_single(mat2)
 
-        print("svd emulation pass.")
-
-    finally:
-        emulator.down()
+def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_svd(emulator)
 
 
 if __name__ == "__main__":
-    emul_svd(emulation.Mode.MULTIPROCESS)
+    cluster_config = "emulations/utils/3pc_128.json"
+    mode = emulation.Mode.MULTIPROCESS
+    bandwidth = 300
+    latency = 20
+    main(cluster_config, mode, bandwidth, latency)

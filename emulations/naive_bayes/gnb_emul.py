@@ -25,7 +25,7 @@ import emulations.utils.emulation as emulation
 from sml.naive_bayes.gnb import GaussianNB
 
 
-def emul_SimpleGNB(mode=emulation.Mode.MULTIPROCESS):
+def emul_SimpleGNB(emulator: emulation.Emulator):
     print("start gaussian naive bayes emulation.")
 
     def proc_fit(X1, y1, X2, y2, classes):
@@ -42,63 +42,66 @@ def emul_SimpleGNB(mode=emulation.Mode.MULTIPROCESS):
 
         return y1_pred, y2_pred
 
-    try:
-        # bandwidth and latency only work for docker mode
-        emulator = emulation.Emulator(
-            emulation.CLUSTER_ABY3_3PC, mode, bandwidth=300, latency=20
-        )
-        emulator.up()
-        # Create a simple dataset
-        partial = 0.5
-        n_samples = 1000
-        n_features = 100
-        centers = 3
-        X, y = datasets.make_blobs(
-            n_samples=n_samples, n_features=n_features, centers=centers
-        )
-        classes = jnp.unique(y)
-        assert len(classes) == centers, f"Retry or increase partial."
-        total_samples = len(y)
-        split_idx = int(partial * len(y))
-        X1, y1 = X[:split_idx], y[:split_idx]
-        X2, y2 = X[split_idx:], y[split_idx:]
+    # Create a simple dataset
+    partial = 0.5
+    n_samples = 1000
+    n_features = 100
+    centers = 3
+    X, y = datasets.make_blobs(
+        n_samples=n_samples, n_features=n_features, centers=centers
+    )
+    classes = jnp.unique(y)
+    assert len(classes) == centers, f"Retry or increase partial."
+    total_samples = len(y)
+    split_idx = int(partial * len(y))
+    X1, y1 = X[:split_idx], y[:split_idx]
+    X2, y2 = X[split_idx:], y[split_idx:]
 
-        X1_spu, y1_spu = emulator.seal(X1, y1)
-        X2_spu, y2_spu = emulator.seal(X2, y2)
+    X1_spu, y1_spu = emulator.seal(X1, y1)
+    X2_spu, y2_spu = emulator.seal(X2, y2)
 
-        y1_pred, y2_pred = emulator.run(proc_fit)(
-            X1_spu, y1_spu, X2_spu, y2_spu, classes
-        )
-        result1 = (y == y1_pred).sum() / total_samples
-        result2 = (y == y2_pred).sum() / total_samples
+    y1_pred, y2_pred = emulator.run(proc_fit)(X1_spu, y1_spu, X2_spu, y2_spu, classes)
+    result1 = (y == y1_pred).sum() / total_samples
+    result2 = (y == y2_pred).sum() / total_samples
 
-        print("gaussian naive bayes result:")
-        print("Prediction accuracy with once fit: ", result1)
-        print("Prediction accuracy with twice fits: ", result2)
-        print()
+    print("gaussian naive bayes result:")
+    print("Prediction accuracy with once fit: ", result1)
+    print("Prediction accuracy with twice fits: ", result2)
+    print()
 
-        # Compare with sklearn
-        model = SklearnGaussianNB()
+    # Compare with sklearn
+    model = SklearnGaussianNB()
 
-        model.fit(X1, y1)
-        y1_pred = model.predict(X)
+    model.fit(X1, y1)
+    y1_pred = model.predict(X)
 
-        model.partial_fit(X2, y2)
-        y2_pred = model.predict(X)
+    model.partial_fit(X2, y2)
+    y2_pred = model.predict(X)
 
-        sk_result1 = (y == y1_pred).sum() / total_samples
-        sk_result2 = (y == y2_pred).sum() / total_samples
+    sk_result1 = (y == y1_pred).sum() / total_samples
+    sk_result2 = (y == y2_pred).sum() / total_samples
 
-        print("sklearn gaussian naive bayes result:")
-        print("Sklearn prediction accuracy with once fit: ", sk_result1)
-        print("Sklearn prediction accuracy with twice fits: ", sk_result2)
+    print("sklearn gaussian naive bayes result:")
+    print("Sklearn prediction accuracy with once fit: ", sk_result1)
+    print("Sklearn prediction accuracy with twice fits: ", sk_result2)
 
-        assert np.isclose(result1, sk_result1, atol=1e-4)
-        assert np.isclose(result2, sk_result2, atol=1e-4)
+    assert np.isclose(result1, sk_result1, atol=1e-4)
+    assert np.isclose(result2, sk_result2, atol=1e-4)
 
-    finally:
-        emulator.down()
+
+def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_SimpleGNB(emulator)
 
 
 if __name__ == "__main__":
-    emul_SimpleGNB(emulation.Mode.MULTIPROCESS)
+    cluster_config = emulation.CLUSTER_ABY3_3PC
+    mode = emulation.Mode.MULTIPROCESS
+    bandwidth = 300
+    latency = 20
+    main(cluster_config, mode, bandwidth, latency)

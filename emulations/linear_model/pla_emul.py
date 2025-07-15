@@ -22,7 +22,7 @@ import emulations.utils.emulation as emulation
 from sml.linear_model.pla import Perceptron
 
 
-def emul_perceptron(mode=emulation.Mode.MULTIPROCESS):
+def emul_perceptron(emulator: emulation.Emulator):
     def proc(x, y):
         model = Perceptron(
             max_iter=20,
@@ -58,45 +58,49 @@ def emul_perceptron(mode=emulation.Mode.MULTIPROCESS):
 
         return x, y
 
-    try:
-        # bandwidth and latency only work for docker mode
-        emulator = emulation.Emulator(
-            emulation.CLUSTER_ABY3_3PC, mode, bandwidth=300, latency=20
-        )
-        emulator.up()
+    # load mock data
+    x, y = load_data()
+    n_samples = len(y)
 
-        # load mock data
-        x, y = load_data()
-        n_samples = len(y)
+    # compare with sklearn
+    sk_pla = sk.Perceptron(
+        max_iter=20,
+        eta0=1.0,
+        penalty="elasticnet",
+        alpha=0.001,
+        l1_ratio=0.7,
+        fit_intercept=True,
+    )
+    result_sk = sk_pla.fit(x, y).predict(x)
+    result_sk = result_sk.reshape(result_sk.shape[0], 1)
+    acc_sk = jnp.sum((result_sk == y)) / n_samples * 100
 
-        # compare with sklearn
-        sk_pla = sk.Perceptron(
-            max_iter=20,
-            eta0=1.0,
-            penalty="elasticnet",
-            alpha=0.001,
-            l1_ratio=0.7,
-            fit_intercept=True,
-        )
-        result_sk = sk_pla.fit(x, y).predict(x)
-        result_sk = result_sk.reshape(result_sk.shape[0], 1)
-        acc_sk = jnp.sum((result_sk == y)) / n_samples * 100
+    # mark these data to be protected in SPU
+    x_spu, y_spu = emulator.seal(x, y)
 
-        # mark these data to be protected in SPU
-        x_spu, y_spu = emulator.seal(x, y)
+    # run
+    result = emulator.run(proc)(x_spu, y_spu)
+    result = result.reshape(result.shape[0], 1)
+    acc_ = jnp.sum((result == y)) / n_samples * 100
 
-        # run
-        result = emulator.run(proc)(x_spu, y_spu)
-        result = result.reshape(result.shape[0], 1)
-        acc_ = jnp.sum((result == y)) / n_samples * 100
+    # print acc
+    print(f"Accuracy in SKlearn: {acc_sk:.2f}%")
+    print(f"Accuracy in SPU: {acc_:.2f}%")
 
-        # print acc
-        print(f"Accuracy in SKlearn: {acc_sk:.2f}%")
-        print(f"Accuracy in SPU: {acc_:.2f}%")
 
-    finally:
-        emulator.down()
+def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_perceptron(emulator)
 
 
 if __name__ == "__main__":
-    emul_perceptron(emulation.Mode.MULTIPROCESS)
+    cluster_config = emulation.CLUSTER_ABY3_3PC
+    mode = emulation.Mode.MULTIPROCESS
+    bandwidth = 300
+    latency = 20
+    main(cluster_config, mode, bandwidth, latency)

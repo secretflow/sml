@@ -70,7 +70,7 @@ def reveal_while_loop(x):
     return x
 
 
-def emul_reveal(mode=emulation.Mode.MULTIPROCESS):
+def emul_reveal(emulator: emulation.Emulator):
     print("start reveal emulation.")
 
     def _check_reveal_single(emulator):
@@ -145,21 +145,26 @@ def emul_reveal(mode=emulation.Mode.MULTIPROCESS):
 
         print("reveal_while_loop pass.")
 
-    try:
-        # ABY3, FM64, fxp=18
-        conf_path = emulation.CLUSTER_ABY3_3PC
-        emulator = emulation.Emulator(conf_path, mode, bandwidth=300, latency=20)
-        emulator.up()
+    _check_reveal_single(emulator)
+    _check_reveal_list(emulator)
+    _check_reveal_while_loop(emulator)
 
-        _check_reveal_single(emulator)
-        _check_reveal_list(emulator)
-        _check_reveal_while_loop(emulator)
+    print("reveal emulation pass.")
 
-        print("reveal emulation pass.")
 
-    finally:
-        emulator.down()
+def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_reveal(emulator)
 
 
 if __name__ == "__main__":
-    emul_reveal(emulation.Mode.MULTIPROCESS)
+    cluster_config = emulation.CLUSTER_ABY3_3PC
+    mode = emulation.Mode.MULTIPROCESS
+    bandwidth = 300
+    latency = 20
+    main(cluster_config, mode, bandwidth, latency)

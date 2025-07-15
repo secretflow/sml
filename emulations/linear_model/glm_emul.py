@@ -42,14 +42,13 @@ def generate_data():
     return X, y, coef, sample_weight
 
 
-def emul_SGDClassifier(mode=emulation.Mode.MULTIPROCESS, num=10):
+def emul_glm(emulator: emulation.Emulator, num=10):
     """
-    Execute the encrypted SGD classifier in a simulation environment and output the results.
 
     Parameters:
     -----------
-    mode : emulation.Mode.MULTIPROCESS
-        The running mode of the simulation environment, using multi-process mode.
+    emulator : emulation.Emulator
+        The emulator instance.
     num : int, optional (default=5)
         The number of values to output.
 
@@ -82,30 +81,34 @@ def emul_SGDClassifier(mode=emulation.Mode.MULTIPROCESS, num=10):
         model.fit(X, y)
         return model.score(X, y), model.predict(X)
 
-    try:
-        X, y, coef, sample_weight = generate_data()
-        # Create the emulator with specified mode and bandwidth/latency settings
-        emulator = emulation.Emulator(
-            emulation.CLUSTER_ABY3_3PC, mode, bandwidth=300, latency=20
-        )
-        emulator.up()
+    X, y, coef, sample_weight = generate_data()
 
-        # Run the proc_ncSolver function using both plaintext and encrypted data
-        raw_score, raw_result = proc_ncSolver(X, y)
+    # Run the proc_ncSolver function using both plaintext and encrypted data
+    raw_score, raw_result = proc_ncSolver(X, y)
 
-        X, y = emulator.seal(X, y)
-        score, result = emulator.run(proc_ncSolver)(X, y)
+    X, y = emulator.seal(X, y)
+    score, result = emulator.run(proc_ncSolver)(X, y)
 
-        # Print the results
-        print("Plaintext D^2: %.2f" % raw_score)
-        print("Plaintext Result (Top %s):" % num, raw_result[:num])
-        print("Encrypted D^2: %.2f" % score)
-        print("Encrypted Result (Top %s):" % num, result[:num])
+    # Print the results
+    print("Plaintext D^2: %.2f" % raw_score)
+    print("Plaintext Result (Top %s):" % num, raw_result[:num])
+    print("Encrypted D^2: %.2f" % score)
+    print("Encrypted Result (Top %s):" % num, result[:num])
 
-    finally:
-        emulator.down()
+
+def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_glm(emulator)
 
 
 if __name__ == "__main__":
-    # Run the emul_SGDClassifier function in MULTIPROCESS mode
-    emul_SGDClassifier(emulation.Mode.MULTIPROCESS)
+    cluster_config = emulation.CLUSTER_ABY3_3PC
+    mode = emulation.Mode.MULTIPROCESS
+    bandwidth = 300
+    latency = 20
+    main(cluster_config, mode, bandwidth, latency)

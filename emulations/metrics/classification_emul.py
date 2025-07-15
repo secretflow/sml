@@ -38,7 +38,7 @@ from sml.metrics.classification.classification import (
 
 # TODO: design the enumation framework, just like py.unittest
 # all emulation action should begin with `emul_` (for reflection)
-def emul_auc(mode=emulation.Mode.MULTIPROCESS):
+def emul_auc(emulator: emulation.Emulator):
     # Create dataset
     row = 10000
     y_true = np.random.randint(0, 2, (row,))
@@ -51,7 +51,7 @@ def emul_auc(mode=emulation.Mode.MULTIPROCESS):
     print(result)
 
 
-def emul_Classification(mode=emulation.Mode.MULTIPROCESS):
+def emul_Classification(emulator: emulation.Emulator):
     def proc(y_true, y_pred, average="binary", labels=None, pos_label=1, transform=1):
         f1 = f1_score(
             y_true,
@@ -116,7 +116,7 @@ def emul_Classification(mode=emulation.Mode.MULTIPROCESS):
     check(spu_result, sk_result)
 
 
-def emul_average_precision_score(mode=emulation.Mode.MULTIPROCESS):
+def emul_average_precision_score(emulator: emulation.Emulator):
     def procBinary(y_true, y_score, **kwargs):
         sk_res = sk_average_precision_score(y_true, y_score, **kwargs)
         spu_res = emulator.run(average_precision_score)(
@@ -187,7 +187,7 @@ def emul_average_precision_score(mode=emulation.Mode.MULTIPROCESS):
         check(sk_res, spu_res)
 
 
-def emul_brier_score_loss(mode=emulation.Mode.MULTIPROCESS):
+def emul_brier_score_loss(emulator: emulation.Emulator):
     def proc_binary(y_true, y_proba, **kwargs):
         sk_res = sk_brier_score_loss(y_true, y_proba, **kwargs)
         spu_res = emulator.run(brier_score_loss)(
@@ -223,19 +223,22 @@ def emul_brier_score_loss(mode=emulation.Mode.MULTIPROCESS):
     check(*proc_binary(y_true, y_proba))
 
 
+def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_auc(emulator)
+        emul_Classification(emulator)
+        emul_average_precision_score(emulator)
+        emul_brier_score_loss(emulator)
+
+
 if __name__ == "__main__":
-    try:
-        # bandwidth and latency only work for docker mode
-        emulator = emulation.Emulator(
-            emulation.CLUSTER_ABY3_3PC,
-            emulation.Mode.MULTIPROCESS,
-            bandwidth=300,
-            latency=20,
-        )
-        emulator.up()
-        emul_auc(emulation.Mode.MULTIPROCESS)
-        emul_Classification(emulation.Mode.MULTIPROCESS)
-        emul_average_precision_score(emulation.Mode.MULTIPROCESS)
-        emul_brier_score_loss(emulation.Mode.MULTIPROCESS)
-    finally:
-        emulator.down()
+    cluster_config = emulation.CLUSTER_ABY3_3PC
+    mode = emulation.Mode.MULTIPROCESS
+    bandwidth = 300
+    latency = 20
+    main(cluster_config, mode, bandwidth, latency)

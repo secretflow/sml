@@ -91,7 +91,7 @@ def _run_gridsearch_test(
     print(f"--- {model_name} Emulation Test Passed ---")
 
 
-def emul_comprehensive_gridsearch(mode):
+def emul_comprehensive_gridsearch(emulator: emulation.Emulator):
     print("Starting Comprehensive GridSearchCV Emulation.")
     random_seed = 42
     np.random.seed(random_seed)
@@ -152,113 +152,111 @@ def emul_comprehensive_gridsearch(mode):
         (jnp.array(train_idx), jnp.array(test_idx))
         for train_idx, test_idx in kf.split(X_reg)
     ]
-    try:
-        emulator = emulation.Emulator(
-            emulation.CLUSTER_ABY3_3PC, mode, bandwidth=300, latency=20
-        )
-        emulator.up()
-        # estimator = LogisticRegression(epochs=3, batch_size=16, class_labels=[0, 1])
-        # param_grid = {'learning_rate': [0.01, 0.1, 0.05], 'C': [1.0, 2.0, 5.0]}
-        # _run_gridsearch_test(
-        #     emulator,
-        #     "LogisticRegression",
-        #     estimator,
-        #     param_grid,
-        #     X_clf_bin,
-        #     y_clf_bin_reshaped,
-        #     'accuracy',
-        #     'classification',
-        #     cv_splits_clf_bin,
-        # )
-        estimator = KNNClassifer(n_classes=n_classes_binary)
-        param_grid = {"n_neighbors": [2, 3, 4, 5]}
-        _run_gridsearch_test(
-            emulator,
-            "KNNClassifier",
-            estimator,
-            param_grid,
-            X_clf_bin,
-            y_clf_bin,
-            "accuracy",
-            "classification",
-            cv_splits_clf_bin,
-        )
-        classes = jnp.unique(y_clf_bin)
-        estimator = GaussianNB(classes_=classes, var_smoothing=1e-7)
-        param_grid = {"var_smoothing": [1e-6, 2e-6, 1e-5]}
-        _run_gridsearch_test(
-            emulator,
-            "GaussianNB",
-            estimator,
-            param_grid,
-            X_clf_bin,
-            y_clf_bin,
-            "accuracy",
-            "classification",
-            cv_splits_clf_bin,
-        )
-        estimator = Perceptron(max_iter=10, eta0=0.1)
-        param_grid = {"alpha": [0.0001, 0.001]}
-        _run_gridsearch_test(
-            emulator,
-            "Perceptron",
-            estimator,
-            param_grid,
-            X_clf_bin,
-            y_clf_bin_negpos_reshaped,
-            "accuracy",
-            "classification",
-            cv_splits_clf_bin,
-        )
-        estimator = SVM(max_iter=10, C=1.0)
-        param_grid = {"C": [0.5, 1.0, 5.0]}
-        _run_gridsearch_test(
-            emulator,
-            "SVM",
-            estimator,
-            param_grid,
-            X_clf_bin,
-            y_clf_bin_negpos,
-            "accuracy",
-            "classification",
-            cv_splits_clf_bin,
-        )
-        estimator = Ridge(solver="cholesky")
-        param_grid = {"alpha": [0.1, 1.0, 10.0]}
-        _run_gridsearch_test(
-            emulator,
-            "Ridge",
-            estimator,
-            param_grid,
-            X_reg,
-            y_reg_reshaped,
-            "r2",
-            "regression",
-            cv_splits_reg,
-        )
-        estimator = _GeneralizedLinearRegressor(max_iter=10)
-        param_grid = {"alpha": [0.0, 0.1, 0.2]}
-        _run_gridsearch_test(
-            emulator,
-            "GeneralizedLinearRegressor",
-            estimator,
-            param_grid,
-            X_reg,
-            y_reg,
-            "neg_mean_squared_error",
-            "regression",
-            cv_splits_reg,
-        )
-        print("\nComprehensive GridSearchCV Emulation finished successfully.")
-    except Exception as e:
-        print(f"\nEmulation failed with error: {e}")
-        import traceback
 
-        traceback.print_exc()
-    finally:
-        print("Shutting down emulator.")
-        emulator.down()
+    # estimator = LogisticRegression(epochs=3, batch_size=16, class_labels=[0, 1])
+    # param_grid = {'learning_rate': [0.01, 0.1, 0.05], 'C': [1.0, 2.0, 5.0]}
+    # _run_gridsearch_test(
+    #     emulator,
+    #     "LogisticRegression",
+    #     estimator,
+    #     param_grid,
+    #     X_clf_bin,
+    #     y_clf_bin_reshaped,
+    #     'accuracy',
+    #     'classification',
+    #     cv_splits_clf_bin,
+    # )
+    estimator = KNNClassifer(n_classes=n_classes_binary)
+    param_grid = {"n_neighbors": [2, 3, 4, 5]}
+    _run_gridsearch_test(
+        emulator,
+        "KNNClassifier",
+        estimator,
+        param_grid,
+        X_clf_bin,
+        y_clf_bin,
+        "accuracy",
+        "classification",
+        cv_splits_clf_bin,
+    )
+    classes = jnp.unique(y_clf_bin)
+    estimator = GaussianNB(classes_=classes, var_smoothing=1e-7)
+    param_grid = {"var_smoothing": [1e-6, 2e-6, 1e-5]}
+    _run_gridsearch_test(
+        emulator,
+        "GaussianNB",
+        estimator,
+        param_grid,
+        X_clf_bin,
+        y_clf_bin,
+        "accuracy",
+        "classification",
+        cv_splits_clf_bin,
+    )
+    estimator = Perceptron(max_iter=10, eta0=0.1)
+    param_grid = {"alpha": [0.0001, 0.001]}
+    _run_gridsearch_test(
+        emulator,
+        "Perceptron",
+        estimator,
+        param_grid,
+        X_clf_bin,
+        y_clf_bin_negpos_reshaped,
+        "accuracy",
+        "classification",
+        cv_splits_clf_bin,
+    )
+    estimator = SVM(max_iter=10, C=1.0)
+    param_grid = {"C": [0.5, 1.0, 5.0]}
+    _run_gridsearch_test(
+        emulator,
+        "SVM",
+        estimator,
+        param_grid,
+        X_clf_bin,
+        y_clf_bin_negpos,
+        "accuracy",
+        "classification",
+        cv_splits_clf_bin,
+    )
+    estimator = Ridge(solver="cholesky")
+    param_grid = {"alpha": [0.1, 1.0, 10.0]}
+    _run_gridsearch_test(
+        emulator,
+        "Ridge",
+        estimator,
+        param_grid,
+        X_reg,
+        y_reg_reshaped,
+        "r2",
+        "regression",
+        cv_splits_reg,
+    )
+    estimator = _GeneralizedLinearRegressor(max_iter=10)
+    param_grid = {"alpha": [0.0, 0.1, 0.2]}
+    _run_gridsearch_test(
+        emulator,
+        "GeneralizedLinearRegressor",
+        estimator,
+        param_grid,
+        X_reg,
+        y_reg,
+        "neg_mean_squared_error",
+        "regression",
+        cv_splits_reg,
+    )
+    print("\nComprehensive GridSearchCV Emulation finished successfully.")
+
+
+def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_comprehensive_gridsearch(emulator)
 
 
 if __name__ == "__main__":
-    emul_comprehensive_gridsearch(emulation.Mode.MULTIPROCESS)
+    main(emulation.CLUSTER_ABY3_3PC, emulation.Mode.MULTIPROCESS, 300, 20)
