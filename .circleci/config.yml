@@ -59,21 +59,11 @@ workflows:
         - not: << pipeline.parameters.GHA_Action >>
         - not: << pipeline.parameters.GHA_Meta >>
     jobs:
-      - path-filtering/filter:
+      - unittest/continue:
           config-path: .circleci/continue-config.yml
           tag: "3.9"
-          mapping: |
-            sml/.* build-and-run true
-            setup.py build-and-run true
-            requirements build-and-run true
       - lint
   publish-workflow:
-    when:
-      equal: ["release", << pipeline.parameters.GHA_Event >>]
     jobs:
       - continuation/continue:
           configuration_path: .circleci/release-config.yml
-          # This is mandatory to trigger a pipeline when pushing a tag
-          filters:
-            tags:
-              only: /.*/

@@ -56,6 +56,7 @@ commands:
 
             python3 setup.py bdist_wheel
             ls dist/*.whl
+            exit 0
             python3 -m twine upload -r pypi -u __token__ -p ${PYPI_TWINE_TOKEN} dist/*.whl
 
 # Define a job to be invoked later in a workflow.
