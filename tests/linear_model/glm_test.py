@@ -14,6 +14,8 @@
 
 import jax.numpy as jnp
 import numpy as np
+import spu.libspu as libspu
+import spu.utils.simulation as spsim
 from sklearn.linear_model._glm import GammaRegressor as std_GammaRegressor
 from sklearn.linear_model._glm import PoissonRegressor as std_PoissonRegressor
 from sklearn.linear_model._glm import TweedieRegressor as std_TweedieRegressor
@@ -21,8 +23,6 @@ from sklearn.linear_model._glm import (
     _GeneralizedLinearRegressor as std__GeneralizedLinearRegressor,
 )
 
-import spu.libspu as libspu
-import spu.utils.simulation as spsim
 from sml.linear_model.glm import (
     GammaRegressor,
     PoissonRegressor,
@@ -90,7 +90,7 @@ def accuracy_test(model, std_model, y, coef, num=5):
         model.predict(X)[:num] - jnp.array(std_model.predict(X)[:num])
     )
     if verbose:
-        print('True Coefficients:', coef[:num])
+        print("True Coefficients:", coef[:num])
         print("Fitted Coefficients:", model.coef_[:num])
         print("std Fitted Coefficients:", std_model.coef_[:num])
         print("D^2 Score:", model.score(X[:num], y[:num]))
@@ -211,7 +211,7 @@ def test_ncSolver_accuracy():
     model = _GeneralizedLinearRegressor()
     std_model = std__GeneralizedLinearRegressor(alpha=0)
     accuracy_test(model, std_model, exp_y, coef)
-    print('test_ncSolver_accuracy: OK')
+    print("test_ncSolver_accuracy: OK")
 
 
 def test_Poisson_accuracy():
@@ -219,7 +219,7 @@ def test_Poisson_accuracy():
     model = PoissonRegressor()
     std_model = std_PoissonRegressor(alpha=0)
     accuracy_test(model, std_model, round_exp_y, coef)
-    print('test_Poisson_accuracy: OK')
+    print("test_Poisson_accuracy: OK")
 
 
 def test_gamma_accuracy():
@@ -227,7 +227,7 @@ def test_gamma_accuracy():
     model = GammaRegressor()
     std_model = std_GammaRegressor(alpha=0)
     accuracy_test(model, std_model, exp_y, coef)
-    print('test_gamma_accuracy: OK')
+    print("test_gamma_accuracy: OK")
 
 
 def test_Tweedie_accuracy(power=1.5):
@@ -235,28 +235,28 @@ def test_Tweedie_accuracy(power=1.5):
     model = TweedieRegressor(power=power)
     std_model = std_TweedieRegressor(alpha=0, power=power)
     accuracy_test(model, std_model, exp_y, coef)
-    print('test_Tweedie_accuracy: OK')
+    print("test_Tweedie_accuracy: OK")
 
 
 def test_ncSolver_encrypted():
     # Test if the results of the Newton-Cholesky solver are correct after encryption
     proc_test(proc_ncSolver, X, y)
-    print('test_ncSolver_encrypted: OK')
+    print("test_ncSolver_encrypted: OK")
 
 
 def test_Poisson_encrypted():
     # Test if the results of the PoissonRegressor model are correct after encryption
     proc_test(proc_Poisson, X, round_exp_y)
-    print('test_Poisson_encrypted: OK')
+    print("test_Poisson_encrypted: OK")
 
 
 def test_gamma_encrypted():
     # Test if the results of the GammaRegressor model are correct after encryption
     proc_test(proc_Gamma, X, exp_y)
-    print('test_gamma_encrypted: OK')
+    print("test_gamma_encrypted: OK")
 
 
 def test_Tweedie_encrypted():
     # Test if the results of the TweedieRegressor model are correct after encryption
     proc_test(proc_Tweedie, X, exp_y)
-    print('test_Tweedie_encrypted: OK')
+    print("test_Tweedie_encrypted: OK")

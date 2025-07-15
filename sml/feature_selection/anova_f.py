@@ -161,7 +161,7 @@ def f_classif(X, y, n_classes, p_value_iter=100, epsilon=1e-8, fpmin=1e-30):
     n_g = jnp.sum(y_oh, axis=0)
     n_g_safe = n_g + epsilon
 
-    sum_g = jnp.einsum('nk,nd->kd', y_oh, X)
+    sum_g = jnp.einsum("nk,nd->kd", y_oh, X)
     mean_g = sum_g / n_g_safe[:, None]
     overall_mean = jnp.mean(X, axis=0)
 

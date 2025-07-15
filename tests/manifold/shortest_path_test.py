@@ -14,10 +14,10 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
-from scipy.sparse.csgraph import shortest_path
-
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
+from scipy.sparse.csgraph import shortest_path
+
 from sml.manifold.dijkstra import mpc_dijkstra
 from sml.manifold.floyd import floyd_opt
 

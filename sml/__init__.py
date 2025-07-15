@@ -27,3 +27,30 @@ from . import (
     tree,
     utils,
 )
+
+try:
+    from importlib.metadata import version
+
+    __version__ = version("sf-sml")
+except ImportError:
+    try:
+        from ._version import version as __version__
+    except ImportError:
+        __version__ = "unknown"
+
+__all__ = [
+    "cluster",
+    "decomposition",
+    "ensemble",
+    "feature_selection",
+    "gaussian_process",
+    "linear_model",
+    "metrics",
+    "naive_bayes",
+    "neighbors",
+    "preprocessing",
+    "svm",
+    "tree",
+    "utils",
+    "__version__",
+]

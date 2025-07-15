@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import jax.numpy as jnp
+import spu.libspu as libspu  # type: ignore
+import spu.utils.simulation as spsim
 from sklearn.datasets import load_iris
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.tree import DecisionTreeClassifier
 
-import spu.libspu as libspu  # type: ignore
-import spu.utils.simulation as spsim
 from sml.ensemble.adaboost import AdaBoostClassifier as sml_Adaboost
 from sml.tree.tree import DecisionTreeClassifier as sml_dtc
 

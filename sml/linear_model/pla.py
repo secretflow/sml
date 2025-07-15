@@ -22,9 +22,9 @@ import jax.numpy as jnp
 
 class Penalty(Enum):
     NONE = None
-    L1 = 'l1'
-    L2 = 'l2'
-    EN = 'elasticnet'
+    L1 = "l1"
+    L2 = "l2"
+    EN = "elasticnet"
 
 
 class Perceptron:
@@ -125,7 +125,7 @@ class Perceptron:
 
     def _hinge_function(self, x, y, w, b):
         """
-        loss = \frac{1}{n} \sum_{i=1}^{n}max\{-y_i(wx_i+b), 0\}.
+        loss = \frac{1}{n} \\sum_{i=1}^{n}max\\{-y_i(wx_i+b), 0\\}.
         """
         y_hat = jnp.matmul(x, w) + b
         y_hat = y_hat.reshape(y_hat.shape[0], 1)

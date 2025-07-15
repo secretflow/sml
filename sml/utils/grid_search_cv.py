@@ -14,11 +14,9 @@
 
 import copy
 import itertools
-import time
 import warnings
 from collections import defaultdict
 
-import jax.lax as lax
 import jax.numpy as jnp
 import numpy as np
 
@@ -121,23 +119,23 @@ class GridSearchCV:
     """
 
     _SCORERS = {
-        'accuracy': accuracy_score,
-        'precision': precision_score,
-        'recall': recall_score,
-        'f1': f1_score,
-        'neg_mean_squared_error': lambda yt, yp: -mean_squared_error(yt, yp),
-        'r2': r2_score,
+        "accuracy": accuracy_score,
+        "precision": precision_score,
+        "recall": recall_score,
+        "f1": f1_score,
+        "neg_mean_squared_error": lambda yt, yp: -mean_squared_error(yt, yp),
+        "r2": r2_score,
     }
 
     def __init__(
         self,
         estimator,
         param_grid,
-        scoring='accuracy',
+        scoring="accuracy",
         cv=5,
         refit=False,
-        error_score='raise',
-        task_type='classification',
+        error_score="raise",
+        task_type="classification",
     ):
         """
         Initialize the GridSearchCV object.
@@ -208,7 +206,7 @@ class GridSearchCV:
                 estimator = copy.deepcopy(self.estimator)
 
                 try:
-                    if hasattr(estimator, 'set_params'):
+                    if hasattr(estimator, "set_params"):
                         estimator.set_params(**params)
                     else:
                         for k, v in params.items():
@@ -218,16 +216,16 @@ class GridSearchCV:
                     y_pred = estimator.predict(X_test)
                     score = self._scorer_func(y_test, y_pred)
                 except Exception as e:
-                    if self.error_score == 'raise':
+                    if self.error_score == "raise":
                         raise e
                     score = self.error_score
                     warnings.warn(f"Fit or score failed: {str(e)}", FitFailedWarning)
                 scores.append(score)
 
             mean_score = jnp.nanmean(jnp.array(scores))
-            results['mean_test_score'].append(mean_score)
+            results["mean_test_score"].append(mean_score)
 
-        mean_test_scores = jnp.array(results['mean_test_score'])
+        mean_test_scores = jnp.array(results["mean_test_score"])
         self.best_index_ = jnp.nanargmax(mean_test_scores)
         self.best_score_ = mean_test_scores[self.best_index_]
 
@@ -237,7 +235,7 @@ class GridSearchCV:
         if self.refit:
             self.best_estimator_ = copy.deepcopy(self.estimator)
             try:
-                if hasattr(self.best_estimator_, 'set_params'):
+                if hasattr(self.best_estimator_, "set_params"):
                     self.best_estimator_.set_params(**self.best_params_)
                 else:
                     for k, v in self.best_params_.items():
@@ -300,10 +298,6 @@ class GridSearchCV:
 class FitFailedWarning(UserWarning):
     """Warning raised when an estimator fails to fit."""
 
-    pass
-
 
 class NotFittedError(ValueError, AttributeError):
     """Exception class to raise if estimator is used before fitting."""
-
-    pass

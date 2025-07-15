@@ -20,7 +20,7 @@ import numpy as np
 from sklearn.decomposition import PCA as SklearnPCA
 
 # Add the sml directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 import sml.utils.emulation as emulation
 
 from ..pca import PCA
@@ -33,7 +33,7 @@ def emul_rsvdPCA(mode: emulation.Mode.MULTIPROCESS):
 
     def proc(X, random_matrix, n_components, n_oversamples, max_power_iter, scale):
         model = PCA(
-            method='rsvd',
+            method="rsvd",
             n_components=n_components,
             n_oversamples=n_oversamples,
             random_matrix=random_matrix,

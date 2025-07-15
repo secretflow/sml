@@ -17,7 +17,6 @@
 import copy
 import ipaddress
 import json
-import logging
 import pathlib
 import re
 import subprocess
@@ -25,12 +24,12 @@ import time
 from enum import Enum
 from typing import Callable
 
-import yaml
-
 import spu.utils.distributed as ppd
-from sml.utils.utils import get_logger
+import yaml
 from spu import libspu
 from spu.utils.polyfill import Process
+
+from sml.utils.utils import get_logger
 
 CLUSTER_ABY3_3PC = "sml/utils/conf/3pc.json"
 SML_HOME = pathlib.Path(__file__).resolve().parent.parent
@@ -53,7 +52,7 @@ SAMPLE_DOCKER_NODE_CONFIG = {
     "image": SAMPLE_IMAGE,
     "ports": [],
     "volumes": [f"{SML_HOME.parent.resolve()}:/home/admin/dev/"],
-    "command": "sh -c \"@0\"",
+    "command": 'sh -c "@0"',
     "networks": {"spu-emulation": {"ipv4_address": None}},
     "cap_add": ["NET_ADMIN"],
 }
@@ -89,7 +88,7 @@ class Emulator:
     ) -> None:
         assert mode in Mode, "Invalid emulator mode"
         self.mode = mode
-        with open(cluster_config, 'r') as file:
+        with open(cluster_config) as file:
             self.conf = json.load(file)
         self.bandwidth = bandwidth
         self.latency = latency
@@ -174,7 +173,7 @@ class Emulator:
             line = proc.stdout.readline()
             if not line:
                 break
-            logger.info(line.decode('utf-8'))
+            logger.info(line.decode("utf-8"))
         exit_code = proc.wait()
         if exit_code != 0:
             raise Exception(f"Run cmd {cmd} failed")
@@ -219,7 +218,7 @@ class Emulator:
             docker_node_yml["ports"].append(f"{node_port}:{node_port}")
             docker_node_yml["networks"]["spu-emulation"]["ipv4_address"] = str(node_ip)
             self.yaml["services"][re.sub(":", "_", node_id)] = docker_node_yml
-        with open(self.emu_tmp_dir / "docker-compose.yml", 'w') as file:
+        with open(self.emu_tmp_dir / "docker-compose.yml", "w") as file:
             yaml.dump(self.yaml, file)
 
         # generate temporary SPU cluster config

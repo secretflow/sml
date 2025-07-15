@@ -24,8 +24,8 @@ def emul_SGDClassifier(mode: emulation.Mode.MULTIPROCESS):
             epochs=1,
             learning_rate=0.1,
             batch_size=1024,
-            reg_type='logistic',
-            penalty='None',
+            reg_type="logistic",
+            penalty="None",
             l2_norm=0.0,
         )
 
