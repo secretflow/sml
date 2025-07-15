@@ -24,15 +24,15 @@ from sklearn.metrics import brier_score_loss as sk_brier_score_loss
 # add ops dir to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../"))
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.metrics.classification.classification import (
     accuracy_score,
     average_precision_score,
+    brier_score_loss,
     f1_score,
     precision_score,
     recall_score,
     roc_auc_score,
-    brier_score_loss,
 )
 
 

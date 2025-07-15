@@ -20,16 +20,16 @@ import numpy as np
 from sklearn import metrics
 
 # add ops dir to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.metrics.regression.regression import (
-    explained_variance_score,
-    mean_squared_error,
-    mean_poisson_deviance,
-    mean_gamma_deviance,
     d2_tweedie_score,
+    explained_variance_score,
+    mean_gamma_deviance,
+    mean_poisson_deviance,
+    mean_squared_error,
 )
 
 

@@ -22,3 +22,4 @@ from .preprocessing import (
     OneHotEncoder,
     RobustScaler,
 )
+from .quantile_transformer import QuantileTransformer
