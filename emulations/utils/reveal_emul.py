@@ -152,7 +152,12 @@ def emul_reveal(emulator: emulation.Emulator):
     print("reveal emulation pass.")
 
 
-def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+def main(
+    cluster_config: str = emulation.CLUSTER_ABY3_3PC,
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
     with emulation.start_emulator(
         cluster_config,
         mode,

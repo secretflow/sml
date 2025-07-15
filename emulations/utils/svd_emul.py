@@ -53,7 +53,12 @@ def emul_svd(emulator: emulation.Emulator):
     print("svd emulation pass.")
 
 
-def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+def main(
+    cluster_config: str = "emulations/utils/3pc_128.json",
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
     with emulation.start_emulator(
         cluster_config,
         mode,

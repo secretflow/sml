@@ -51,7 +51,12 @@ def emul_gpc(emulator: emulation.Emulator):
     print("Accuracy: ", jnp.sum(result == y_pred) / len(y_pred))
 
 
-def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+def main(
+    cluster_config: str = "emulations/gaussian_process/3pc.json",
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
     with emulation.start_emulator(
         cluster_config,
         mode,

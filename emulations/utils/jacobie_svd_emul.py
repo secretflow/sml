@@ -60,7 +60,12 @@ def emul_jacobi_svd(emulator: emulation.Emulator):
     np.testing.assert_allclose(np.abs(Matrix), np.abs(sorted_V_T), rtol=0.1, atol=0.1)
 
 
-def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+def main(
+    cluster_config: str = emulation.CLUSTER_ABY3_3PC,
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
     with emulation.start_emulator(
         cluster_config,
         mode,

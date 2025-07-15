@@ -324,7 +324,12 @@ def emul_nmf(emulator: emulation.Emulator):
     print("=" * 80)
 
 
-def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+def main(
+    cluster_config: str = "emulations/decomposition/3pc.json",
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
     with emulation.start_emulator(
         cluster_config,
         mode,

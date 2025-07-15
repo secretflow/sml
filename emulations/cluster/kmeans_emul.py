@@ -183,7 +183,12 @@ def emul_kmeans_random(emulator: emulation.Emulator):
     np.testing.assert_allclose(result, sk_result, rtol=0, atol=1e-4)
 
 
-def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+def main(
+    cluster_config: str = emulation.CLUSTER_ABY3_3PC,
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
     with emulation.start_emulator(
         cluster_config,
         mode,

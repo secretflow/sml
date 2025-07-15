@@ -74,7 +74,12 @@ def emul_isomap(emulator: emulation.Emulator):
     np.testing.assert_allclose(jnp.abs(X_transformed), jnp.abs(ans), rtol=0, atol=1e-1)
 
 
-def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+def main(
+    cluster_config: str = emulation.CLUSTER_ABY3_3PC,
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
     with emulation.start_emulator(
         cluster_config,
         mode,

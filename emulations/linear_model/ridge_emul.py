@@ -58,7 +58,12 @@ def emul_Ridge(emulator: emulation.Emulator):
         print(jnp.round(jnp.abs(result - sklearn_result)[:20], 5))
 
 
-def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+def main(
+    cluster_config: str = emulation.CLUSTER_ABY3_3PC,
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
     with emulation.start_emulator(
         cluster_config,
         mode,

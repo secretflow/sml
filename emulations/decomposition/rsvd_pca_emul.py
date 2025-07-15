@@ -93,7 +93,12 @@ def emul_rsvdPCA(emulator: emulation.Emulator):
     assert np.allclose(X_reconstructed, result[2], atol=1e-1)
 
 
-def main(cluster_config: str, mode: emulation.Mode, bandwidth: int, latency: int):
+def main(
+    cluster_config: str = "emulations/decomposition/3pc.json",
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
     with emulation.start_emulator(
         cluster_config,
         mode,
