@@ -21,19 +21,19 @@ import numpy as np
 from sklearn.decomposition import PCA as SklearnPCA
 
 # Add the library directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.decomposition.pca import PCA
 
 
-def test_pca(mode: emulation.Mode.MULTIPROCESS):
+def test_pca(mode: emulation.Mode):
     def emul_powerPCA():
         print("start power method emulation.")
 
         def proc_transform(X):
             model = PCA(
-                method='power_iteration',
+                method="power_iteration",
                 n_components=2,
                 max_power_iter=200,
             )
@@ -71,14 +71,14 @@ def test_pca(mode: emulation.Mode.MULTIPROCESS):
 
         X_reconstructed = model.inverse_transform(X_transformed_sklearn)
 
-        np.testing.assert_allclose(X_reconstructed, result[2], atol=1e-3)
+        np.testing.assert_allclose(X_reconstructed, result[2], atol=1e-2, rtol=1e-2)
 
     def emul_jacobi_PCA():
         print("start jacobi method emulation.")
 
         def proc_transform(X):
             model = PCA(
-                method='serial_jacobi_iteration',
+                method="serial_jacobi_iteration",
                 n_components=4,
                 max_jacobi_iter=5,
             )

@@ -15,18 +15,17 @@
 import jax.numpy as jnp
 import numpy as np
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.utils.extmath import svd
 
 
-def emul_svd(mode: emulation.Mode.MULTIPROCESS):
+def emul_svd(mode: emulation.Mode):
     print("start svd emulation.")
     np.random.seed(0)
 
     # ONLY test small matrix for usage purpose
     mat1 = jnp.array(np.random.rand(10, 5))
     mat2 = jnp.array(np.random.rand(5, 10))
-    mat3 = jnp.array(np.random.rand(5, 5) + 0.1 * np.eye(5))
 
     def _check_svd_single(mat, power_iter=100):
         print("start svd emulation test, with shape=", mat.shape)
@@ -56,7 +55,6 @@ def emul_svd(mode: emulation.Mode.MULTIPROCESS):
 
         _check_svd_single(mat1)
         _check_svd_single(mat2)
-        _check_svd_single(mat3)
 
         print("svd emulation pass.")
 

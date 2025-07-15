@@ -12,19 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
 from enum import Enum
 
 import jax.numpy as jnp
 
-from ..utils import extmath
+from sml.utils import extmath
 
 
 class Method(Enum):
-    PCA_power = 'power_iteration'
-    PCA_jacobi = 'serial_jacobi_iteration'
-    PCA_rsvd = 'rsvd'
+    PCA_power = "power_iteration"
+    PCA_jacobi = "serial_jacobi_iteration"
+    PCA_rsvd = "rsvd"
 
 
 class PCA:

@@ -20,13 +20,13 @@ from sklearn.datasets import load_iris
 
 # Add the library directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.gaussian_process._gpc import GaussianProcessClassifier
 
 
-def emul_gpc(mode: emulation.Mode.MULTIPROCESS):
+def emul_gpc(mode: emulation.Mode):
     def proc(x, y, x_pred):
-        model = GaussianProcessClassifier(max_iter_predict=10, n_classes_=3)
+        model = GaussianProcessClassifier(max_iter_predict=10, n_classes=3)
         model.fit(x, y)
 
         pred = model.predict(x_pred)
@@ -35,7 +35,7 @@ def emul_gpc(mode: emulation.Mode.MULTIPROCESS):
     try:
         # bandwidth and latency only work for docker mode
         emulator = emulation.Emulator(
-            "sml/gaussian_process/emulations/3pc.json", mode, bandwidth=300, latency=20
+            "emulations/gaussian_process/3pc.json", mode, bandwidth=300, latency=20
         )
         emulator.up()
 
