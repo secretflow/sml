@@ -16,13 +16,12 @@ import os
 import sys
 
 import numpy as np
+import spu.libspu as libspu
+import spu.utils.simulation as spsim
 from sklearn.datasets import load_iris
 from sklearn.feature_selection import chi2 as chi2_sklearn
 
-import spu.libspu as libspu
-import spu.utils.simulation as spsim
-
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 from sml.feature_selection.univariate_selection import chi2
 
 
@@ -48,7 +47,7 @@ def test_chi2():
     print("Sklearn chi2 stats result:")
     print(sklearn_chi2_stats)
     assert np.allclose(
-        sklearn_chi2_stats,
+        chi2_stats,
         sklearn_chi2_stats,
         rtol=1.0e-5,
         atol=1.0e-2,
