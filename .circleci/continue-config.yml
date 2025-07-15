@@ -48,23 +48,22 @@ commands:
       - run:
           name: "sml_test"
           command: |
-            set +e
-
-            declare -i status0=0
-            declare -i status1=0
-            declare -i status2=0
+            set -ex
 
             python -m pip install -r requirements.txt
-            python setup.py bdist_wheel; status1=${PIPESTATUS[0]}
+
+            python setup.py bdist_wheel
             # install sml
-            python -m pip install ./dist/*.whl; status2=${PIPESTATUS[0]}
+            python -m pip install ./dist/*.whl
 
             python -m pip install pytest==7.3.1 pytest-testmon pytest-custom-exit-code pytest-xdist pytest-cov
-            python -m pytest --suppress-no-test-exit-code --testmon ./ | tee -a sml_test_result.log; status3=${PIPESTATUS[0]}
+
+            set +e
+            python -m pytest --suppress-no-test-exit-code --testmon ./ | tee -a sml_test_result.log ; status=${PIPESTATUS[0]}
+            set -e
 
             tar -czvf test_logs.tar.gz sml_test_result.log
 
-            status=$((${status0} + ${status1} + ${status2} + ${status3}))
             exit ${status}
       - store_test_results:
           path: test-results
