@@ -150,7 +150,7 @@ class UnitTests:
         sk_result.sort(axis=0)
         # print("sklearn:\n", sk_result)
 
-        assert np.allclose(result, sk_result, rtol=0, atol=1e-4)
+        np.testing.assert_allclose(result, sk_result, rtol=0, atol=1e-4)
 
     def test_kmeans_init_array(self):
         sim = spsim.Simulator.simple(3, libspu.ProtocolKind.ABY3, libspu.FieldType.FM64)
