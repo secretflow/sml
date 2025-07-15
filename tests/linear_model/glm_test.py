@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-
 import jax.numpy as jnp
 import numpy as np
 from sklearn.linear_model._glm import GammaRegressor as std_GammaRegressor
@@ -208,56 +206,57 @@ def proc_Tweedie(X, exp_y):
     return model.coef_
 
 
-class TestGeneralizedLinearRegressor(unittest.TestCase):
-    def test_ncSolver_accuracy(self):
-        # Test the accuracy of the Generalized Linear Regression model using Newton-Cholesky solver
-        model = _GeneralizedLinearRegressor()
-        std_model = std__GeneralizedLinearRegressor(alpha=0)
-        accuracy_test(model, std_model, exp_y, coef)
-        print('test_ncSolver_accuracy: OK')
-
-    def test_Poisson_accuracy(self):
-        # Test the accuracy of the PoissonRegressor model
-        model = PoissonRegressor()
-        std_model = std_PoissonRegressor(alpha=0)
-        accuracy_test(model, std_model, round_exp_y, coef)
-        print('test_Poisson_accuracy: OK')
-
-    def test_gamma_accuracy(self):
-        # Test the accuracy of the GammaRegressor model
-        model = GammaRegressor()
-        std_model = std_GammaRegressor(alpha=0)
-        accuracy_test(model, std_model, exp_y, coef)
-        print('test_gamma_accuracy: OK')
-
-    def test_Tweedie_accuracy(self, power=1.5):
-        # Test the accuracy of the TweedieRegressor model
-        model = TweedieRegressor(power=power)
-        std_model = std_TweedieRegressor(alpha=0, power=power)
-        accuracy_test(model, std_model, exp_y, coef)
-        print('test_Tweedie_accuracy: OK')
-
-    def test_ncSolver_encrypted(self):
-        # Test if the results of the Newton-Cholesky solver are correct after encryption
-        proc_test(proc_ncSolver, X, y)
-        print('test_ncSolver_encrypted: OK')
-
-    def test_Poisson_encrypted(self):
-        # Test if the results of the PoissonRegressor model are correct after encryption
-        proc_test(proc_Poisson, X, round_exp_y)
-        print('test_Poisson_encrypted: OK')
-
-    def test_gamma_encrypted(self):
-        # Test if the results of the GammaRegressor model are correct after encryption
-        proc_test(proc_Gamma, X, exp_y)
-        print('test_gamma_encrypted: OK')
-
-    def test_Tweedie_encrypted(self):
-        # Test if the results of the TweedieRegressor model are correct after encryption
-        proc_test(proc_Tweedie, X, exp_y)
-        print('test_Tweedie_encrypted: OK')
+def test_ncSolver_accuracy():
+    # Test the accuracy of the Generalized Linear Regression model using Newton-Cholesky solver
+    model = _GeneralizedLinearRegressor()
+    std_model = std__GeneralizedLinearRegressor(alpha=0)
+    accuracy_test(model, std_model, exp_y, coef)
+    print('test_ncSolver_accuracy: OK')
 
 
-if __name__ == '__main__':
-    # Run the unit tests
-    unittest.main()
+def test_Poisson_accuracy():
+    # Test the accuracy of the PoissonRegressor model
+    model = PoissonRegressor()
+    std_model = std_PoissonRegressor(alpha=0)
+    accuracy_test(model, std_model, round_exp_y, coef)
+    print('test_Poisson_accuracy: OK')
+
+
+def test_gamma_accuracy():
+    # Test the accuracy of the GammaRegressor model
+    model = GammaRegressor()
+    std_model = std_GammaRegressor(alpha=0)
+    accuracy_test(model, std_model, exp_y, coef)
+    print('test_gamma_accuracy: OK')
+
+
+def test_Tweedie_accuracy(power=1.5):
+    # Test the accuracy of the TweedieRegressor model
+    model = TweedieRegressor(power=power)
+    std_model = std_TweedieRegressor(alpha=0, power=power)
+    accuracy_test(model, std_model, exp_y, coef)
+    print('test_Tweedie_accuracy: OK')
+
+
+def test_ncSolver_encrypted():
+    # Test if the results of the Newton-Cholesky solver are correct after encryption
+    proc_test(proc_ncSolver, X, y)
+    print('test_ncSolver_encrypted: OK')
+
+
+def test_Poisson_encrypted():
+    # Test if the results of the PoissonRegressor model are correct after encryption
+    proc_test(proc_Poisson, X, round_exp_y)
+    print('test_Poisson_encrypted: OK')
+
+
+def test_gamma_encrypted():
+    # Test if the results of the GammaRegressor model are correct after encryption
+    proc_test(proc_Gamma, X, exp_y)
+    print('test_gamma_encrypted: OK')
+
+
+def test_Tweedie_encrypted():
+    # Test if the results of the TweedieRegressor model are correct after encryption
+    proc_test(proc_Tweedie, X, exp_y)
+    print('test_Tweedie_encrypted: OK')
