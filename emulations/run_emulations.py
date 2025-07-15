@@ -23,6 +23,8 @@ providing a comprehensive report of results.
 import argparse
 import importlib
 import inspect
+import multiprocessing
+import queue
 import sys
 import time
 import traceback
@@ -63,6 +65,7 @@ class EmulationRunner:
         slowest_tests_count: int = 5,
         target_module: Optional[str] = None,
         verbose: bool = False,
+        timeout: int = 300,
     ):
         """
         Initialize the emulation runner.
@@ -75,6 +78,7 @@ class EmulationRunner:
             slowest_tests_count: Number of slowest tests to show in report
             target_module: Specific module to run (e.g., 'emulations.cluster.kmeans_emul')
             verbose: Whether to show verbose output during execution
+            timeout: Timeout for each emulation test in seconds (0 means no timeout)
         """
         # Check for docker mode and raise error
         if mode.lower() == "docker":
@@ -93,6 +97,7 @@ class EmulationRunner:
         self.slowest_tests_count = slowest_tests_count
         self.target_module = target_module
         self.verbose = verbose
+        self.timeout = timeout
         self.results: List[TestResult] = []
 
     def discover_emulation_files(self) -> List[str]:
@@ -125,39 +130,33 @@ class EmulationRunner:
         """
         return hasattr(module, "main") and callable(getattr(module, "main"))
 
-    def run_main_function(self, module_path: str) -> TestResult:
+    def _run_main_in_process(
+        self, module_path: str, result_queue: multiprocessing.Queue
+    ) -> None:
         """
-        Run the main function from a specific emulation module.
+        Helper function to run main function in a separate process.
 
         Args:
-            module_path: Path to the module (e.g., 'emulations.cluster.kmeans_emul')
-
-        Returns:
-            TestResult object with execution details
+            module_path: Path to the module
+            result_queue: Queue to store the result
         """
-        start_time = time.time()
-
         try:
             # Import the module
             module = importlib.import_module(module_path)
 
             # Check if main function exists
             if not self.discover_main_function(module):
-                duration = time.time() - start_time
-                return TestResult(
-                    module_path=module_path,
-                    function_name="main",
-                    success=False,
-                    duration=duration,
-                    error_message="No main function found",
-                    error_type="AttributeError",
+                result_queue.put(
+                    {
+                        "success": False,
+                        "error_message": "No main function found",
+                        "error_type": "AttributeError",
+                    }
                 )
+                return
 
             # Get the main function
             main_func = getattr(module, "main")
-
-            if self.verbose:
-                print(f"  Running main function...")
 
             # Prepare arguments for main function
             main_kwargs = {}
@@ -183,12 +182,124 @@ class EmulationRunner:
                 # Call with no arguments if no matching parameters or no override values
                 main_func()
 
+            # If we get here, the function completed successfully
+            result_queue.put({"success": True})
+
+        except Exception as e:
+            error_type = type(e).__name__
+            error_message = str(e)
+            result_queue.put(
+                {
+                    "success": False,
+                    "error_message": error_message,
+                    "error_type": error_type,
+                    "traceback": traceback.format_exc(),
+                }
+            )
+
+    def run_main_function(self, module_path: str) -> TestResult:
+        """
+        Run the main function from a specific emulation module in a separate process.
+
+        Args:
+            module_path: Path to the module (e.g., 'emulations.cluster.kmeans_emul')
+
+        Returns:
+            TestResult object with execution details
+        """
+        start_time = time.time()
+
+        if self.verbose:
+            print(f"  Running main function in separate process...")
+
+        # Create a queue for inter-process communication
+        # Note: we use a separate process to run to avoid the grpc termination issue.
+        result_queue = multiprocessing.Queue()
+
+        # Create and start the process
+        process = multiprocessing.Process(
+            target=self._run_main_in_process, args=(module_path, result_queue)
+        )
+
+        try:
+            process.start()
+
+            # Wait for the process to complete with a timeout
+            timeout_value = None if self.timeout == 0 else self.timeout
+            process.join(timeout=timeout_value)
+
             duration = time.time() - start_time
+
+            # Check if process is still alive (timeout occurred)
+            if process.is_alive():
+                process.terminate()
+                process.join(timeout=5)  # Give it 5 seconds to terminate gracefully
+                if process.is_alive():
+                    process.kill()  # Force kill if still alive
+
+                timeout_msg = (
+                    "Process timeout (no timeout limit set)"
+                    if self.timeout == 0
+                    else f"Process timeout (exceeded {self.timeout} seconds)"
+                )
+                return TestResult(
+                    module_path=module_path,
+                    function_name="main",
+                    success=False,
+                    duration=duration,
+                    error_message=timeout_msg,
+                    error_type="TimeoutError",
+                )
+
+            # Check process exit code
+            if process.exitcode != 0 and result_queue.empty():
+                return TestResult(
+                    module_path=module_path,
+                    function_name="main",
+                    success=False,
+                    duration=duration,
+                    error_message=f"Process exited with code {process.exitcode}",
+                    error_type="ProcessError",
+                )
+
+            # Get result from queue
+            if not result_queue.empty():
+                try:
+                    result = result_queue.get_nowait()
+
+                    if result["success"]:
+                        return TestResult(
+                            module_path=module_path,
+                            function_name="main",
+                            success=True,
+                            duration=duration,
+                        )
+                    else:
+                        if self.verbose and "traceback" in result:
+                            print(
+                                f"  ERROR in main: {result['error_type']}: {result['error_message']}"
+                            )
+                            print(result["traceback"])
+
+                        return TestResult(
+                            module_path=module_path,
+                            function_name="main",
+                            success=False,
+                            duration=duration,
+                            error_message=result["error_message"],
+                            error_type=result["error_type"],
+                        )
+                except queue.Empty:
+                    pass
+
+            # If we get here, something went wrong
             return TestResult(
                 module_path=module_path,
                 function_name="main",
-                success=True,
+                success=False,
                 duration=duration,
+                error_message="No result received from process",
+                error_type="ProcessError",
             )
 
         except Exception as e:
@@ -197,8 +308,15 @@ class EmulationRunner:
             error_message = str(e)
 
             if self.verbose:
-                print(f"  ERROR in main: {error_type}: {error_message}")
+                print(f"  ERROR in process management: {error_type}: {error_message}")
                 traceback.print_exc()
+
+            # Clean up process if still running
+            if process.is_alive():
+                process.terminate()
+                process.join(timeout=5)
+                if process.is_alive():
+                    process.kill()
 
             return TestResult(
                 module_path=module_path,
@@ -380,6 +498,14 @@ class EmulationRunner:
 
 def main():
     """Main entry point for the batch emulation runner."""
+    # Set multiprocessing start method to 'spawn' for better isolation
+    if hasattr(multiprocessing, "set_start_method"):
+        try:
+            multiprocessing.set_start_method("spawn", force=True)
+        except RuntimeError:
+            # Start method already set, ignore
+            pass
+
     usage_examples = """
     Examples:
       # Run with default parameters(all emulations will be run with default configs)
@@ -399,6 +525,12 @@ def main():
       
       # Verbose output with top 10 slowest tests
       python emulations/run_emulations.py --verbose --slowest-tests=10
+      
+      # Run with custom timeout (e.g., 600 seconds)
+      python emulations/run_emulations.py --timeout=600
+      
+      # Run with no timeout limit (useful for long-running tests)
+      python emulations/run_emulations.py --timeout=0
     """
 
     parser = argparse.ArgumentParser(
@@ -439,6 +571,12 @@ def main():
         help="Run a specific module only (e.g., 'emulations.cluster.kmeans_emul')",
     )
     parser.add_argument(
+        "--timeout",
+        type=int,
+        default=300,
+        help="Timeout for each emulation test in seconds (default: 300). Use 0 for no timeout limit.",
+    )
+    parser.add_argument(
         "--verbose",
         "-v",
         action="store_true",
@@ -462,6 +600,7 @@ def main():
             slowest_tests_count=getattr(args, "slowest_tests", 5),
             target_module=args.module,
             verbose=args.verbose,
+            timeout=args.timeout,
         )
     except ValueError as e:
         print(f"❌ Error: {e}")

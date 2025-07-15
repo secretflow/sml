@@ -49,8 +49,8 @@ def emul_quantile(emulator: emulation.Emulator):
 
         key = random.PRNGKey(42)
         key, subkey = random.split(key)
-        X = random.normal(subkey, (100, 2))
-        y = 5 * X[:, 0] + 2 * X[:, 1] + random.normal(key, (100,)) * 0.1
+        X = random.normal(subkey, (50, 2))
+        y = 5 * X[:, 0] + 2 * X[:, 1] + random.normal(key, (50,)) * 0.1
         return X, y
 
     # load mock data
@@ -72,10 +72,10 @@ def emul_quantile(emulator: emulation.Emulator):
     # mark these data to be protected in SPU
     X_spu, y_spu = emulator.seal(X, y)
 
-    # run
-    # Larger max_iter can give higher accuracy, but it will take more time to run
+    # run larger max_iter can give higher accuracy, but it will take more time to run
+    # Note: here we use a very small max_iter to avoid the timeout issue.
     proc = proc_wrapper(
-        quantile=0.2, alpha=0.1, fit_intercept=True, lr=0.01, max_iter=200
+        quantile=0.2, alpha=0.1, fit_intercept=True, lr=0.01, max_iter=10
     )
     start = time.time()
     result, coef, intercept = emulator.run(proc)(X_spu, y_spu)
