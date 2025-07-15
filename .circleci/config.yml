@@ -65,8 +65,12 @@ workflows:
           tag: "3.9"
           mapping: |
             sml/.* build-and-run true
+            emulations/.* build-and-run true
+            .circleci/.* build-and-run true
             setup.py build-and-run true
-            requirements build-and-run true
+            pyproject.toml build-and-run true
+            requirements.txt build-and-run true
+            tests/.* build-and-run true
       - lint
   publish-workflow:
     when:
