@@ -27,7 +27,7 @@ executors:
       resource_class:
         type: string
     docker:
-      - image: secretflow/ubuntu-base-ci:latest
+      - image: secretflow/ubuntu-base-ci:20250228
     resource_class: << parameters.resource_class >>
     shell: /bin/bash --login -eo pipefail
 

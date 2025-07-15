@@ -30,12 +30,12 @@ parameters:
 executors:
   linux_x64_executor: # declares a reusable executor
     docker:
-      - image: secretflow/release-ci:latest
+      - image: secretflow/release-ci:20250228
     resource_class: 2xlarge
     shell: /bin/bash --login -eo pipefail
   linux_aarch64_executor:
     docker:
-      - image: secretflow/release-ci-aarch64:latest
+      - image: secretflow/release-ci-aarch64:20250228
     resource_class: arm.2xlarge
     shell: /bin/bash --login -eo pipefail
 
@@ -64,7 +64,7 @@ commands:
 jobs:
   macOS_publish:
     macos:
-      xcode: 16.0.0
+      xcode: 15.4.0
     resource_class: macos.m1.large.gen1
     parameters:
       python_ver:
@@ -78,7 +78,7 @@ jobs:
       - run:
           name: "Install Miniconda"
           command: |
-            wget https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh -O ~/miniconda.sh
+            wget https://repo.anaconda.com/miniconda/Miniconda3-py313_25.5.1-0-MacOSX-arm64.sh -O ~/miniconda.sh
             bash ~/miniconda.sh -b -p $HOME/miniconda
             source $HOME/miniconda/bin/activate
             conda init zsh bash
