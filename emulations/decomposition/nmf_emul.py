@@ -122,7 +122,7 @@ def evaluate_nmf_quality(X, W, H, reconstruction_err=None):
         metrics["spearman_correlation"] = spearman_corr
         metrics["spearman_p_value"] = spearman_p
         print(f"Spearman correlation: {spearman_corr:.4f} (p-value: {spearman_p:.4f})")
-    except:
+    except ValueError:
         metrics["spearman_correlation"] = np.nan
         metrics["spearman_p_value"] = np.nan
         print("✗ Cannot compute Spearman correlation")
