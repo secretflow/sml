@@ -62,7 +62,7 @@ def evaluate_nmf_quality(X, W, H, reconstruction_err=None):
             print("⚠ Moderate numerical stability (condition numbers < 1000)")
         else:
             print("✗ Poor numerical stability (condition numbers too large)")
-    except:
+    except np.linalg.LinAlgError:
         metrics["condition_number_W"] = np.inf
         metrics["condition_number_H"] = np.inf
         print("✗ Cannot compute condition numbers")
