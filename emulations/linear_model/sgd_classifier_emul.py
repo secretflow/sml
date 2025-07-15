@@ -12,20 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.linear_model.sgd_classifier import SGDClassifier
 from sml.utils.dataset_utils import load_mock_datasets
 
 
-def emul_SGDClassifier(mode: emulation.Mode.MULTIPROCESS):
+def emul_SGDClassifier(mode=emulation.Mode.MULTIPROCESS):
 
     def proc(x, y):
         model = SGDClassifier(
             epochs=1,
             learning_rate=0.1,
             batch_size=1024,
-            reg_type='logistic',
-            penalty='None',
+            reg_type="logistic",
+            penalty="None",
             l2_norm=0.0,
         )
 

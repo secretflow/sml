@@ -22,7 +22,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 # Add the library directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../"))
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.linear_model.logistic import LogisticRegression
 
 

@@ -23,16 +23,16 @@ from sklearn.neighbors import KNeighborsClassifier
 # from sklearn.metrics import roc_auc_score, explained_variance_score
 
 # Add the library directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.neighbors.knn import KNNClassifer
 
 
 # TODO: design the enumation framework, just like py.unittest
 # all emulation action should begin with `emul_` (for reflection)
-def emul_KNN(mode: emulation.Mode.MULTIPROCESS):
-    def proc_KNN(X_train, y_train, X_test, n_classes, n_neighbors=5, weights='uniform'):
+def emul_KNN(mode=emulation.Mode.MULTIPROCESS):
+    def proc_KNN(X_train, y_train, X_test, n_classes, n_neighbors=5, weights="uniform"):
         knn_model = KNNClassifer(
             n_neighbors=n_neighbors, weights=weights, n_classes=n_classes
         )
@@ -68,11 +68,11 @@ def emul_KNN(mode: emulation.Mode.MULTIPROCESS):
         ) = emulator.seal(X_train, y_train_new, X_test)
 
         result_uniform = emulator.run(proc_KNN, static_argnums=(3, 4, 5))(
-            X_train_, y_train_new_, X_test_, n_classes, n_neighbors, 'uniform'
+            X_train_, y_train_new_, X_test_, n_classes, n_neighbors, "uniform"
         )
 
         result_distance = emulator.run(proc_KNN, static_argnums=(3, 4, 5))(
-            X_train_, y_train_new_, X_test_, n_classes, n_neighbors, 'distance'
+            X_train_, y_train_new_, X_test_, n_classes, n_neighbors, "distance"
         )
 
         # 再从连续数组映射回原来的标签
@@ -91,14 +91,14 @@ def emul_KNN(mode: emulation.Mode.MULTIPROCESS):
         y_train = np.array(y_train)
         X_test = np.array(X_test)
 
-        neigh_uni = KNeighborsClassifier(n_neighbors=3, weights='uniform')
+        neigh_uni = KNeighborsClassifier(n_neighbors=3, weights="uniform")
         neigh_uni.fit(X_train, y_train)
 
         sklearn_predictions = neigh_uni.predict(X_test)
 
         assert np.array_equal(predictions_uniform, sklearn_predictions)
 
-        neigh_dis = KNeighborsClassifier(n_neighbors=3, weights='distance')
+        neigh_dis = KNeighborsClassifier(n_neighbors=3, weights="distance")
         neigh_dis.fit(X_train, y_train)
 
         sklearn_predictions = neigh_dis.predict(X_test)

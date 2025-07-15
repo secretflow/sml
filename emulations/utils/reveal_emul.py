@@ -16,7 +16,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.utils.utils import sml_reveal
 
 
@@ -70,7 +70,7 @@ def reveal_while_loop(x):
     return x
 
 
-def emul_reveal(mode: emulation.Mode.MULTIPROCESS):
+def emul_reveal(mode=emulation.Mode.MULTIPROCESS):
     print("start reveal emulation.")
 
     def _check_reveal_single(emulator):

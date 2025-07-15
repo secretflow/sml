@@ -20,12 +20,12 @@ import numpy as np
 from sklearn import datasets
 from sklearn.naive_bayes import GaussianNB as SklearnGaussianNB
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
-import sml.utils.emulation as emulation
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
+import emulations.utils.emulation as emulation
 from sml.naive_bayes.gnb import GaussianNB
 
 
-def emul_SimpleGNB(mode: emulation.Mode.MULTIPROCESS):
+def emul_SimpleGNB(mode=emulation.Mode.MULTIPROCESS):
     print("start gaussian naive bayes emulation.")
 
     def proc_fit(X1, y1, X2, y2, classes):
@@ -57,7 +57,7 @@ def emul_SimpleGNB(mode: emulation.Mode.MULTIPROCESS):
             n_samples=n_samples, n_features=n_features, centers=centers
         )
         classes = jnp.unique(y)
-        assert len(classes) == centers, f'Retry or increase partial.'
+        assert len(classes) == centers, f"Retry or increase partial."
         total_samples = len(y)
         split_idx = int(partial * len(y))
         X1, y1 = X[:split_idx], y[:split_idx]

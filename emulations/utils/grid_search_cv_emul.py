@@ -24,9 +24,9 @@ import numpy as np
 from sklearn.datasets import make_classification, make_regression
 from sklearn.model_selection import KFold, StratifiedKFold
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.ensemble.adaboost import AdaBoostClassifier
 from sml.ensemble.forest import RandomForestClassifier
 from sml.gaussian_process._gpc import GaussianProcessClassifier
@@ -126,7 +126,7 @@ def emul_comprehensive_gridsearch(mode):
     X_clf_multi = jnp.array(X_clf_multi)
     y_clf_multi = jnp.array(y_clf_multi_np)
     y_clf_multi_reshaped = y_clf_multi.reshape(-1, 1)
-    binner = KBinsDiscretizer(n_bins=2, strategy='uniform')
+    binner = KBinsDiscretizer(n_bins=2, strategy="uniform")
     X_clf_bin_binary_features = binner.fit_transform(X_clf_bin)
     X_reg, y_reg_np = make_regression(
         n_samples=n_samples,
@@ -171,7 +171,7 @@ def emul_comprehensive_gridsearch(mode):
         #     cv_splits_clf_bin,
         # )
         estimator = KNNClassifer(n_classes=n_classes_binary)
-        param_grid = {'n_neighbors': [2, 3, 4, 5]}
+        param_grid = {"n_neighbors": [2, 3, 4, 5]}
         _run_gridsearch_test(
             emulator,
             "KNNClassifier",
@@ -179,13 +179,13 @@ def emul_comprehensive_gridsearch(mode):
             param_grid,
             X_clf_bin,
             y_clf_bin,
-            'accuracy',
-            'classification',
+            "accuracy",
+            "classification",
             cv_splits_clf_bin,
         )
         classes = jnp.unique(y_clf_bin)
         estimator = GaussianNB(classes_=classes, var_smoothing=1e-7)
-        param_grid = {'var_smoothing': [1e-6, 2e-6, 1e-5]}
+        param_grid = {"var_smoothing": [1e-6, 2e-6, 1e-5]}
         _run_gridsearch_test(
             emulator,
             "GaussianNB",
@@ -193,12 +193,12 @@ def emul_comprehensive_gridsearch(mode):
             param_grid,
             X_clf_bin,
             y_clf_bin,
-            'accuracy',
-            'classification',
+            "accuracy",
+            "classification",
             cv_splits_clf_bin,
         )
         estimator = Perceptron(max_iter=10, eta0=0.1)
-        param_grid = {'alpha': [0.0001, 0.001]}
+        param_grid = {"alpha": [0.0001, 0.001]}
         _run_gridsearch_test(
             emulator,
             "Perceptron",
@@ -206,12 +206,12 @@ def emul_comprehensive_gridsearch(mode):
             param_grid,
             X_clf_bin,
             y_clf_bin_negpos_reshaped,
-            'accuracy',
-            'classification',
+            "accuracy",
+            "classification",
             cv_splits_clf_bin,
         )
         estimator = SVM(max_iter=10, C=1.0)
-        param_grid = {'C': [0.5, 1.0, 5.0]}
+        param_grid = {"C": [0.5, 1.0, 5.0]}
         _run_gridsearch_test(
             emulator,
             "SVM",
@@ -219,12 +219,12 @@ def emul_comprehensive_gridsearch(mode):
             param_grid,
             X_clf_bin,
             y_clf_bin_negpos,
-            'accuracy',
-            'classification',
+            "accuracy",
+            "classification",
             cv_splits_clf_bin,
         )
-        estimator = Ridge(solver='cholesky')
-        param_grid = {'alpha': [0.1, 1.0, 10.0]}
+        estimator = Ridge(solver="cholesky")
+        param_grid = {"alpha": [0.1, 1.0, 10.0]}
         _run_gridsearch_test(
             emulator,
             "Ridge",
@@ -232,12 +232,12 @@ def emul_comprehensive_gridsearch(mode):
             param_grid,
             X_reg,
             y_reg_reshaped,
-            'r2',
-            'regression',
+            "r2",
+            "regression",
             cv_splits_reg,
         )
         estimator = _GeneralizedLinearRegressor(max_iter=10)
-        param_grid = {'alpha': [0.0, 0.1, 0.2]}
+        param_grid = {"alpha": [0.0, 0.1, 0.2]}
         _run_gridsearch_test(
             emulator,
             "GeneralizedLinearRegressor",
@@ -245,8 +245,8 @@ def emul_comprehensive_gridsearch(mode):
             param_grid,
             X_reg,
             y_reg,
-            'neg_mean_squared_error',
-            'regression',
+            "neg_mean_squared_error",
+            "regression",
             cv_splits_reg,
         )
         print("\nComprehensive GridSearchCV Emulation finished successfully.")

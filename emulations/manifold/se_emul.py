@@ -19,11 +19,11 @@ import numpy as np
 from sklearn.manifold import spectral_embedding
 from sklearn.neighbors import kneighbors_graph
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.manifold.se import SE
 
 
-def emul_se(mode: emulation.Mode.MULTIPROCESS):
+def emul_se(mode=emulation.Mode.MULTIPROCESS):
     try:
         emulator = emulation.Emulator(
             emulation.CLUSTER_ABY3_3PC, mode, bandwidth=300, latency=20

@@ -18,16 +18,16 @@ import pandas as pd
 import sklearn.linear_model as sk
 from sklearn.datasets import load_iris
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.linear_model.pla import Perceptron
 
 
-def emul_perceptron(mode: emulation.Mode.MULTIPROCESS):
+def emul_perceptron(mode=emulation.Mode.MULTIPROCESS):
     def proc(x, y):
         model = Perceptron(
             max_iter=20,
             eta0=1.0,
-            penalty='elasticnet',
+            penalty="elasticnet",
             alpha=0.001,
             fit_intercept=True,
             l1_ratio=0.7,
@@ -42,9 +42,9 @@ def emul_perceptron(mode: emulation.Mode.MULTIPROCESS):
         iris = load_iris()
         df = pd.DataFrame(
             iris.data,
-            columns=['sepal length', 'sepal width', 'petal length', 'petal width'],
+            columns=["sepal length", "sepal width", "petal length", "petal width"],
         )
-        df['label'] = iris.target
+        df["label"] = iris.target
 
         # only use sepal length and sepal width features
         # 100 samples
@@ -73,7 +73,7 @@ def emul_perceptron(mode: emulation.Mode.MULTIPROCESS):
         sk_pla = sk.Perceptron(
             max_iter=20,
             eta0=1.0,
-            penalty='elasticnet',
+            penalty="elasticnet",
             alpha=0.001,
             l1_ratio=0.7,
             fit_intercept=True,

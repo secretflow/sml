@@ -19,9 +19,9 @@ import jax.numpy as jnp
 import numpy as np
 
 # Add the sml directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.utils.extmath import serial_jacobi_evd
 
 
@@ -42,7 +42,7 @@ def _generate_symmetric_matrix_with_bounded_eigenvalues(n, upper_bound=2):
     return A
 
 
-def emul_jacobievd(mode: emulation.Mode.MULTIPROCESS):
+def emul_jacobievd(mode=emulation.Mode.MULTIPROCESS):
     print("start jacobi evd emulation.")
     np.random.seed(0)
 

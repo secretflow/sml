@@ -21,12 +21,12 @@ from sklearn.datasets import load_iris
 from sklearn.feature_selection import chi2 as chi2_sklearn
 
 # Add the library directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
-import sml.utils.emulation as emulation
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
+import emulations.utils.emulation as emulation
 from sml.feature_selection.univariate_selection import chi2
 
 
-def emul_Chi2(mode: emulation.Mode.MULTIPROCESS):
+def emul_Chi2(mode=emulation.Mode.MULTIPROCESS):
     print("start chi2 stats emulation")
 
     def load_data():

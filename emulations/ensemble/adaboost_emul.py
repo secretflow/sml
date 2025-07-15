@@ -18,7 +18,7 @@ from sklearn.datasets import load_iris
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.tree import DecisionTreeClassifier
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.ensemble.adaboost import AdaBoostClassifier as sml_Adaboost
 from sml.tree.tree import DecisionTreeClassifier as sml_dtc
 

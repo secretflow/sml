@@ -18,11 +18,11 @@ import jax.numpy as jnp
 import numpy as np
 from sklearn.manifold import Isomap
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.manifold.isomap import ISOMAP
 
 
-def emul_isomap(mode: emulation.Mode.MULTIPROCESS):
+def emul_isomap(mode=emulation.Mode.MULTIPROCESS):
     try:
         # bandwidth and latency only work for docker mode
         emulator = emulation.Emulator(

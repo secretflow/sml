@@ -17,7 +17,7 @@ import jax.numpy as jnp
 from sklearn.datasets import load_iris
 from sklearn.ensemble import RandomForestClassifier
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.ensemble.forest import RandomForestClassifier as sml_rfc
 
 MAX_DEPTH = 3
@@ -82,7 +82,7 @@ def emul_forest(mode=emulation.Mode.MULTIPROCESS):
         rf = RandomForestClassifier(
             n_estimators=3,
             max_features=None,
-            criterion='gini',
+            criterion="gini",
             max_depth=MAX_DEPTH,
             bootstrap=False,
             max_samples=None,
@@ -100,8 +100,8 @@ def emul_forest(mode=emulation.Mode.MULTIPROCESS):
         proc = proc_wrapper(
             n_estimators=3,
             max_features=0.7,
-            criterion='gini',
-            splitter='best',
+            criterion="gini",
+            splitter="best",
             max_depth=3,
             bootstrap=False,
             max_samples=None,

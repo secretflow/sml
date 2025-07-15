@@ -14,7 +14,7 @@
 
 import jax.numpy as jnp
 import numpy as np
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sklearn import preprocessing
 from sml.preprocessing.preprocessing import (
     Binarizer,

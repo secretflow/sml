@@ -21,8 +21,8 @@ import numpy as np
 from sklearn.datasets import make_blobs
 from sklearn.manifold import trustworthiness
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
-import sml.utils.emulation as emulation
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
+import emulations.utils.emulation as emulation
 from sml.decomposition.tsne import TSNE
 
 
@@ -50,7 +50,7 @@ def test_tsne(mode: emulation.Mode = emulation.Mode.MULTIPROCESS):
                 perplexity=10,
                 max_iter=50,  # Set to 50 for faster unit test execution; to achieve better results, it needs to be set to 150 or above.
                 early_exaggeration=12,
-                init='random',
+                init="random",
             )
             Y_spu_out = model.fit_transform(x, Y_init=Y_init_jax)
             kl_spu_out = model.kl_divergence_
@@ -115,7 +115,7 @@ def test_tsne(mode: emulation.Mode = emulation.Mode.MULTIPROCESS):
                 perplexity=10,
                 max_iter=50,  # Set to 50 for faster unit test execution; to achieve better results, it needs to be set to 150 or above.
                 early_exaggeration=12,
-                init='pca',
+                init="pca",
             )
             Y_spu_out = model.fit_transform(x)
             kl_spu_out = model.kl_divergence_

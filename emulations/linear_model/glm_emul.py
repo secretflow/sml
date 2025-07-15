@@ -13,7 +13,7 @@
 # limitations under the License.
 import numpy as np
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 import spu.utils.distributed as ppd
 from sml.linear_model.glm import _GeneralizedLinearRegressor
 
@@ -42,7 +42,7 @@ def generate_data():
     return X, y, coef, sample_weight
 
 
-def emul_SGDClassifier(mode: emulation.Mode.MULTIPROCESS, num=10):
+def emul_SGDClassifier(mode=emulation.Mode.MULTIPROCESS, num=10):
     """
     Execute the encrypted SGD classifier in a simulation environment and output the results.
 

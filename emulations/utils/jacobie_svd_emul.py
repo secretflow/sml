@@ -22,7 +22,7 @@ from sklearn.decomposition import TruncatedSVD as SklearnSVD
 # Add the library directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.utils.jacobi_svd import jacobi_svd
 
 

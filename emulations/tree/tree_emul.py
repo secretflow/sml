@@ -18,7 +18,7 @@ import jax.numpy as jnp
 from sklearn.datasets import load_iris
 from sklearn.tree import DecisionTreeClassifier
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.tree.tree import DecisionTreeClassifier as sml_dtc
 
 MAX_DEPTH = 3
@@ -28,7 +28,7 @@ CONFIG_FILE = emulation.CLUSTER_ABY3_3PC
 def emul_tree(mode=emulation.Mode.MULTIPROCESS):
     def proc_wrapper(max_depth=2, n_labels=3):
         dt = sml_dtc(
-            max_depth=max_depth, criterion='gini', splitter='best', n_labels=n_labels
+            max_depth=max_depth, criterion="gini", splitter="best", n_labels=n_labels
         )
 
         def proc(X, y):
@@ -66,7 +66,7 @@ def emul_tree(mode=emulation.Mode.MULTIPROCESS):
 
         # compare with sklearn
         clf = DecisionTreeClassifier(
-            max_depth=MAX_DEPTH, criterion='gini', splitter='best', random_state=None
+            max_depth=MAX_DEPTH, criterion="gini", splitter="best", random_state=None
         )
         start = time.time()
         clf = clf.fit(X, y)

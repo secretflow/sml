@@ -14,12 +14,12 @@
 import jax.numpy as jnp
 from sklearn.linear_model import Ridge as skRidge
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.linear_model.ridge import Ridge
 from sml.utils.dataset_utils import load_open_source_datasets
 
 
-def emul_Ridge(mode: emulation.Mode.MULTIPROCESS):
+def emul_Ridge(mode=emulation.Mode.MULTIPROCESS):
     def proc(x, y, solver):
         model = Ridge(alpha=1.0, max_iter=100, solver=solver)
         y = y.reshape((y.shape[0], 1))
@@ -31,7 +31,7 @@ def emul_Ridge(mode: emulation.Mode.MULTIPROCESS):
         return x, y
 
     try:
-        solver_list = ['cholesky', 'svd']
+        solver_list = ["cholesky", "svd"]
         print(f"solver_list={solver_list}")
         # bandwidth and latency only work for docker mode
         emulator = emulation.Emulator(

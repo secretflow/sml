@@ -17,7 +17,7 @@ import time
 import jax.numpy as jnp
 from sklearn.linear_model import QuantileRegressor as SklearnQuantileRegressor
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.linear_model.quantile import QuantileRegressor as SmlQuantileRegressor
 
 CONFIG_FILE = emulation.CLUSTER_ABY3_3PC
@@ -65,7 +65,7 @@ def emul_quantile(mode=emulation.Mode.MULTIPROCESS):
 
         # compare with sklearn
         quantile_sklearn = SklearnQuantileRegressor(
-            quantile=0.2, alpha=0.1, fit_intercept=True, solver='highs'
+            quantile=0.2, alpha=0.1, fit_intercept=True, solver="highs"
         )
         start = time.time()
         quantile_sklearn_fit = quantile_sklearn.fit(X, y)
