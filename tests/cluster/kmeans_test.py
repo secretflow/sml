@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import logging
-import unittest
 
 import jax
 import jax.numpy as jnp
@@ -25,7 +24,7 @@ import spu.utils.simulation as spsim
 from sml.cluster.kmeans import KMEANS
 
 
-class UnitTests(unittest.TestCase):
+class UnitTests:
     def test_kmeans_sep(self):
         sim = spsim.Simulator.simple(3, libspu.ProtocolKind.ABY3, libspu.FieldType.FM64)
 
@@ -57,9 +56,9 @@ class UnitTests(unittest.TestCase):
         print(f"sklearn center: {model.cluster_centers_}")
         print("sklearn:\n", sml_result)
         if result[0] == sml_result[0]:
-            self.assertTrue(np.all(sml_result == result))
+            assert np.all(sml_result == result)
         else:
-            self.assertTrue(np.all(sml_result + result == 1))
+            assert np.all(sml_result + result == 1)
 
     def test_kmeans(self):
         sim = spsim.Simulator.simple(3, libspu.ProtocolKind.ABY3, libspu.FieldType.FM64)
@@ -97,9 +96,9 @@ class UnitTests(unittest.TestCase):
         print(f"sklearn center: {model.cluster_centers_}")
         print("sklearn:\n", model.predict(X))
         if result[1][0] == sml_result[0]:
-            self.assertTrue(np.all(sml_result == result[1]))
+            assert np.all(sml_result == result[1])
         else:
-            self.assertTrue(np.all(sml_result + result[1] == 1))
+            assert np.all(sml_result + result[1] == 1)
 
         sklearn_centers = model.cluster_centers_
 
@@ -176,7 +175,7 @@ class UnitTests(unittest.TestCase):
         model.fit(X)
         sk_result = model.cluster_centers_
         # print("sklearn:\n", sk_result)
-        np.testing.assert_allclose(result, sk_result, rtol=0, atol=1e-4)
+        assert np.allclose(result, sk_result, rtol=0, atol=1e-4)
 
     def test_kmeans_random(self):
         sim = spsim.Simulator.simple(3, libspu.ProtocolKind.ABY3, libspu.FieldType.FM64)
@@ -214,8 +213,4 @@ class UnitTests(unittest.TestCase):
         sk_result = model.cluster_centers_
         sk_result.sort(axis=0)
 
-        np.testing.assert_allclose(result, sk_result, rtol=0, atol=1e-4)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert np.allclose(result, sk_result, rtol=0, atol=1e-4)
