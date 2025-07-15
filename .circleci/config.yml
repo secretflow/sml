@@ -68,8 +68,6 @@ workflows:
             .circleci/.* build-and-run true
             setup.py build-and-run true
             requirements build-and-run true
-      - lint
-  publish-workflow:
-    jobs:
       - continuation/continue:
           configuration_path: .circleci/release-config.yml
+      - lint
