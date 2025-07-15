@@ -87,7 +87,7 @@ def test_power(setup_sim):
     X_transformed_sklearn = sklearn_pca.fit_transform(X_np)
 
     # Compare the transform results(omit sign)
-    assert np.allclose(
+    np.testing.assert_allclose(
         np.abs(X_transformed_sklearn), np.abs(result[0]), rtol=0.1, atol=0.1
     )
 
