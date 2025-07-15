@@ -85,15 +85,7 @@ jobs:
     # See: https://circleci.com/docs/2.0/configuration-reference/#steps
     steps:
       - checkout
-      - restore_cache:
-          name: restore pip cache
-          key: &pip-cache pip-{{ arch }}-{{ .Branch }}-{{ checksum "requirements.txt" }}
       - build_and_test
-      - save_cache:
-          key: *pip-cache
-          paths:
-            - /root/miniconda3/lib/python3.10/site-packages
-          when: always
   macOS_ut:
     macos:
       xcode: 16.0.0
