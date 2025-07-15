@@ -15,10 +15,8 @@
 # 不支持early_stop
 
 import copy
-import warnings
 
 import jax.numpy as jnp
-from jax import lax
 
 from ..tree.tree import DecisionTreeClassifier as sml_dtc
 
@@ -87,17 +85,17 @@ class AdaBoostClassifier:
 
     def _num_samples(self, x):
         """返回x中的样本数量."""
-        if hasattr(x, 'fit'):
+        if hasattr(x, "fit"):
             # 检查是否是一个estimator
-            raise TypeError('Expected sequence or array-like, got estimator')
+            raise TypeError("Expected sequence or array-like, got estimator")
         if (
-            not hasattr(x, '__len__')
-            and not hasattr(x, 'shape')
-            and not hasattr(x, '__array__')
+            not hasattr(x, "__len__")
+            and not hasattr(x, "shape")
+            and not hasattr(x, "__array__")
         ):
             raise TypeError("Expected sequence or array-like, got %s" % type(x))
 
-        if hasattr(x, 'shape'):
+        if hasattr(x, "shape"):
             if len(x.shape) == 0:  # scalar
                 raise TypeError(
                     "Singleton array %r cannot be considered a valid collection." % x
@@ -107,7 +105,7 @@ class AdaBoostClassifier:
             return len(x)
 
     def _check_sample_weight(self, sample_weight, X):
-        '''
+        """
         Description: Validate and process sample weights.
 
         Parameters:
@@ -128,7 +126,7 @@ class AdaBoostClassifier:
            - If sample_weight is an array or array-like, it will be converted to a JAX array.
            - The array must be 1D and its length must match the number of samples.
            - If these conditions are not met, an error will be raised.
-        '''
+        """
         n_samples = self._num_samples(X)
 
         if sample_weight is None:

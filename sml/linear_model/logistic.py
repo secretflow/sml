@@ -23,24 +23,24 @@ from sml.utils.utils import sml_reveal
 
 
 class Penalty(Enum):
-    NONE = 'None'
-    L1 = 'l1'
-    L2 = 'l2'
-    Elastic = 'elasticnet'
+    NONE = "None"
+    L1 = "l1"
+    L2 = "l2"
+    Elastic = "elasticnet"
 
 
 class MultiClass(Enum):
-    Binary = 'binary'
-    Ovr = 'ovr'
-    Multy = 'multinomial'  # not supported yet
+    Binary = "binary"
+    Ovr = "ovr"
+    Multy = "multinomial"  # not supported yet
 
 
 class Solver(Enum):
-    SGD = 'sgd'
+    SGD = "sgd"
 
 
 class EarlyStoppingMetric(Enum):
-    WEIGHT = 'weight'
+    WEIGHT = "weight"
 
 
 class LogisticRegression:
@@ -101,25 +101,25 @@ class LogisticRegression:
 
     def __init__(
         self,
-        penalty: str = 'l2',
-        solver: str = 'sgd',
-        multi_class: str = 'binary',
+        penalty: str = "l2",
+        solver: str = "sgd",
+        multi_class: str = "binary",
         class_labels: list = [0, 1],
         class_weight=None,
-        sig_type: str = 'sr',
+        sig_type: str = "sr",
         C: float = 1.0,
         l1_ratio: float = 0.5,
         epochs: int = 20,
         learning_rate: float = 0.1,
         batch_size: int = 512,
         early_stopping_threshold: float = 0.0,
-        early_stopping_metric: str = 'weight',
+        early_stopping_metric: str = "weight",
     ):
         # parameter check.
         assert epochs > 0, f"epochs should >0"
         assert learning_rate > 0, f"learning_rate should >0"
         assert batch_size > 0, f"batch_size should >0"
-        assert solver == 'sgd', "only support sgd solver for now"
+        assert solver == "sgd", "only support sgd solver for now"
         assert C > 0, f"C should >0"
         assert early_stopping_threshold >= 0, f"early_stopping_threshold should >0"
         assert early_stopping_metric in [
@@ -135,10 +135,10 @@ class LogisticRegression:
         assert sig_type in [
             e.value for e in SigType
         ], f"sig_type should in {[e.value for e in SigType]}, but got {sig_type}"
-        assert class_weight == None, f"not support class_weight for now"
+        assert class_weight is None, f"not support class_weight for now"
         assert multi_class in [
-            'binary',
-            'ovr',
+            "binary",
+            "ovr",
         ], f"only support [binary,ovr] problem for now"
 
         self.epochs = epochs
@@ -253,7 +253,7 @@ class LogisticRegression:
         # not support class_weight for now
         if isinstance(self.class_weight, dict):
             raise NotImplementedError
-        elif self.class_weight == 'balanced':
+        elif self.class_weight == "balanced":
             raise NotImplementedError
 
         for i in range(n_classes):

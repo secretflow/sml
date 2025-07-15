@@ -16,11 +16,11 @@ import time
 import jax
 import jax.numpy as jnp
 import numpy as np
+import spu.libspu as libspu
+import spu.utils.simulation as spsim
 from sklearn.manifold import spectral_embedding
 from sklearn.neighbors import kneighbors_graph
 
-import spu.libspu as libspu
-import spu.utils.simulation as spsim
 from sml.manifold.se import SE
 
 

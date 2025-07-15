@@ -12,19 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
 import time
 
 import jax.numpy as jnp
 import numpy as np
+import spu.libspu as libspu
+import spu.utils.simulation as spsim
 from sklearn import metrics
 from sklearn.metrics import average_precision_score as sk_average_precision_score
 from sklearn.metrics import brier_score_loss as sk_brier_score_loss
 from sklearn.metrics import roc_auc_score as sk_roc_auc_score
 
-import spu.libspu as libspu
-import spu.utils.simulation as spsim
 from sml.metrics.classification.classification import (
     accuracy_score,
     average_precision_score,
@@ -153,9 +151,7 @@ def test_average_precision_score():
 
     def proc(y_true, y_score, **kwargs):
         sk_res = sk_average_precision_score(y_true, y_score, **kwargs)
-        spu_res = spsim.sim_jax(sim, average_precision_score)(
-            y_true, y_score, **kwargs
-        )
+        spu_res = spsim.sim_jax(sim, average_precision_score)(y_true, y_score, **kwargs)
         return sk_res, spu_res
 
     def check(res1, res2):

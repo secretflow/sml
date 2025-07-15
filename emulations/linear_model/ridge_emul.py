@@ -31,7 +31,7 @@ def emul_Ridge(mode: emulation.Mode.MULTIPROCESS):
         return x, y
 
     try:
-        solver_list = ['cholesky', 'svd']
+        solver_list = ["cholesky", "svd"]
         print(f"solver_list={solver_list}")
         # bandwidth and latency only work for docker mode
         emulator = emulation.Emulator(

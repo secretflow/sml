@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple, Optional
+from typing import Optional, Tuple
 
 import jax
 import jax.numpy as jnp
+from spu.ops.groupby import groupby, groupby_sum
 
 from sml.preprocessing.preprocessing import label_binarize
-from spu.ops.groupby import groupby, groupby_sum
 
 from .auc import binary_clf_curve, binary_roc_auc
 

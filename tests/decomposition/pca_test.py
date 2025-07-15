@@ -18,14 +18,13 @@ import sys
 import jax.numpy as jnp
 import numpy as np
 import pytest
+import spu.libspu as libspu
+import spu.utils.simulation as spsim
 from jax import random
 from sklearn.decomposition import PCA as SklearnPCA
 
-import spu.libspu as libspu
-import spu.utils.simulation as spsim
-
 # Add the sml directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
 from sml.decomposition.pca import PCA
 
@@ -35,9 +34,7 @@ np.random.seed(0)
 @pytest.fixture(scope="module")
 def setup_sim():
     print(" ========= start test of pca package ========= \n")
-    sim64 = spsim.Simulator.simple(
-        3, libspu.ProtocolKind.ABY3, libspu.FieldType.FM64
-    )
+    sim64 = spsim.Simulator.simple(3, libspu.ProtocolKind.ABY3, libspu.FieldType.FM64)
     config128 = libspu.RuntimeConfig(
         protocol=libspu.ProtocolKind.ABY3,
         field=libspu.FieldType.FM128,
@@ -56,7 +53,7 @@ def test_power(setup_sim):
     # Test fit_transform
     def proc_transform(X):
         model = PCA(
-            method='power_iteration',
+            method="power_iteration",
             n_components=2,
             max_power_iter=200,
         )
@@ -92,9 +89,7 @@ def test_power(setup_sim):
     )
 
     # Compare the variance results
-    assert np.allclose(
-        sklearn_pca.explained_variance_, result[1], rtol=0.1, atol=0.1
-    )
+    assert np.allclose(sklearn_pca.explained_variance_, result[1], rtol=0.1, atol=0.1)
 
     # Run inverse_transform using sklearn
     X_reconstructed_sklearn = sklearn_pca.inverse_transform(X_transformed_sklearn)
@@ -109,7 +104,7 @@ def test_jacobi(setup_sim):
 
     def proc_transform(X):
         model = PCA(
-            method='serial_jacobi_iteration',
+            method="serial_jacobi_iteration",
             n_components=4,
             max_jacobi_iter=5,
         )
@@ -146,9 +141,7 @@ def test_jacobi(setup_sim):
     )
 
     # Compare the variance results
-    assert np.allclose(
-        sklearn_pca.explained_variance_, result[1], rtol=0.1, atol=0.1
-    )
+    assert np.allclose(sklearn_pca.explained_variance_, result[1], rtol=0.1, atol=0.1)
 
     # Run inverse_transform using sklearn
     X_reconstructed_sklearn = sklearn_pca.inverse_transform(X_transformed_sklearn)
@@ -170,7 +163,7 @@ def test_rsvd(setup_sim):
     # Test fit_transform
     def proc_transform(X, random_matrix):
         model = PCA(
-            method='rsvd',
+            method="rsvd",
             n_components=n_components,
             n_oversamples=n_oversamples,
             random_matrix=random_matrix,
@@ -224,9 +217,7 @@ def test_rsvd(setup_sim):
     )
 
     # Compare the variance results
-    assert np.allclose(
-        sklearn_pca.explained_variance_, result[1], rtol=1, atol=0.1
-    )
+    assert np.allclose(sklearn_pca.explained_variance_, result[1], rtol=1, atol=0.1)
 
     # Run inverse_transform using sklearn
     X_reconstructed_sklearn = sklearn_pca.inverse_transform(X_transformed_sklearn)

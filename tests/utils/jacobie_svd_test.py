@@ -15,14 +15,12 @@
 import os
 import sys
 
-import jax.numpy as jnp
 import numpy as np
 import pytest
-from jax import random
-from sklearn.decomposition import TruncatedSVD as SklearnSVD
-
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
+from jax import random
+from sklearn.decomposition import TruncatedSVD as SklearnSVD
 
 # Add the sml directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
@@ -35,9 +33,7 @@ np.random.seed(0)
 @pytest.fixture(scope="module")
 def setup_sim():
     print(" ========= start test of jacobi_svd package ========= \n")
-    sim64 = spsim.Simulator.simple(
-        3, libspu.ProtocolKind.ABY3, libspu.FieldType.FM64
-    )
+    sim64 = spsim.Simulator.simple(3, libspu.ProtocolKind.ABY3, libspu.FieldType.FM64)
     config128 = libspu.RuntimeConfig(
         protocol=libspu.ProtocolKind.ABY3,
         field=libspu.FieldType.FM128,

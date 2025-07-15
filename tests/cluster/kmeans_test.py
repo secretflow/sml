@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 
-import jax
 import jax.numpy as jnp
 import numpy as np
-from sklearn.datasets import make_blobs
-
 import spu.libspu as libspu  # type: ignore
 import spu.utils.simulation as spsim
+from sklearn.datasets import make_blobs
+
 from sml.cluster.kmeans import KMEANS
 
 

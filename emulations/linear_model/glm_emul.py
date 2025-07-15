@@ -14,7 +14,6 @@
 import numpy as np
 
 import sml.utils.emulation as emulation
-import spu.utils.distributed as ppd
 from sml.linear_model.glm import _GeneralizedLinearRegressor
 
 n_samples, n_features = 100, 5

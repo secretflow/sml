@@ -82,7 +82,7 @@ def emul_forest(mode=emulation.Mode.MULTIPROCESS):
         rf = RandomForestClassifier(
             n_estimators=3,
             max_features=None,
-            criterion='gini',
+            criterion="gini",
             max_depth=MAX_DEPTH,
             bootstrap=False,
             max_samples=None,
@@ -100,8 +100,8 @@ def emul_forest(mode=emulation.Mode.MULTIPROCESS):
         proc = proc_wrapper(
             n_estimators=3,
             max_features=0.7,
-            criterion='gini',
-            splitter='best',
+            criterion="gini",
+            splitter="best",
             max_depth=3,
             bootstrap=False,
             max_samples=None,
@@ -110,7 +110,7 @@ def emul_forest(mode=emulation.Mode.MULTIPROCESS):
         start = time.time()
         result = emulator.run(proc)(X_spu, y_spu)
         end = time.time()
-        score_encrpted = jnp.mean((result == y))
+        score_encrpted = jnp.mean(result == y)
         print(f"Running time in SPU: {end - start:.2f}s")
 
         # print acc

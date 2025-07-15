@@ -61,7 +61,7 @@ def compute_regularization(X, l1_ratio, alpha_W, alpha_H):
 
 
 def _beta_divergence(X, W, H, beta, square_root=False):
-    if beta == 'frobenius':
+    if beta == "frobenius":
         vec = jnp.ravel(X - jnp.dot(W, H))
         res = jnp.dot(vec, vec) / 2.0
         if square_root:
@@ -76,7 +76,7 @@ class NMF:
         max_iter: int = 200,
         l1_ratio: float = 0.0,
         alpha_W: float = 0.0,
-        beta_loss: str = 'frobenius',
+        beta_loss: str = "frobenius",
         alpha_H=None,
         random_matrixA=None,
         random_matrixB=None,
@@ -121,7 +121,7 @@ class NMF:
         """
         # parameter check.
         assert n_components > 0, f"n_components should >0"
-        assert beta_loss == 'frobenius', f"beta_loss only support frobenius now"
+        assert beta_loss == "frobenius", f"beta_loss only support frobenius now"
 
         if alpha_H is None:
             alpha_H = alpha_W

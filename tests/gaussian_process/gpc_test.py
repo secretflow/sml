@@ -17,10 +17,9 @@ import sys
 
 import jax
 import jax.numpy as jnp
-from sklearn.datasets import load_iris
-
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
+from sklearn.datasets import load_iris
 
 # Add the library directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))

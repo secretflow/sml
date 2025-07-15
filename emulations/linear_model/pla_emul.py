@@ -27,7 +27,7 @@ def emul_perceptron(mode: emulation.Mode.MULTIPROCESS):
         model = Perceptron(
             max_iter=20,
             eta0=1.0,
-            penalty='elasticnet',
+            penalty="elasticnet",
             alpha=0.001,
             fit_intercept=True,
             l1_ratio=0.7,
@@ -42,9 +42,9 @@ def emul_perceptron(mode: emulation.Mode.MULTIPROCESS):
         iris = load_iris()
         df = pd.DataFrame(
             iris.data,
-            columns=['sepal length', 'sepal width', 'petal length', 'petal width'],
+            columns=["sepal length", "sepal width", "petal length", "petal width"],
         )
-        df['label'] = iris.target
+        df["label"] = iris.target
 
         # only use sepal length and sepal width features
         # 100 samples
@@ -73,14 +73,14 @@ def emul_perceptron(mode: emulation.Mode.MULTIPROCESS):
         sk_pla = sk.Perceptron(
             max_iter=20,
             eta0=1.0,
-            penalty='elasticnet',
+            penalty="elasticnet",
             alpha=0.001,
             l1_ratio=0.7,
             fit_intercept=True,
         )
         result_sk = sk_pla.fit(x, y).predict(x)
         result_sk = result_sk.reshape(result_sk.shape[0], 1)
-        acc_sk = jnp.sum((result_sk == y)) / n_samples * 100
+        acc_sk = jnp.sum(result_sk == y) / n_samples * 100
 
         # mark these data to be protected in SPU
         x_spu, y_spu = emulator.seal(x, y)
@@ -88,7 +88,7 @@ def emul_perceptron(mode: emulation.Mode.MULTIPROCESS):
         # run
         result = emulator.run(proc)(x_spu, y_spu)
         result = result.reshape(result.shape[0], 1)
-        acc_ = jnp.sum((result == y)) / n_samples * 100
+        acc_ = jnp.sum(result == y) / n_samples * 100
 
         # print acc
         print(f"Accuracy in SKlearn: {acc_sk:.2f}%")

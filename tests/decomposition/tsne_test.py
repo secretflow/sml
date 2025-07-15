@@ -18,15 +18,14 @@ import time
 
 import jax.random as random
 import numpy as np
+import spu.libspu as libspu
+import spu.utils.simulation as spsim
 from scipy.spatial import procrustes
 from sklearn.datasets import make_blobs
 from sklearn.manifold import TSNE as SklearnTSNE
 from sklearn.manifold import trustworthiness
 
-import spu.libspu as libspu
-import spu.utils.simulation as spsim
-
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
 from sml.decomposition.tsne import TSNE
 
@@ -47,7 +46,7 @@ def test_tsne_similarity_init_pca():
             perplexity=perplexity_in,
             max_iter=max_iter_in,
             early_exaggeration_iter=spu_early_exaggeration_iter,
-            init='pca',
+            init="pca",
             max_attempts=20,
             sigma_maxs=1e6,
             sigma_mins=1e-6,
@@ -79,7 +78,7 @@ def test_tsne_similarity_init_pca():
         perplexity=perplexity,
         max_iter=max_iter,
         random_state=random_state,
-        init='pca',
+        init="pca",
     )
 
     Y_sklearn = sklearn_tsne.fit_transform(X.astype(np.float64))
@@ -184,7 +183,7 @@ def test_tsne_similarity_init_random():
             perplexity=perplexity_in,
             max_iter=max_iter_in,
             early_exaggeration_iter=spu_early_exaggeration_iter,
-            init='random',
+            init="random",
             max_attempts=20,
             sigma_maxs=1e6,
             sigma_mins=1e-6,
@@ -216,7 +215,7 @@ def test_tsne_similarity_init_random():
         perplexity=perplexity,
         max_iter=max_iter,
         random_state=random_state,
-        init='random',
+        init="random",
     )
 
     Y_sklearn = sklearn_tsne.fit_transform(X.astype(np.float64))
@@ -236,9 +235,7 @@ def test_tsne_similarity_init_random():
 
     key = random.PRNGKey(random_state)
 
-    Y_init_jax = 1e-4 * random.normal(key, (n_samples, n_components)).astype(
-        np.float32
-    )
+    Y_init_jax = 1e-4 * random.normal(key, (n_samples, n_components)).astype(np.float32)
 
     config = libspu.RuntimeConfig(
         protocol=libspu.ProtocolKind.ABY3,
