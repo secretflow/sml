@@ -27,7 +27,7 @@ import sys
 import time
 import traceback
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -54,19 +54,44 @@ class TestResult:
 class EmulationRunner:
     """Main runner class for batch emulation execution."""
 
-    def __init__(self, mode: str = "multiprocess", verbose: bool = False):
+    def __init__(
+        self,
+        mode: str = "multiprocess",
+        cluster_config: Optional[str] = None,
+        bandwidth: Optional[int] = None,
+        latency: Optional[int] = None,
+        slowest_tests_count: int = 5,
+        target_module: Optional[str] = None,
+        verbose: bool = False,
+    ):
         """
         Initialize the emulation runner.
 
         Args:
             mode: Emulation mode ('multiprocess' or 'docker')
+            cluster_config: Cluster configuration file path
+            bandwidth: Network bandwidth limit in Mbps
+            latency: Network latency in ms
+            slowest_tests_count: Number of slowest tests to show in report
+            target_module: Specific module to run (e.g., 'emulations.cluster.kmeans_emul')
             verbose: Whether to show verbose output during execution
         """
+        # Check for docker mode and raise error
+        if mode.lower() == "docker":
+            raise ValueError(
+                "Docker mode is not yet implemented. Please use 'multiprocess' mode."
+            )
+
         self.mode = (
             emulation.Mode.MULTIPROCESS
             if mode.lower() == "multiprocess"
             else emulation.Mode.DOCKER
         )
+        self.cluster_config = cluster_config
+        self.bandwidth = bandwidth
+        self.latency = latency
+        self.slowest_tests_count = slowest_tests_count
+        self.target_module = target_module
         self.verbose = verbose
         self.results: List[TestResult] = []
 
@@ -88,35 +113,24 @@ class EmulationRunner:
 
         return sorted(emulation_files)
 
-    def discover_emul_functions(self, module) -> List[str]:
+    def discover_main_function(self, module) -> bool:
         """
-        Discover all emul_* functions in a module.
+        Check if module has a main function.
 
         Args:
             module: The imported module
 
         Returns:
-            List of function names that start with 'emul_'
+            True if main function exists, False otherwise
         """
-        functions = []
-        for name, obj in inspect.getmembers(module):
-            if (
-                inspect.isfunction(obj)
-                and name.startswith("emul_")
-                and not name.startswith("emul_test")
-            ):  # Skip test helper functions
-                functions.append(name)
-        return sorted(functions)
+        return hasattr(module, "main") and callable(getattr(module, "main"))
 
-    def run_emulation_function(
-        self, module_path: str, function_name: str
-    ) -> TestResult:
+    def run_main_function(self, module_path: str) -> TestResult:
         """
-        Run a specific emulation function and record results.
+        Run the main function from a specific emulation module.
 
         Args:
             module_path: Path to the module (e.g., 'emulations.cluster.kmeans_emul')
-            function_name: Name of the function to run
 
         Returns:
             TestResult object with execution details
@@ -127,26 +141,52 @@ class EmulationRunner:
             # Import the module
             module = importlib.import_module(module_path)
 
-            # Get the function
-            func = getattr(module, function_name)
+            # Check if main function exists
+            if not self.discover_main_function(module):
+                duration = time.time() - start_time
+                return TestResult(
+                    module_path=module_path,
+                    function_name="main",
+                    success=False,
+                    duration=duration,
+                    error_message="No main function found",
+                    error_type="AttributeError",
+                )
 
-            # Check function signature to determine if it needs mode parameter
-            sig = inspect.signature(func)
-            params = list(sig.parameters.keys())
+            # Get the main function
+            main_func = getattr(module, "main")
 
             if self.verbose:
-                print(f"  Running {function_name}...")
+                print(f"  Running main function...")
 
-            # Run the function with appropriate parameters
+            # Prepare arguments for main function
+            main_kwargs = {}
+
+            # Check function signature to see what parameters it accepts
+            sig = inspect.signature(main_func)
+            params = sig.parameters
+
+            # Add arguments based on what the main function accepts and what we have
+            if "cluster_config" in params and self.cluster_config is not None:
+                main_kwargs["cluster_config"] = self.cluster_config
             if "mode" in params:
-                func(mode=self.mode)
+                main_kwargs["mode"] = self.mode
+            if "bandwidth" in params and self.bandwidth is not None:
+                main_kwargs["bandwidth"] = self.bandwidth
+            if "latency" in params and self.latency is not None:
+                main_kwargs["latency"] = self.latency
+
+            # Run the main function
+            if main_kwargs:
+                main_func(**main_kwargs)
             else:
-                func()
+                # Call with no arguments if no matching parameters or no override values
+                main_func()
 
             duration = time.time() - start_time
             return TestResult(
                 module_path=module_path,
-                function_name=function_name,
+                function_name="main",
                 success=True,
                 duration=duration,
             )
@@ -157,12 +197,12 @@ class EmulationRunner:
             error_message = str(e)
 
             if self.verbose:
-                print(f"  ERROR in {function_name}: {error_type}: {error_message}")
+                print(f"  ERROR in main: {error_type}: {error_message}")
                 traceback.print_exc()
 
             return TestResult(
                 module_path=module_path,
-                function_name=function_name,
+                function_name="main",
                 success=False,
                 duration=duration,
                 error_message=error_message,
@@ -171,12 +211,39 @@ class EmulationRunner:
 
     def run_all_emulations(self) -> None:
         """
-        Run all discovered emulation functions.
+        Run all discovered emulation main functions or a specific target module.
         """
         emulation_files = self.discover_emulation_files()
 
-        print(f"🔍 Discovered {len(emulation_files)} emulation files")
+        # Filter to specific module if target_module is specified
+        if self.target_module:
+            if self.target_module in emulation_files:
+                emulation_files = [self.target_module]
+                print(f"🎯 Running specific module: {self.target_module}")
+            else:
+                available_modules = "\n  • ".join([""] + emulation_files)
+                raise ValueError(
+                    f"Module '{self.target_module}' not found. Available modules:{available_modules}"
+                )
+        else:
+            print(f"🔍 Discovered {len(emulation_files)} emulation files")
+
         print(f"🚀 Running emulations in {self.mode.name} mode...")
+
+        # Print configuration info
+        config_info = []
+        if self.cluster_config:
+            config_info.append(f"cluster_config={self.cluster_config}")
+        if self.bandwidth:
+            config_info.append(f"bandwidth={self.bandwidth}")
+        if self.latency:
+            config_info.append(f"latency={self.latency}")
+        if self.target_module:
+            config_info.append(f"target_module={self.target_module}")
+
+        if config_info:
+            print(f"📋 Configuration: {', '.join(config_info)}")
+
         print("=" * 80)
 
         for i, module_path in enumerate(emulation_files, 1):
@@ -184,29 +251,35 @@ class EmulationRunner:
 
             try:
                 module = importlib.import_module(module_path)
-                functions = self.discover_emul_functions(module)
 
-                if not functions:
-                    print(f"  ⚠️  No emul_ functions found in {module_path}")
+                if not self.discover_main_function(module):
+                    print(f"  ⚠️  No main function found in {module_path}")
+                    self.results.append(
+                        TestResult(
+                            module_path=module_path,
+                            function_name="main",
+                            success=False,
+                            duration=0.0,
+                            error_message="No main function found",
+                            error_type="AttributeError",
+                        )
+                    )
                     continue
 
-                print(
-                    f"  Found {len(functions)} emul functions: {', '.join(functions)}"
-                )
+                print(f"  Found main function")
 
-                for function_name in functions:
-                    result = self.run_emulation_function(module_path, function_name)
-                    self.results.append(result)
+                result = self.run_main_function(module_path)
+                self.results.append(result)
 
-                    status = "✅ PASS" if result.success else "❌ FAIL"
-                    print(f"  {status} {function_name} ({result.duration:.2f}s)")
+                status = "✅ PASS" if result.success else "❌ FAIL"
+                print(f"  {status} main ({result.duration:.2f}s)")
 
             except ImportError as e:
                 print(f"  ❌ Failed to import {module_path}: {e}")
                 self.results.append(
                     TestResult(
                         module_path=module_path,
-                        function_name="<import_error>",
+                        function_name="main",
                         success=False,
                         duration=0.0,
                         error_message=str(e),
@@ -289,9 +362,9 @@ class EmulationRunner:
 
         # Top slowest tests
         slowest_tests = sorted(self.results, key=lambda r: r.duration, reverse=True)[
-            :10
+            : self.slowest_tests_count
         ]
-        print(f"\n🐌 TOP 10 SLOWEST TESTS")
+        print(f"\n🐌 TOP {self.slowest_tests_count} SLOWEST TESTS")
         print("-" * 80)
 
         for i, result in enumerate(slowest_tests, 1):
@@ -307,14 +380,63 @@ class EmulationRunner:
 
 def main():
     """Main entry point for the batch emulation runner."""
+    usage_examples = """
+    Examples:
+      # Run with default parameters(all emulations will be run with default configs)
+      python emulations/run_emulations.py
+      
+      # Run with custom parameters
+      python emulations/run_emulations.py --mode=docker --bandwidth=500 --latency=10
+      
+      # Specify cluster configuration
+      python emulations/run_emulations.py --cluster_config=path/to/config.json
+      
+      # List available emulation files only
+      python emulations/run_emulations.py --list-only
+      
+      # Run a specific module only
+      python emulations/run_emulations.py --module=emulations.cluster.kmeans_emul
+      
+      # Verbose output with top 10 slowest tests
+      python emulations/run_emulations.py --verbose --slowest-tests=10
+    """
+
     parser = argparse.ArgumentParser(
-        description="Run all SML emulation tests and generate comprehensive reports"
+        description="Run all SML emulation tests and generate comprehensive reports",
+        epilog=usage_examples,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--mode",
         choices=["multiprocess", "docker"],
         default="multiprocess",
-        help="Emulation mode (default: multiprocess)",
+        help="Emulation mode (default: multiprocess). Note: docker mode is not yet implemented.",
+    )
+    parser.add_argument(
+        "--cluster_config",
+        type=str,
+        help="Path to cluster configuration file (will override default configs in emul files)",
+    )
+    parser.add_argument(
+        "--bandwidth",
+        type=int,
+        help="Network bandwidth limit in Mbps (for docker mode)",
+    )
+    parser.add_argument(
+        "--latency",
+        type=int,
+        help="Network latency in milliseconds (for docker mode)",
+    )
+    parser.add_argument(
+        "--slowest-tests",
+        type=int,
+        default=5,
+        help="Number of slowest tests to show in the report (default: 5)",
+    )
+    parser.add_argument(
+        "--module",
+        type=str,
+        help="Run a specific module only (e.g., 'emulations.cluster.kmeans_emul')",
     )
     parser.add_argument(
         "--verbose",
@@ -331,11 +453,37 @@ def main():
     args = parser.parse_args()
 
     # Initialize runner
-    runner = EmulationRunner(mode=args.mode, verbose=args.verbose)
+    try:
+        runner = EmulationRunner(
+            mode=args.mode,
+            cluster_config=args.cluster_config,
+            bandwidth=args.bandwidth,
+            latency=args.latency,
+            slowest_tests_count=getattr(args, "slowest_tests", 5),
+            target_module=args.module,
+            verbose=args.verbose,
+        )
+    except ValueError as e:
+        print(f"❌ Error: {e}")
+        sys.exit(1)
 
     if args.list_only:
         emulation_files = runner.discover_emulation_files()
-        print(f"📁 Found {len(emulation_files)} emulation files:")
+
+        # Filter to specific module if target_module is specified
+        if runner.target_module:
+            if runner.target_module in emulation_files:
+                emulation_files = [runner.target_module]
+                print(f"🎯 Specified module: {runner.target_module}")
+            else:
+                available_modules = "\n  • ".join([""] + emulation_files)
+                print(
+                    f"❌ Module '{runner.target_module}' not found. Available modules:{available_modules}"
+                )
+                return
+        else:
+            print(f"📁 Found {len(emulation_files)} emulation files:")
+
         for file in emulation_files:
             print(f"  • {file}")
         return
