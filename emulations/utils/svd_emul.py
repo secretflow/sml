@@ -18,6 +18,8 @@ import numpy as np
 import emulations.utils.emulation as emulation
 from sml.utils.extmath import svd
 
+CONFIG_PATH = "emulations/utils/3pc_128.json"
+
 
 def emul_svd(emulator: emulation.Emulator):
     print("start svd emulation.")
@@ -54,7 +56,7 @@ def emul_svd(emulator: emulation.Emulator):
 
 
 def main(
-    cluster_config: str = "emulations/utils/3pc_128.json",
+    cluster_config: str = CONFIG_PATH,
     mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
     bandwidth: int = 300,
     latency: int = 20,
