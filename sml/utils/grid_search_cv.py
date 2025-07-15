@@ -300,4 +300,9 @@ class FitFailedWarning(UserWarning):
 
 
 class NotFittedError(ValueError, AttributeError):
-    """Exception class to raise if estimator is used before fitting."""
+    """
+    Exception raised when an estimator is used before fitting.
+
+    This exception is typically raised when methods like `predict` or `score`
+    are called on an estimator that has not been fitted yet.
+    """
