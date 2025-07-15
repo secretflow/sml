@@ -135,7 +135,7 @@ class LogisticRegression:
         assert sig_type in [
             e.value for e in SigType
         ], f"sig_type should in {[e.value for e in SigType]}, but got {sig_type}"
-        assert class_weight == None, f"not support class_weight for now"
+        assert class_weight is None, f"not support class_weight for now"
         assert multi_class in [
             "binary",
             "ovr",
