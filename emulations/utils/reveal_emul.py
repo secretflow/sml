@@ -117,9 +117,12 @@ def emul_reveal(emulator: emulation.Emulator):
         x_float_seal = emulator.seal(x_float)
 
         # spu test
-        xx_int_spu, xx_float_spu, reveal_x_log_int_spu, reveal_x_log_float_spu = (
-            emulator.run(reveal_func_list)(x_int_seal, x_float_seal)
-        )
+        (
+            xx_int_spu,
+            xx_float_spu,
+            reveal_x_log_int_spu,
+            reveal_x_log_float_spu,
+        ) = emulator.run(reveal_func_list)(x_int_seal, x_float_seal)
         # For FM64, fxp=18, SPU will compute log(x) with large error which confirm that yy is computed in plaintext.
         int_diff = np.abs(xx_int_spu - reveal_x_log_int_spu)
         assert np.any(int_diff > 1), f"max diff: {np.max(int_diff)}"

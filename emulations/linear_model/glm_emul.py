@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import numpy as np
+import spu.utils.distributed as ppd
 
 import emulations.utils.emulation as emulation
-import spu.utils.distributed as ppd
 from sml.linear_model.glm import _GeneralizedLinearRegressor
 
 n_samples, n_features = 100, 5

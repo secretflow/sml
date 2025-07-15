@@ -15,13 +15,13 @@
 import time
 
 import jax.numpy as jnp
+import spu.libspu as libspu  # type: ignore
 from sklearn import datasets
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 
 import emulations.utils.emulation as emulation
-import spu.libspu as libspu  # type: ignore
 from sml.svm.svm import SVM
 
 

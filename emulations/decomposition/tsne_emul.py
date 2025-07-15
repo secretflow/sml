@@ -27,7 +27,6 @@ from sml.decomposition.tsne import TSNE
 
 
 def emul_tsne(emulator: emulation.Emulator):
-
     def tsne_random():
         print("Start t-SNE emulation...")
 

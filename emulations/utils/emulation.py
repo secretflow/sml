@@ -25,12 +25,12 @@ from contextlib import contextmanager
 from enum import Enum
 from typing import Callable, Optional
 
-import yaml
-
 import spu.utils.distributed as ppd
-from sml.utils.utils import get_logger
+import yaml
 from spu import libspu
 from spu.utils.polyfill import Process
+
+from sml.utils.utils import get_logger
 
 CLUSTER_ABY3_3PC = "sml/utils/conf/3pc.json"
 SML_HOME = pathlib.Path(__file__).resolve().parent.parent

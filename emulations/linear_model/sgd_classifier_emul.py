@@ -18,7 +18,6 @@ from sml.utils.dataset_utils import load_mock_datasets
 
 
 def emul_SGDClassifier(emulator: emulation.Emulator):
-
     def proc(x, y):
         model = SGDClassifier(
             epochs=1,

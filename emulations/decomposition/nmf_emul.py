@@ -16,14 +16,13 @@ import os
 import sys
 
 import numpy as np
+from scipy.stats import pearsonr, spearmanr
 from sklearn.decomposition import NMF as SklearnNMF
 from sklearn.metrics import r2_score
-from scipy.stats import pearsonr, spearmanr
 
 # Add the sml directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 import emulations.utils.emulation as emulation
-
 from sml.decomposition.nmf import NMF
 
 

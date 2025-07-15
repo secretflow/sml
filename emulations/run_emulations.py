@@ -27,10 +27,10 @@ import queue
 import sys
 import time
 import traceback
-from pathlib import Path
-from typing import Dict, List, Tuple, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 # Add the project root to Python path
 project_root = Path(__file__).parent.parent
@@ -453,7 +453,9 @@ class EmulationRunner:
             status_icon = (
                 "✅"
                 if module_success == module_total
-                else "❌" if module_success == 0 else "⚠️"
+                else "❌"
+                if module_success == 0
+                else "⚠️"
             )
             print(f"\n{status_icon} {module_path}")
             print(

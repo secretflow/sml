@@ -18,22 +18,21 @@ import sys
 import jax.numpy as jnp
 import numpy as np
 from sklearn import metrics
-from sklearn.metrics import average_precision_score as sk_average_precision_score
+from sklearn.metrics import \
+    average_precision_score as sk_average_precision_score
 from sklearn.metrics import brier_score_loss as sk_brier_score_loss
 
 # add ops dir to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../"))
 
 import emulations.utils.emulation as emulation
-from sml.metrics.classification.classification import (
-    accuracy_score,
-    average_precision_score,
-    brier_score_loss,
-    f1_score,
-    precision_score,
-    recall_score,
-    roc_auc_score,
-)
+from sml.metrics.classification.classification import (accuracy_score,
+                                                       average_precision_score,
+                                                       brier_score_loss,
+                                                       f1_score,
+                                                       precision_score,
+                                                       recall_score,
+                                                       roc_auc_score)
 
 
 # TODO: design the enumation framework, just like py.unittest

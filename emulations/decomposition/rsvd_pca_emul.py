@@ -22,7 +22,6 @@ from sklearn.decomposition import PCA as SklearnPCA
 # Add the sml directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 import emulations.utils.emulation as emulation
-
 from sml.decomposition.pca import PCA
 
 np.random.seed(0)

@@ -19,7 +19,8 @@ import time
 import jax.numpy as jnp
 import jax.random as random
 import numpy as np
-from sklearn.preprocessing import QuantileTransformer as SklearnQuantileTransformer
+from sklearn.preprocessing import \
+    QuantileTransformer as SklearnQuantileTransformer
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 import emulations.utils.emulation as emulation
