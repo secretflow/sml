@@ -340,8 +340,4 @@ def main(
 
 
 if __name__ == "__main__":
-    cluster_config = "emulations/decomposition/3pc.json"
-    mode = emulation.Mode.MULTIPROCESS
-    bandwidth = 300
-    latency = 20
-    main(cluster_config, mode, bandwidth, latency)
+    main()

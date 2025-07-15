@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright 2025 Ant Group Co., Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -214,6 +213,7 @@ class EmulationRunner:
 
         # Create a queue for inter-process communication
         # Note: we use a separate process to run to avoid the grpc termination issue.
+        # However, we can not exactly use multiple processes, because the ports will be occupied.
         result_queue = multiprocessing.Queue()
 
         # Create and start the process

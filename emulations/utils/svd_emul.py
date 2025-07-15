@@ -69,8 +69,4 @@ def main(
 
 
 if __name__ == "__main__":
-    cluster_config = "emulations/utils/3pc_128.json"
-    mode = emulation.Mode.MULTIPROCESS
-    bandwidth = 300
-    latency = 20
-    main(cluster_config, mode, bandwidth, latency)
+    main()

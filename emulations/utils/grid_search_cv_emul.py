@@ -264,4 +264,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main(emulation.CLUSTER_ABY3_3PC, emulation.Mode.MULTIPROCESS, 300, 20)
+    main()

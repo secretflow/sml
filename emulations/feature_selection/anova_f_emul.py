@@ -143,12 +143,5 @@ def main(
         emul_ANOVA_F(emulator)
 
 
-def test_anova_f(mode: emulation.Mode = emulation.Mode.MULTIPROCESS):
-    cluster_config = emulation.CLUSTER_ABY3_3PC
-    bandwidth = 300
-    latency = 20
-    main(cluster_config, mode, bandwidth, latency)
-
-
 if __name__ == "__main__":
-    test_anova_f(emulation.Mode.MULTIPROCESS)
+    main()

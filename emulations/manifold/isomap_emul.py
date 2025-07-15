@@ -90,8 +90,4 @@ def main(
 
 
 if __name__ == "__main__":
-    cluster_config = emulation.CLUSTER_ABY3_3PC
-    mode = emulation.Mode.MULTIPROCESS
-    bandwidth = 300
-    latency = 20
-    main(cluster_config, mode, bandwidth, latency)
+    main()
