@@ -12,14 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
 
 import jax.numpy as jnp
 from sklearn.datasets import load_iris
 
-# Add the library directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 import emulations.utils.emulation as emulation
 from sml.gaussian_process._gpc import GaussianProcessClassifier
 

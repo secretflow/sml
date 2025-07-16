@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
 import time
 
 import jax.random as random
@@ -21,7 +19,6 @@ import numpy as np
 from sklearn.datasets import make_blobs
 from sklearn.manifold import trustworthiness
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 import emulations.utils.emulation as emulation
 from sml.decomposition.tsne import TSNE
 

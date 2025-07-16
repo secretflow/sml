@@ -12,17 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
-
 import jax.numpy as jnp
 import numpy as np
 from sklearn import metrics
 from sklearn.metrics import average_precision_score as sk_average_precision_score
 from sklearn.metrics import brier_score_loss as sk_brier_score_loss
-
-# add ops dir to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../"))
 
 import emulations.utils.emulation as emulation
 from sml.metrics.classification.classification import (

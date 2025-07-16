@@ -12,15 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
-
 import jax.random as random
 import numpy as np
 from sklearn.decomposition import TruncatedSVD as SklearnSVD
-
-# Add the library directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
 import emulations.utils.emulation as emulation
 from sml.utils.jacobi_svd import jacobi_svd

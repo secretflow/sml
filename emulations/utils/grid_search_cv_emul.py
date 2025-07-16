@@ -13,8 +13,6 @@
 # limitations under the License.
 
 import copy
-import os
-import sys
 import time
 
 import jax.numpy as jnp
@@ -22,9 +20,6 @@ import jax.random as random
 import numpy as np
 from sklearn.datasets import make_classification, make_regression
 from sklearn.model_selection import KFold, StratifiedKFold
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
 import emulations.utils.emulation as emulation
 from sml.ensemble.adaboost import AdaBoostClassifier
