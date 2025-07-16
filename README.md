@@ -32,7 +32,7 @@ So we establish a new library SML trying to bridge these gaps:
 1. accuracy: optimize and test the algorithm based on fixed-point number,
 e.g. prefer high-precision ops(`rsqrt` rather than `1/sqrt`),
 essential re-transform to accommodate the valid range of non-linear ops
-(see [fxp pitfalls](../docs/development/fxp.ipynb)).
+(see [fxp pitfalls](https://www.secretflow.org.cn/en/docs/spu/main/development/fxp)).
 2. efficiency: use MPC-friendly op to replace CPU-friendly op,
 e.g. use numeric approximation trick to avoid sophistic computation, prefer arithmetic ops to comparison ops.
 
@@ -55,29 +55,39 @@ and you should test the **efficiency** using `emulator`.
 
 You can install SML in two ways:
 
-**Option 1: Install from PyPI (Recommended)**
+### Option 1: Install from PyPI (Recommended
+
 ```bash
 pip install sf-sml
 ```
 
-**Option 2: Install from source**
+### Option 2: Install from source
+
 ```bash
 git clone https://github.com/secretflow/sml.git
 cd sml
 pip install -e .
 ```
 
+### After installation
+
 After installation, you can run any test like:
 
 ```bash
-# run unit tests
+# run single unit test
 pytest tests/cluster/kmeans_test.py  # run kmeans simulation
 
-# run emulation tests
-python emulations/run_emulation.py emulations.cluster.kmeans_emul  # run kmeans emulation
+# run all unit tests
+pytest tests
+
+# run single emulation test
+python emulations/run_emulations.py --module emulations.cluster.kmeans_emul  # run kmeans emulation
+
+# run all emulations
+python emulations/run_emulations.py
 
 # list all available emulations
-python emulations/run_emulation.py --list
+python emulations/run_emulations.py --list-only
 ```
 
 ## Algorithm Support lists

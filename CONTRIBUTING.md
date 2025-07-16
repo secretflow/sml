@@ -14,7 +14,7 @@ If you want to submit an issue, please do your best to follow these guidelines w
 
 ## Contributing code
 
-![sml develop paradiam](./sml_develop.svg)
+![sml develop paradigm](./sml_develop.svg)
 
 > 1. To avoid duplicating work, it is highly advised that you search through the issue tracker and the PR list.
 > If in doubt about duplicated work, or if you want to work on a non-trivial feature,
@@ -24,13 +24,9 @@ If you want to submit an issue, please do your best to follow these guidelines w
 The preferred way to contribute to SML is to fork the main repository, then submit a "pull request" (PR).
 
 1. Create a GitHub account if you do not have one.
-2. Fork the [project repository](https://github.com/secretflow/sml),
-your can refer to [this](https://docs.github.com/en/get-started/quickstart/fork-a-repo) for more details.
-3. Develop the feature on **your feature branch** on your computer,
-using [Git](https://docs.github.com/en/get-started/quickstart/set-up-git) to do the version control.
-4. Following [Before Pull Request](<./CONTRIBUTING.md#Before Pull Request>) to place or test your codes,
-[these](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork)
-to create a pull request from your fork.
+2. Fork the [project repository](https://github.com/secretflow/sml), your can refer to [this](https://docs.github.com/en/get-started/quickstart/fork-a-repo) for more details.
+3. Develop the feature on **your feature branch** on your computer, using [Git](https://docs.github.com/en/get-started/quickstart/set-up-git) to do the version control.
+4. Following [Before Pull Request](<./CONTRIBUTING.md#Before Pull Request>) to place or test your codes, [these](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork) to create a pull request from your fork.
 5. Committers do code review and then merge.
 
 ## Before Pull Request
@@ -40,15 +36,11 @@ When finishing your coding work, you are supposed to do some extra work before p
 1. **Make sure your code is up-to-date**: It is often helpful to keep your local feature branch **synchronized** with
 the latest changes of the main sml repository.
 2. **Place your codes properly**: Generally speaking, for every algorithm, at least 3 files are needed
-   - `<algorithm>.py`: implementation of algorithm or new features, it should be a **"jit-able"** program which run correctly in plaintext
-   (same or near to output from scikit-learn).
-   - `<algorithm>_test.py`: a pytest test file, in which you test your program with **simulator**, then you should report the behavior
-   (like correctness or error rate) under MPC setting.
-   - `<algorithm>_emul.py`: similar to the above file, except you will test program with **emulator**,
-   then you can get sense of efficiency under different MPC protocols.
+   - `<algorithm>.py`: implementation of algorithm or new features, it should be a **"jit-able"** program which run correctly in plaintext (same or near to output from scikit-learn).
+   - `<algorithm>_test.py`: a pytest test file, in which you test your program with **simulator**, then you should report the behavior (like correctness or error rate) under MPC setting.
+   - `<algorithm>_emul.py`: similar to the above file, except you will test program with **emulator**, then you can get sense of efficiency under different MPC protocols.
 3. **Other things**: there are still some small fixes to do.
-   - **Add necessary doc**: your implementation may only have part features, or some changes have been made for limitation of both JAX and SPU,
-    you **MUST** describe these things explicitly!
+   - **Add necessary doc**: your implementation may only have part features, or some changes have been made for limitation of both JAX and SPU, you **MUST** describe these things explicitly!
    - **Code quality and formatting**: The project uses pre-commit hooks to automatically maintain code quality:
      - **Pre-commit hooks**: Run automatically on each commit to check and fix common issues
      - **Black**: Automatically formats Python code for consistent style
@@ -76,10 +68,8 @@ If hooks fail during commit, fix the reported issues, stage the changes (`git ad
 
 ### Reveal some data during your programs
 
-First and foremost, it is important to emphasize that revealing data in plaintext is a risky operation.
-You must be fully aware of the potential data leakage risks associated with this action.
-If you still need to reveal some data from the SPU, you can use the `sml_reveal` function defined in `sml/utils/utils.py`,
-which allows you to reveal one or more arrays as plaintext.
+First and foremost, it is important to emphasize that revealing data in plaintext is a risky operation. You must be fully aware of the potential data leakage risks associated with this action.
+If you still need to reveal some data from the SPU, you can use the `sml_reveal` function defined in `sml/utils/utils.py`, which allows you to reveal one or more arrays as plaintext.
 
 #### How to use the revealed values
 
@@ -134,8 +124,6 @@ def reveal_while_loop(x):
 
 ```
 
-For concrete usage of the two examples above, please refer to `sml/utils/tests/reveal_test.py`.
+For concrete usage of the two examples above, please refer to `tests/utils/reveal_test.py`.
 
-Finally, in `sml/linear_model/logistic.py`, we have also implemented a simple early stopping mechanism based on parameter changes (as a practical
-application of `while_loop`). This allows for more efficient logistic model training by revealing only a few bits,
-which can be considered to have very limited information leakage.
+Finally, in `sml/linear_model/logistic.py`, we have also implemented a simple early stopping mechanism based on parameter changes (as a practical application of `while_loop`). This allows for more efficient logistic model training by revealing only a few bits, which can be considered to have very limited information leakage.
