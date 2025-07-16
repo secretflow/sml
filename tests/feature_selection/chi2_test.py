@@ -12,16 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
-
 import numpy as np
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
 from sklearn.datasets import load_iris
 from sklearn.feature_selection import chi2 as chi2_sklearn
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 from sml.feature_selection.univariate_selection import chi2
 
 

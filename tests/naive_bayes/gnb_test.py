@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
-
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -22,9 +19,6 @@ import spu.libspu as libspu
 import spu.utils.simulation as spsim
 from sklearn import datasets
 from sklearn.naive_bayes import GaussianNB as SklearnGaussianNB
-
-# Add the sml directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
 from sml.naive_bayes.gnb import GaussianNB
 

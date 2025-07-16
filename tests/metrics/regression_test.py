@@ -12,17 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
-
 import jax.numpy as jnp
 import numpy as np
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
 from sklearn import metrics
-
-# add ops dir to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
 from sml.metrics.regression.regression import (
     d2_tweedie_score,
