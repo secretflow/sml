@@ -18,16 +18,16 @@ import jax.numpy as jnp
 
 
 class SigType(Enum):
-    T1 = 't1'
-    T3 = 't3'
-    T5 = 't5'
-    SEG3 = 'seg3'
-    DF = 'df'
-    SR = 'sr'
-    LS7 = 'ls7'
+    T1 = "t1"
+    T3 = "t3"
+    T5 = "t5"
+    SEG3 = "seg3"
+    DF = "df"
+    SR = "sr"
+    LS7 = "ls7"
     # DO NOT use this except in hessian case.
-    MIX = 'mix'
-    REAL = 'real'
+    MIX = "mix"
+    REAL = "real"
 
 
 # taylor series referenced from:

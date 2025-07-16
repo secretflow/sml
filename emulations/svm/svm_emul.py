@@ -16,8 +16,9 @@ import time
 
 import jax.numpy as jnp
 import spu.libspu as libspu  # type: ignore
+import spu.libspu as libspu  # type: ignore
 from sklearn import datasets
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 

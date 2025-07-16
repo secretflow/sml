@@ -14,12 +14,12 @@
 
 from .glm import (
     GammaRegressor,
-    TweedieRegressor,
     PoissonRegressor,
+    TweedieRegressor,
     _GeneralizedLinearRegressor,
 )
 from .logistic import LogisticRegression
 from .pla import Perceptron
 from .quantile import QuantileRegressor
-from .ridge import Solver, Ridge
+from .ridge import Ridge, Solver
 from .sgd_classifier import SGDClassifier

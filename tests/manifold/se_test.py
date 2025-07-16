@@ -12,77 +12,67 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import time
-import unittest
 
 import jax
 import jax.numpy as jnp
 import numpy as np
+import spu.libspu as libspu
+import spu.utils.simulation as spsim
 from sklearn.manifold import spectral_embedding
 from sklearn.neighbors import kneighbors_graph
 
-import spu.libspu as libspu
-import spu.utils.simulation as spsim
 from sml.manifold.se import SE
 
 
-class UnitTests(unittest.TestCase):
-    def test_se(self):
-        sim = spsim.Simulator.simple(3, libspu.ProtocolKind.ABY3, libspu.FieldType.FM64)
+def test_se():
+    sim = spsim.Simulator.simple(3, libspu.ProtocolKind.ABY3, libspu.FieldType.FM64)
 
-        def se(sX, num_samples, num_features, k, num_components):
-            embedding = SE(
-                n_components=num_components,
-                n_neighbors=k,
-                n_samples=num_samples,
-                n_features=num_features,
-                max_iterations=5,
-            )
-            X_transformed = embedding.fit_transform(sX)
-            return X_transformed
-
-        # Set sample size and dimensions
-        num_samples = (
-            20  # Number of samples, se can meet larger num_samples, such as 150
+    def se(sX, num_samples, num_features, k, num_components):
+        embedding = SE(
+            n_components=num_components,
+            n_neighbors=k,
+            n_samples=num_samples,
+            n_features=num_features,
+            max_iterations=5,
         )
-        num_features = (
-            4  # Sample dimension, se can meet larger num_features, such as 12
-        )
-        k = 5  # Number of nearest neighbors
-        num_components = 3  # Dimension after dimensionality reduction
+        X_transformed = embedding.fit_transform(sX)
+        return X_transformed
 
-        # Generate random input
-        seed = int(time.time())
-        key = jax.random.PRNGKey(seed)
-        X = jax.random.uniform(
-            key, shape=(num_samples, num_features), minval=0.0, maxval=1.0
-        )
+    # Set sample size and dimensions
+    num_samples = 20  # Number of samples, se can meet larger num_samples, such as 150
+    num_features = 4  # Sample dimension, se can meet larger num_features, such as 12
+    k = 5  # Number of nearest neighbors
+    num_components = 3  # Dimension after dimensionality reduction
 
-        ans = spsim.sim_jax(
-            sim,
-            se,
-            static_argnums=(
-                1,
-                2,
-                3,
-                4,
-            ),
-        )(X, num_samples, num_features, k, num_components)
+    # Generate random input
+    seed = int(time.time())
+    key = jax.random.PRNGKey(seed)
+    X = jax.random.uniform(
+        key, shape=(num_samples, num_features), minval=0.0, maxval=1.0
+    )
 
-        # sklearn test
-        affinity_matrix = kneighbors_graph(
-            X, n_neighbors=k, mode="distance", include_self=False
-        )
+    ans = spsim.sim_jax(
+        sim,
+        se,
+        static_argnums=(
+            1,
+            2,
+            3,
+            4,
+        ),
+    )(X, num_samples, num_features, k, num_components)
 
-        # Make the matrix symmetric
-        affinity_matrix = 0.5 * (affinity_matrix + affinity_matrix.T)
+    # sklearn test
+    affinity_matrix = kneighbors_graph(
+        X, n_neighbors=k, mode="distance", include_self=False
+    )
 
-        embedding = spectral_embedding(
-            affinity_matrix, n_components=num_components, random_state=None
-        )
+    # Make the matrix symmetric
+    affinity_matrix = 0.5 * (affinity_matrix + affinity_matrix.T)
 
-        # Since the final calculation result is calculated by the eigenvector, the accuracy cannot reach 1e-3
-        np.testing.assert_allclose(jnp.abs(embedding), jnp.abs(ans), rtol=0, atol=1e-2)
+    embedding = spectral_embedding(
+        affinity_matrix, n_components=num_components, random_state=None
+    )
 
-
-if __name__ == "__main__":
-    unittest.main()
+    # Since the final calculation result is calculated by the eigenvector, the accuracy cannot reach 1e-3
+    np.testing.assert_allclose(jnp.abs(embedding), jnp.abs(ans), rtol=0, atol=1e-2)

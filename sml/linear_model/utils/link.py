@@ -73,7 +73,7 @@ class ExpLink(BaseLink):
 
 
 class LogLink(BaseLink):
-    """The log link function g(x) = log(x), x \in (0, inf)"""
+    r"""The log link function g(x) = log(x), x \in (0, inf)"""
 
     def link(self, y_pred):
         # Apply the logarithm to the input (logarithmic link)
@@ -86,7 +86,7 @@ class LogLink(BaseLink):
 
 
 class LogitLink(BaseLink):
-    """The logit link function g(x)=logit(x), x \in (0,1)"""
+    r"""The logit link function g(x)=logit(x), x \in (0,1)"""
 
     def link(self, y_pred):
         return logit(y_pred)

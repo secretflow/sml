@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-
 import jax
 import jax.numpy as jnp
 import numpy as np
-
+import pytest
 import spu.libspu as libspu  # type: ignore
 import spu.utils.simulation as spsim
+
 from sml.utils.utils import sml_reveal
 
 
@@ -76,97 +75,100 @@ def reveal_while_loop(x):
     return x
 
 
-class RevealTest(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        print("RevealTest setUpClass\n")
-        config64 = libspu.RuntimeConfig(
-            protocol=libspu.ProtocolKind.ABY3,
-            field=libspu.FieldType.FM64,
-            fxp_fraction_bits=18,
-        )
-        config64.enable_pphlo_profile = False
-        config64.enable_hal_profile = False
-        cls.sim = spsim.Simulator(3, config64)
-
-    def test_reveal_single(self):
-        print("RevealTest test_reveal_single start\n")
-        x_int = jnp.array([1, 2, 3]) * (2**25)
-        x_float = jnp.array([1.0, 2.0, 3.0]) * (2**25)
-
-        reveal_func_single_spu = spsim.sim_jax(self.sim, reveal_func_single)
-
-        # plain test
-        y_int_plain, yy_int_plain, pred_int_plain = reveal_func_single(x_int)
-        y_float_plain, yy_float_plain, pred_float_plain = reveal_func_single(x_float)
-
-        # all computed in plaintext, suppose no large diff
-        np.testing.assert_allclose(y_int_plain, y_float_plain)
-        np.testing.assert_allclose(yy_int_plain, yy_float_plain)
-        np.testing.assert_allclose(y_int_plain, yy_int_plain)
-        # we get 0-dim array, so we can fetch the element directly
-        np.testing.assert_equal(pred_int_plain.item(), True)
-        np.testing.assert_equal(pred_float_plain.item(), True)
-
-        # spu test
-        y_int_spu, yy_int_spu, pred_int_spu = reveal_func_single_spu(x_int)
-        y_float_spu, yy_float_spu, pred_float_spu = reveal_func_single_spu(x_float)
-
-        # For FM64, fxp=18, SPU will compute log(x) with large error which confirm that yy is computed in plaintext.
-        int_diff = np.abs(y_int_spu - yy_int_spu)
-        self.assertTrue(np.any(int_diff > 1), f"max diff: {np.max(int_diff)}")
-
-        float_diff = np.abs(y_float_spu - yy_float_spu)
-        self.assertTrue(np.any(float_diff > 1), f"max diff: {np.max(float_diff)}")
-
-        np.testing.assert_equal(pred_int_spu.item(), True)
-        np.testing.assert_equal(pred_float_spu.item(), True)
-
-        print("RevealTest test_reveal_single end\n")
-
-    def test_reveal_list(self):
-        print("RevealTest test_reveal_list start\n")
-        x_int = jnp.array([1, 2, 3]) * (2**25)
-        x_float = jnp.array([1.0, 2.0, 3.0]) * (2**25)
-        reveal_func_list_spu = spsim.sim_jax(self.sim, reveal_func_list)
-
-        # plain test
-        xx_int, xx_float, reveal_x_log_int, reveal_x_log_float = reveal_func_list(
-            x_int, x_float
-        )
-        np.testing.assert_allclose(xx_int, reveal_x_log_int)
-        np.testing.assert_allclose(xx_float, reveal_x_log_float)
-        np.testing.assert_allclose(reveal_x_log_int, reveal_x_log_float)
-
-        # spu test
-        xx_int_spu, xx_float_spu, reveal_x_log_int_spu, reveal_x_log_float_spu = (
-            reveal_func_list_spu(x_int, x_float)
-        )
-        # For FM64, fxp=18, SPU will compute log(x) with large error which confirm that yy is computed in plaintext.
-        int_diff = np.abs(xx_int_spu - reveal_x_log_int_spu)
-        self.assertTrue(np.any(int_diff > 1), f"max diff: {np.max(int_diff)}")
-
-        float_diff = np.abs(xx_float_spu - reveal_x_log_float_spu)
-        self.assertTrue(np.any(float_diff > 1), f"max diff: {np.max(float_diff)}")
-
-        print("RevealTest test_reveal_list end\n")
-
-    def test_reveal_while_loop(self):
-        print("RevealTest test_reveal_while_loop start\n")
-        x = jnp.array([1, 2, 3, 4, 5])
-        reveal_while_loop_spu = spsim.sim_jax(self.sim, reveal_while_loop)
-
-        # plain test
-        y_plain = reveal_while_loop(x)
-
-        # spu test
-        y_spu = reveal_while_loop_spu(x)
-
-        # plaintext and spu should be the same
-        np.testing.assert_allclose(y_plain, y_spu)
-
-        print("RevealTest test_reveal_while_loop end\n")
+@pytest.fixture(scope="module")
+def setup_sim():
+    print("RevealTest setUpClass\n")
+    config64 = libspu.RuntimeConfig(
+        protocol=libspu.ProtocolKind.ABY3,
+        field=libspu.FieldType.FM64,
+        fxp_fraction_bits=18,
+    )
+    config64.enable_pphlo_profile = False
+    config64.enable_hal_profile = False
+    sim = spsim.Simulator(3, config64)
+    yield sim
+    print("RevealTest tearDownClass\n")
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_reveal_single(setup_sim):
+    sim = setup_sim
+    print("RevealTest test_reveal_single start\n")
+    x_int = jnp.array([1, 2, 3]) * (2**25)
+    x_float = jnp.array([1.0, 2.0, 3.0]) * (2**25)
+
+    reveal_func_single_spu = spsim.sim_jax(sim, reveal_func_single)
+
+    # plain test
+    y_int_plain, yy_int_plain, pred_int_plain = reveal_func_single(x_int)
+    y_float_plain, yy_float_plain, pred_float_plain = reveal_func_single(x_float)
+
+    # all computed in plaintext, suppose no large diff
+    np.testing.assert_allclose(y_int_plain, y_float_plain)
+    np.testing.assert_allclose(yy_int_plain, yy_float_plain)
+    np.testing.assert_allclose(y_int_plain, yy_int_plain)
+    # we get 0-dim array, so we can fetch the element directly
+    assert pred_int_plain.item() is True
+    assert pred_float_plain.item() is True
+
+    # spu test
+    y_int_spu, yy_int_spu, pred_int_spu = reveal_func_single_spu(x_int)
+    y_float_spu, yy_float_spu, pred_float_spu = reveal_func_single_spu(x_float)
+
+    # For FM64, fxp=18, SPU will compute log(x) with large error which confirm that yy is computed in plaintext.
+    int_diff = np.abs(y_int_spu - yy_int_spu)
+    assert np.any(int_diff > 1), f"max diff: {np.max(int_diff)}"
+
+    float_diff = np.abs(y_float_spu - yy_float_spu)
+    assert np.any(float_diff > 1), f"max diff: {np.max(float_diff)}"
+
+    assert pred_int_spu.item() is True
+    assert pred_float_spu.item() is True
+
+    print("RevealTest test_reveal_single end\n")
+
+
+def test_reveal_list(setup_sim):
+    sim = setup_sim
+    print("RevealTest test_reveal_list start\n")
+    x_int = jnp.array([1, 2, 3]) * (2**25)
+    x_float = jnp.array([1.0, 2.0, 3.0]) * (2**25)
+    reveal_func_list_spu = spsim.sim_jax(sim, reveal_func_list)
+
+    # plain test
+    xx_int, xx_float, reveal_x_log_int, reveal_x_log_float = reveal_func_list(
+        x_int, x_float
+    )
+    np.testing.assert_allclose(xx_int, reveal_x_log_int)
+    np.testing.assert_allclose(xx_float, reveal_x_log_float)
+    np.testing.assert_allclose(reveal_x_log_int, reveal_x_log_float)
+
+    # spu test
+    xx_int_spu, xx_float_spu, reveal_x_log_int_spu, reveal_x_log_float_spu = (
+        reveal_func_list_spu(x_int, x_float)
+    )
+    # For FM64, fxp=18, SPU will compute log(x) with large error which confirm that yy is computed in plaintext.
+    int_diff = np.abs(xx_int_spu - reveal_x_log_int_spu)
+    assert np.any(int_diff > 1), f"max diff: {np.max(int_diff)}"
+
+    float_diff = np.abs(xx_float_spu - reveal_x_log_float_spu)
+    assert np.any(float_diff > 1), f"max diff: {np.max(float_diff)}"
+
+    print("RevealTest test_reveal_list end\n")
+
+
+def test_reveal_while_loop(setup_sim):
+    sim = setup_sim
+    print("RevealTest test_reveal_while_loop start\n")
+    x = jnp.array([1, 2, 3, 4, 5])
+    reveal_while_loop_spu = spsim.sim_jax(sim, reveal_while_loop)
+
+    # plain test
+    y_plain = reveal_while_loop(x)
+
+    # spu test
+    y_spu = reveal_while_loop_spu(x)
+
+    # plaintext and spu should be the same
+    np.testing.assert_allclose(y_plain, y_spu)
+
+    print("RevealTest test_reveal_while_loop end\n")

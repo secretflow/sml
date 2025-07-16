@@ -16,7 +16,6 @@ from typing import Tuple
 
 import jax
 import jax.numpy as jnp
-
 from spu.ops.groupby import groupby_sorted
 
 

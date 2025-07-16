@@ -16,7 +16,6 @@ import copy
 import os
 import sys
 import time
-from collections import defaultdict
 
 import jax.numpy as jnp
 import jax.random as random
@@ -25,22 +24,19 @@ from sklearn.datasets import make_classification, make_regression
 from sklearn.model_selection import KFold, StratifiedKFold
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
 import emulations.utils.emulation as emulation
 from sml.ensemble.adaboost import AdaBoostClassifier
 from sml.ensemble.forest import RandomForestClassifier
 from sml.gaussian_process._gpc import GaussianProcessClassifier
 from sml.linear_model.glm import _GeneralizedLinearRegressor
-from sml.linear_model.logistic import LogisticRegression
 from sml.linear_model.pla import Perceptron
-from sml.linear_model.quantile import QuantileRegressor
 from sml.linear_model.ridge import Ridge
-from sml.linear_model.sgd_classifier import SGDClassifier
 from sml.naive_bayes.gnb import GaussianNB
 from sml.neighbors.knn import KNNClassifer
 from sml.preprocessing.preprocessing import KBinsDiscretizer
 from sml.svm.svm import SVM
-from sml.tree.tree import DecisionTreeClassifier
 from sml.utils.grid_search_cv import GridSearchCV
 
 
@@ -126,6 +122,7 @@ def emul_comprehensive_gridsearch(emulator: emulation.Emulator):
     X_clf_multi = jnp.array(X_clf_multi)
     y_clf_multi = jnp.array(y_clf_multi_np)
     y_clf_multi_reshaped = y_clf_multi.reshape(-1, 1)
+    binner = KBinsDiscretizer(n_bins=2, strategy="uniform")
     binner = KBinsDiscretizer(n_bins=2, strategy="uniform")
     X_clf_bin_binary_features = binner.fit_transform(X_clf_bin)
     X_reg, y_reg_np = make_regression(

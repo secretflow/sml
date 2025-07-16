@@ -14,7 +14,6 @@
 
 import warnings
 
-import jax
 import jax.numpy as jnp
 from jax import vmap
 
@@ -23,7 +22,7 @@ class QuantileTransformer:
     def __init__(
         self,
         n_quantiles=1000,
-        output_distribution='uniform',
+        output_distribution="uniform",
         subsample=100_000,
     ):
         """Initialize the transformer.
@@ -59,13 +58,13 @@ class QuantileTransformer:
             raise ValueError(
                 f"n_quantiles must be a positive integer, got {n_quantiles}."
             )
-        if output_distribution != 'uniform':
+        if output_distribution != "uniform":
             warnings.warn(
                 f"output_distribution='{output_distribution}' is not supported. "
                 f"Using 'uniform' instead.",
                 UserWarning,
             )
-            self.output_distribution = 'uniform'
+            self.output_distribution = "uniform"
         else:
             self.output_distribution = output_distribution
         if not isinstance(subsample, int) or subsample <= 0:
@@ -116,7 +115,7 @@ class QuantileTransformer:
         references_perc = target_quantiles_prob * 100
 
         empirical_quantiles = jnp.percentile(
-            X_subset, q=references_perc, axis=0, method='linear'
+            X_subset, q=references_perc, axis=0, method="linear"
         )
 
         self.references_ = empirical_quantiles

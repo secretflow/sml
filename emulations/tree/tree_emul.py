@@ -28,6 +28,7 @@ def emul_tree(emulator: emulation.Emulator):
     def proc_wrapper(max_depth=2, n_labels=3):
         dt = sml_dtc(
             max_depth=max_depth, criterion="gini", splitter="best", n_labels=n_labels
+            max_depth=max_depth, criterion="gini", splitter="best", n_labels=n_labels
         )
 
         def proc(X, y):

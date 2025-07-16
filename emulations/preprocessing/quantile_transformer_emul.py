@@ -87,6 +87,7 @@ def emul_quantile_transformer(emulator: emulation.Emulator):
         print(f"Sklearn transform comparison ({output_dist}) PASSED.")
 
         if output_dist == "uniform":
+        if output_dist == "uniform":
             assert jnp.all(
                 (X_transformed_spu >= -1e-6) & (X_transformed_spu <= 1 + 1e-6)
             ), "Uniform output out of [0, 1] range"
@@ -107,6 +108,7 @@ def emul_quantile_transformer(emulator: emulation.Emulator):
     def uniform_test(emulator, X_plaintext):
         """Runs the emulation test specifically for the 'uniform' distribution."""
         print("\n===== Running Test: Uniform Distribution =====")
+        output_dist = "uniform"
         output_dist = "uniform"
 
         print("Sealing data for uniform test...")

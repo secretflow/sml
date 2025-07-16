@@ -17,10 +17,16 @@ import numpy as np
 from sklearn import preprocessing
 
 import emulations.utils.emulation as emulation
-from sml.preprocessing.preprocessing import (Binarizer, KBinsDiscretizer,
-                                             LabelBinarizer, MaxAbsScaler,
-                                             MinMaxScaler, Normalizer,
-                                             OneHotEncoder, RobustScaler)
+from sml.preprocessing.preprocessing import (
+    Binarizer,
+    KBinsDiscretizer,
+    LabelBinarizer,
+    MaxAbsScaler,
+    MinMaxScaler,
+    Normalizer,
+    OneHotEncoder,
+    RobustScaler,
+)
 
 
 def emul_labelbinarizer(emulator: emulation.Emulator):

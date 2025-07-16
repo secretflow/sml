@@ -24,6 +24,7 @@ from sklearn.neighbors import KNeighborsClassifier
 
 # Add the library directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
 import emulations.utils.emulation as emulation
 from sml.neighbors.knn import KNNClassifer

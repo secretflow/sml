@@ -14,7 +14,6 @@
 
 import jax
 import jax.numpy as jnp
-from jax import jit, lax
 
 
 def _pivot_col(T, tol=1e-5):

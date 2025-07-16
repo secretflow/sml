@@ -48,6 +48,7 @@ def emul_tsne(emulator: emulation.Emulator):
                 max_iter=50,  # Set to 50 for faster unit test execution; to achieve better results, it needs to be set to 150 or above.
                 early_exaggeration=12,
                 init="random",
+                init="random",
             )
             Y_spu_out = model.fit_transform(x, Y_init=Y_init_jax)
             kl_spu_out = model.kl_divergence_
@@ -112,6 +113,7 @@ def emul_tsne(emulator: emulation.Emulator):
                 perplexity=10,
                 max_iter=50,  # Set to 50 for faster unit test execution; to achieve better results, it needs to be set to 150 or above.
                 early_exaggeration=12,
+                init="pca",
                 init="pca",
             )
             Y_spu_out = model.fit_transform(x)

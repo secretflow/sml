@@ -192,6 +192,7 @@ def emul_nmf(emulator: emulation.Emulator):
         model_sklearn = SklearnNMF(
             n_components=n_components,
             init="random",
+            init="random",
             random_state=random_seed,
             l1_ratio=l1_ratio,
             solver="mu",
@@ -246,6 +247,7 @@ def emul_nmf(emulator: emulation.Emulator):
         print("\n=== sklearn Baseline Comparison ===")
         model_sklearn = SklearnNMF(
             n_components=n_components,
+            init="random",
             init="random",
             random_state=random_seed,
             l1_ratio=l1_ratio,

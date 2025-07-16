@@ -33,6 +33,7 @@ def emul_rsvdPCA(emulator: emulation.Emulator):
     def proc(X, random_matrix, n_components, n_oversamples, max_power_iter, scale):
         model = PCA(
             method="rsvd",
+            method="rsvd",
             n_components=n_components,
             n_oversamples=n_oversamples,
             random_matrix=random_matrix,

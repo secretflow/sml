@@ -42,7 +42,7 @@ class SVM:
         Acceptable error to consider the two to be equal.
     """
 
-    def __init__(self, kernel="rbf", C=1.0, gamma='scale', max_iter=300, tol=1e-3):
+    def __init__(self, kernel="rbf", C=1.0, gamma="scale", max_iter=300, tol=1e-3):
         self.kernel = kernel
         self.C = C
         self.gamma = gamma
@@ -54,14 +54,14 @@ class SVM:
         self.b = None
         self.X = None
 
-        assert self.gamma in {'scale', 'auto'}, "Gamma only support 'scale' and 'auto'"
+        assert self.gamma in {"scale", "auto"}, "Gamma only support 'scale' and 'auto'"
         assert self.kernel == "rbf", "Kernel function only support 'rbf'"
 
     def cal_kernel(self, x, x_):
         """Calculate kernel."""
         gamma = {
-            'scale': 1 / (self.n_features * x.var()),
-            'auto': 1 / self.n_features,
+            "scale": 1 / (self.n_features * x.var()),
+            "auto": 1 / self.n_features,
         }[self.gamma]
 
         kernel_res = jnp.exp(
