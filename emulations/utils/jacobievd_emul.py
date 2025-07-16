@@ -12,16 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
-
 import jax.numpy as jnp
 import numpy as np
 
-# Add the sml directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
-
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.utils.extmath import serial_jacobi_evd
 
 
@@ -42,7 +36,7 @@ def _generate_symmetric_matrix_with_bounded_eigenvalues(n, upper_bound=2):
     return A
 
 
-def emul_jacobievd(mode: emulation.Mode.MULTIPROCESS):
+def emul_jacobievd(emulator: emulation.Emulator):
     print("start jacobi evd emulation.")
     np.random.seed(0)
 
@@ -93,18 +87,24 @@ def emul_jacobievd(mode: emulation.Mode.MULTIPROCESS):
             ortho_check, np.eye(eig_vec.shape[1]), rtol=2e-2, atol=2e-2
         )
 
-    try:
-        conf_path = "sml/utils/emulations/3pc_128.json"
-        emulator = emulation.Emulator(conf_path, mode, bandwidth=300, latency=20)
-        emulator.up()
+    _check_jacobievd_single(mat)
+    print("evd emulation pass.")
 
-        _check_jacobievd_single(mat)
 
-        print("evd emulation pass.")
-
-    finally:
-        emulator.down()
+def main(
+    cluster_config: str = "emulations/utils/3pc_128.json",
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_jacobievd(emulator)
 
 
 if __name__ == "__main__":
-    emul_jacobievd(emulation.Mode.MULTIPROCESS)
+    main()

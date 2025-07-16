@@ -16,7 +16,7 @@ from enum import Enum
 
 import jax.numpy as jnp
 
-from ..utils import extmath
+from sml.utils import extmath
 
 
 class Method(Enum):

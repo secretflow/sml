@@ -21,8 +21,9 @@ import pathlib
 import re
 import subprocess
 import time
+from contextlib import contextmanager
 from enum import Enum
-from typing import Callable
+from typing import Callable, Optional
 
 import spu.utils.distributed as ppd
 import yaml
@@ -52,6 +53,7 @@ SAMPLE_DOCKER_NODE_CONFIG = {
     "image": SAMPLE_IMAGE,
     "ports": [],
     "volumes": [f"{SML_HOME.parent.resolve()}:/home/admin/dev/"],
+    "command": 'sh -c "@0"',
     "command": 'sh -c "@0"',
     "networks": {"spu-emulation": {"ipv4_address": None}},
     "cap_add": ["NET_ADMIN"],
@@ -83,12 +85,12 @@ class Emulator:
         self,
         cluster_config: str,
         mode: Mode = Mode.MULTIPROCESS,
-        bandwidth: int = None,
-        latency: int = None,
+        bandwidth: Optional[int] = None,
+        latency: Optional[int] = None,
     ) -> None:
         assert mode in Mode, "Invalid emulator mode"
         self.mode = mode
-        with open(cluster_config) as file:
+        with open(cluster_config, "r") as file:
             self.conf = json.load(file)
         self.bandwidth = bandwidth
         self.latency = latency
@@ -169,11 +171,12 @@ class Emulator:
             cmd,
             stdout=subprocess.PIPE,
         )
-        while True:
-            line = proc.stdout.readline()
-            if not line:
-                break
-            logger.info(line.decode("utf-8"))
+        if proc.stdout:
+            while True:
+                line = proc.stdout.readline()
+                if not line:
+                    break
+                logger.info(line.decode("utf-8"))
         exit_code = proc.wait()
         if exit_code != 0:
             raise Exception(f"Run cmd {cmd} failed")
@@ -235,3 +238,48 @@ class Emulator:
             )
         with open(self.emu_tmp_dir / "emulation.json", "w") as outfile:
             json.dump(self.conf, outfile, indent=4)
+
+
+# emulator context helper
+@contextmanager
+def start_emulator(
+    cluster_config: str,
+    mode: Mode = Mode.MULTIPROCESS,
+    bandwidth: Optional[int] = None,
+    latency: Optional[int] = None,
+):
+    """
+    Context manager for emulator lifecycle management.
+
+    Automatically calls emulator.up() when entering the context and
+    emulator.down() when exiting the context.
+
+    Args:
+        cluster_config: Path to cluster configuration file
+        mode: Emulation mode (MULTIPROCESS or DOCKER)
+        bandwidth: Network bandwidth limit in Mbps (for DOCKER mode)
+        latency: Network latency in ms (for DOCKER mode)
+
+    Yields:
+        Emulator: The emulator instance
+
+    Example:
+        with start_emulator("path/to/config.json", Mode.MULTIPROCESS) as emulator:
+            # Your emulation code here
+            sealed_data = emulator.seal(data)
+            result = emulator.run(my_function)(sealed_data)
+    """
+    emulator = Emulator(
+        cluster_config=cluster_config,
+        mode=mode,
+        bandwidth=bandwidth,
+        latency=latency,
+    )
+
+    try:
+        logger.info(f"Starting emulator in {mode.name} mode...")
+        emulator.up()
+        yield emulator
+    finally:
+        logger.info("Shutting down emulator...")
+        emulator.down()

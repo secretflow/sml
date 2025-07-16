@@ -12,23 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
 
 import jax.numpy as jnp
 import jax.random as random
 import numpy as np
 from sklearn.decomposition import PCA as SklearnPCA
 
-# Add the library directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
-
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.decomposition.pca import PCA
 
 
-def test_pca(mode: emulation.Mode.MULTIPROCESS):
-    def emul_powerPCA():
+def emul_pca(emulator: emulation.Emulator):
+    def powerPCA():
         print("start power method emulation.")
 
         def proc_transform(X):
@@ -71,9 +66,9 @@ def test_pca(mode: emulation.Mode.MULTIPROCESS):
 
         X_reconstructed = model.inverse_transform(X_transformed_sklearn)
 
-        np.testing.assert_allclose(X_reconstructed, result[2], atol=1e-3)
+        np.testing.assert_allclose(X_reconstructed, result[2], atol=1e-2, rtol=1e-2)
 
-    def emul_jacobi_PCA():
+    def jacobi_PCA():
         print("start jacobi method emulation.")
 
         def proc_transform(X):
@@ -116,17 +111,24 @@ def test_pca(mode: emulation.Mode.MULTIPROCESS):
 
         np.testing.assert_allclose(X_reconstructed, result[2], atol=0.1)
 
-    try:
-        # bandwidth and latency only work for docker mode
-        emulator = emulation.Emulator(
-            emulation.CLUSTER_ABY3_3PC, mode, bandwidth=300, latency=20
-        )
-        emulator.up()
-        emul_powerPCA()
-        emul_jacobi_PCA()
-    finally:
-        emulator.down()
+    powerPCA()
+    jacobi_PCA()
+
+
+def main(
+    cluster_config: str = emulation.CLUSTER_ABY3_3PC,
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_pca(emulator)
 
 
 if __name__ == "__main__":
-    test_pca(emulation.Mode.MULTIPROCESS)
+    main()

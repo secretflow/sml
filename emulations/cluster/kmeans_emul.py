@@ -16,11 +16,11 @@ import jax.numpy as jnp
 import numpy as np
 from sklearn.datasets import make_blobs
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.cluster.kmeans import KMEANS
 
 
-def emul_KMEANS(mode: emulation.Mode.MULTIPROCESS):
+def emul_KMEANS(emulator: emulation.Emulator):
     n_samples = 1000
     n_features = 100
     model = KMEANS(n_clusters=2, n_samples=n_samples, init="random", max_iter=10)
@@ -76,7 +76,7 @@ def emul_KMEANS(mode: emulation.Mode.MULTIPROCESS):
     ) or np.allclose(spu_center_1, sklearn_center_0, rtol=1e-2, atol=1e-2)
 
 
-def emul_kmeans_kmeans_plus_plus(mode: emulation.Mode.MULTIPROCESS):
+def emul_kmeans_kmeans_plus_plus(emulator: emulation.Emulator):
     X = jnp.array([[-4, -3, -2, -1], [-4, -3, -2, -1]]).T
 
     # define model in outer scope
@@ -114,7 +114,7 @@ def emul_kmeans_kmeans_plus_plus(mode: emulation.Mode.MULTIPROCESS):
     np.testing.assert_allclose(result, sk_result, rtol=0, atol=1e-4)
 
 
-def emul_kmeans_init_array(mode: emulation.Mode.MULTIPROCESS):
+def emul_kmeans_init_array(emulator: emulation.Emulator):
     def proc(x, init):
         model = KMEANS(
             n_clusters=4, n_samples=x.shape[0], init=init, n_init=1, max_iter=10
@@ -142,7 +142,7 @@ def emul_kmeans_init_array(mode: emulation.Mode.MULTIPROCESS):
     np.testing.assert_allclose(result, sk_result, rtol=0, atol=1e-4)
 
 
-def emul_kmeans_random(mode: emulation.Mode.MULTIPROCESS):
+def emul_kmeans_random(emulator: emulation.Emulator):
     X = jnp.array([[-4, -3, -2, -1], [-4, -3, -2, -1]]).T
 
     # define model in outer scope
@@ -182,19 +182,23 @@ def emul_kmeans_random(mode: emulation.Mode.MULTIPROCESS):
     np.testing.assert_allclose(result, sk_result, rtol=0, atol=1e-4)
 
 
+def main(
+    cluster_config: str = emulation.CLUSTER_ABY3_3PC,
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_KMEANS(emulator)
+        emul_kmeans_kmeans_plus_plus(emulator)
+        emul_kmeans_init_array(emulator)
+        emul_kmeans_random(emulator)
+
+
 if __name__ == "__main__":
-    try:
-        # bandwidth and latency only work for docker mode
-        emulator = emulation.Emulator(
-            emulation.CLUSTER_ABY3_3PC,
-            emulation.Mode.MULTIPROCESS,
-            bandwidth=300,
-            latency=20,
-        )
-        emulator.up()
-        emul_KMEANS(emulation.Mode.MULTIPROCESS)
-        emul_kmeans_kmeans_plus_plus(emulation.Mode.MULTIPROCESS)
-        emul_kmeans_init_array(emulation.Mode.MULTIPROCESS)
-        emul_kmeans_random(emulation.Mode.MULTIPROCESS)
-    finally:
-        emulator.down()
+    main()

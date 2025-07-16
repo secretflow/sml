@@ -16,7 +16,7 @@ import jax.numpy as jnp
 import numpy as np
 from sklearn import preprocessing
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.preprocessing.preprocessing import (
     Binarizer,
     KBinsDiscretizer,
@@ -29,7 +29,7 @@ from sml.preprocessing.preprocessing import (
 )
 
 
-def emul_labelbinarizer():
+def emul_labelbinarizer(emulator: emulation.Emulator):
     def labelbinarize(X, Y):
         transformer = LabelBinarizer(neg_label=-2, pos_label=3)
         transformer.fit(X, n_classes=4)
@@ -56,7 +56,7 @@ def emul_labelbinarizer():
     np.testing.assert_allclose(sk_inv_transformed, spu_inv_transformed, rtol=0, atol=0)
 
 
-def emul_labelbinarizer_binary():
+def emul_labelbinarizer_binary(emulator: emulation.Emulator):
     def labelbinarize(X):
         transformer = LabelBinarizer()
         transformed = transformer.fit_transform(X, n_classes=2, unique=False)
@@ -79,7 +79,7 @@ def emul_labelbinarizer_binary():
     np.testing.assert_allclose(sk_inv_transformed, spu_inv_transformed, rtol=0, atol=0)
 
 
-def emul_labelbinarizer_unseen():
+def emul_labelbinarizer_unseen(emulator: emulation.Emulator):
     def labelbinarize(X, Y):
         transformer = LabelBinarizer()
         transformer.fit(X, n_classes=3)
@@ -100,7 +100,7 @@ def emul_labelbinarizer_unseen():
     np.testing.assert_allclose(sk_result, spu_result, rtol=0, atol=0)
 
 
-def emul_binarizer():
+def emul_binarizer(emulator: emulation.Emulator):
     def binarize(X):
         transformer = Binarizer()
         return transformer.transform(X)
@@ -118,7 +118,7 @@ def emul_binarizer():
     np.testing.assert_allclose(sk_result, spu_result, rtol=0, atol=0)
 
 
-def emul_onehotEncoder():
+def emul_onehotEncoder(emulator: emulation.Emulator):
     manual_categories = [[1, 1.1, 3.25], [2.0, 4.32, 6.10]]
 
     X = jnp.array([[1, 2.0], [3.25, 4.32], [1.1, 6.10]], dtype=jnp.float64)
@@ -154,7 +154,7 @@ def emul_onehotEncoder():
     )
 
 
-def emul_normalizer():
+def emul_normalizer(emulator: emulation.Emulator):
     def normalize_l1(X):
         transformer = Normalizer(norm="l1")
         return transformer.transform(X)
@@ -192,7 +192,7 @@ def emul_normalizer():
     np.testing.assert_allclose(sk_result_max, spu_result_max, rtol=0, atol=1e-4)
 
 
-def emul_robustscaler():
+def emul_robustscaler(emulator: emulation.Emulator):
     X = jnp.array([[-2, 0.5], [-0.5, 1.5], [0, 10.0], [1, 15.0], [5, 20.0]])
     Y = jnp.array([[3, 2]])
 
@@ -238,7 +238,7 @@ def emul_robustscaler():
         np.testing.assert_allclose(sk_restore_2, spu_restore_2, rtol=1e-4, atol=1e-4)
 
 
-def emul_minmaxscaler():
+def emul_minmaxscaler(emulator: emulation.Emulator):
     def minmaxscale(X, Y):
         transformer = MinMaxScaler()
         result1 = transformer.fit_transform(X)
@@ -263,7 +263,7 @@ def emul_minmaxscaler():
     np.testing.assert_allclose(sk_result_2, spu_result_2, rtol=0, atol=1e-4)
 
 
-def emul_minmaxscaler_partial_fit():
+def emul_minmaxscaler_partial_fit(emulator: emulation.Emulator):
     def minmaxscale(X):
         transformer = MinMaxScaler()
         for batch in range(50):
@@ -301,7 +301,7 @@ def emul_minmaxscaler_partial_fit():
     np.testing.assert_allclose(sk_result_max, spu_result_max, rtol=0, atol=1e-4)
 
 
-def emul_minmaxscaler_zero_variance():
+def emul_minmaxscaler_zero_variance(emulator: emulation.Emulator):
     def minmaxscale(X, X_new):
         transformer = MinMaxScaler()
         transformer.fit(X, zero_variance=True)
@@ -339,7 +339,7 @@ def emul_minmaxscaler_zero_variance():
     )
 
 
-def emul_maxabsscaler():
+def emul_maxabsscaler(emulator: emulation.Emulator):
     def maxabsscale(X):
         transformer = MaxAbsScaler()
         result = transformer.fit_transform(X)
@@ -358,7 +358,7 @@ def emul_maxabsscaler():
     np.testing.assert_allclose(sk_result, spu_result, rtol=0, atol=1e-4)
 
 
-def emul_maxabsscaler_zero_maxabs():
+def emul_maxabsscaler_zero_maxabs(emulator: emulation.Emulator):
     def maxabsscale(X, X_new):
         transformer = MaxAbsScaler()
         transformer.fit(X, zero_maxabs=True)
@@ -398,7 +398,7 @@ def emul_maxabsscaler_zero_maxabs():
     )
 
 
-def emul_kbinsdiscretizer_uniform():
+def emul_kbinsdiscretizer_uniform(emulator: emulation.Emulator):
     def kbinsdiscretize(X):
         transformer = KBinsDiscretizer(n_bins=3, strategy="uniform")
         transformed = transformer.fit_transform(X)
@@ -426,7 +426,7 @@ def emul_kbinsdiscretizer_uniform():
     )
 
 
-def emul_kbinsdiscretizer_uniform_diverse_n_bins():
+def emul_kbinsdiscretizer_uniform_diverse_n_bins(emulator: emulation.Emulator):
     def kbinsdiscretize(X, n_bins):
         transformer = KBinsDiscretizer(
             n_bins=3, diverse_n_bins=n_bins, strategy="uniform"
@@ -457,7 +457,9 @@ def emul_kbinsdiscretizer_uniform_diverse_n_bins():
     )
 
 
-def emul_kbinsdiscretizer_uniform_diverse_n_bins_no_vectorize():
+def emul_kbinsdiscretizer_uniform_diverse_n_bins_no_vectorize(
+    emulator: emulation.Emulator,
+):
     def kbinsdiscretize(X):
         transformer = KBinsDiscretizer(
             n_bins=3, diverse_n_bins=np.array([2, 3, 3, 3]), strategy="uniform"
@@ -488,7 +490,7 @@ def emul_kbinsdiscretizer_uniform_diverse_n_bins_no_vectorize():
     )
 
 
-def emul_kbinsdiscretizer_quantile():
+def emul_kbinsdiscretizer_quantile(emulator: emulation.Emulator):
     def kbinsdiscretize(X):
         transformer = KBinsDiscretizer(n_bins=3, strategy="quantile")
         transformed = transformer.fit_transform(X)
@@ -519,7 +521,7 @@ def emul_kbinsdiscretizer_quantile():
     )
 
 
-def emul_kbinsdiscretizer_quantile_diverse_n_bins():
+def emul_kbinsdiscretizer_quantile_diverse_n_bins(emulator: emulation.Emulator):
     def kbinsdiscretize(X, n_bins):
         transformer = KBinsDiscretizer(
             n_bins=3, diverse_n_bins=n_bins, strategy="quantile"
@@ -551,7 +553,7 @@ def emul_kbinsdiscretizer_quantile_diverse_n_bins():
     )
 
 
-def emul_kbinsdiscretizer_quantile_diverse_n_bins2():
+def emul_kbinsdiscretizer_quantile_diverse_n_bins2(emulator: emulation.Emulator):
     def kbinsdiscretize(X, n_bins):
         transformer = KBinsDiscretizer(
             n_bins=4, diverse_n_bins=n_bins, strategy="quantile"
@@ -583,7 +585,9 @@ def emul_kbinsdiscretizer_quantile_diverse_n_bins2():
     )
 
 
-def emul_kbinsdiscretizer_quantile_diverse_n_bins_no_vectorize():
+def emul_kbinsdiscretizer_quantile_diverse_n_bins_no_vectorize(
+    emulator: emulation.Emulator,
+):
     def kbinsdiscretize(X):
         transformer = KBinsDiscretizer(
             n_bins=3, diverse_n_bins=np.array([2, 3, 3, 3]), strategy="quantile"
@@ -615,7 +619,7 @@ def emul_kbinsdiscretizer_quantile_diverse_n_bins_no_vectorize():
     )
 
 
-def emul_kbinsdiscretizer_quantile_eliminate():
+def emul_kbinsdiscretizer_quantile_eliminate(emulator: emulation.Emulator):
     def kbinsdiscretize(X):
         transformer = KBinsDiscretizer(n_bins=3, strategy="quantile")
         transformed = transformer.fit_transform(X, remove_bin=True)
@@ -650,7 +654,7 @@ def emul_kbinsdiscretizer_quantile_eliminate():
     )
 
 
-def emul_kbinsdiscretizer_quantile_sample_weight():
+def emul_kbinsdiscretizer_quantile_sample_weight(emulator: emulation.Emulator):
     def kbinsdiscretize(X, sample_weight):
         transformer = KBinsDiscretizer(n_bins=3, strategy="quantile")
         transformed = transformer.fit_transform(
@@ -684,7 +688,9 @@ def emul_kbinsdiscretizer_quantile_sample_weight():
     )
 
 
-def emul_kbinsdiscretizer_quantile_sample_weight_diverse_n_bins():
+def emul_kbinsdiscretizer_quantile_sample_weight_diverse_n_bins(
+    emulator: emulation.Emulator,
+):
     def kbinsdiscretize(X, n_bins, sample_weight):
         transformer = KBinsDiscretizer(
             n_bins=3, diverse_n_bins=n_bins, strategy="quantile"
@@ -721,7 +727,9 @@ def emul_kbinsdiscretizer_quantile_sample_weight_diverse_n_bins():
     )
 
 
-def emul_kbinsdiscretizer_quantile_sample_weight_diverse_n_bins2():
+def emul_kbinsdiscretizer_quantile_sample_weight_diverse_n_bins2(
+    emulator: emulation.Emulator,
+):
     def kbinsdiscretize(X, n_bins, sample_weight):
         transformer = KBinsDiscretizer(
             n_bins=4, diverse_n_bins=n_bins, strategy="quantile"
@@ -758,7 +766,9 @@ def emul_kbinsdiscretizer_quantile_sample_weight_diverse_n_bins2():
     )
 
 
-def emul_kbinsdiscretizer_quantile_sample_weight_diverse_n_bins_no_vectorize():
+def emul_kbinsdiscretizer_quantile_sample_weight_diverse_n_bins_no_vectorize(
+    emulator: emulation.Emulator,
+):
     def kbinsdiscretize(X, sample_weight):
         transformer = KBinsDiscretizer(
             n_bins=3, diverse_n_bins=np.array([2, 3, 3, 3]), strategy="quantile"
@@ -795,7 +805,7 @@ def emul_kbinsdiscretizer_quantile_sample_weight_diverse_n_bins_no_vectorize():
     )
 
 
-def emul_kbinsdiscretizer_kmeans():
+def emul_kbinsdiscretizer_kmeans(emulator: emulation.Emulator):
     def kbinsdiscretize(X):
         transformer = KBinsDiscretizer(n_bins=4, strategy="kmeans")
         transformed = transformer.fit_transform(X)
@@ -825,7 +835,9 @@ def emul_kbinsdiscretizer_kmeans():
     )
 
 
-def emul_kbinsdiscretizer_kmeans_diverse_n_bins_no_vectorize():
+def emul_kbinsdiscretizer_kmeans_diverse_n_bins_no_vectorize(
+    emulator: emulation.Emulator,
+):
     def kbinsdiscretize(X):
         transformer = KBinsDiscretizer(
             n_bins=3, diverse_n_bins=np.array([2, 3, 3, 3]), strategy="kmeans"
@@ -857,41 +869,47 @@ def emul_kbinsdiscretizer_kmeans_diverse_n_bins_no_vectorize():
     )
 
 
-if __name__ == "__main__":
-    try:
-        # bandwidth and latency only work for docker mode
-        emulator = emulation.Emulator(
-            emulation.CLUSTER_ABY3_3PC,
-            emulation.Mode.MULTIPROCESS,
-            bandwidth=300,
-            latency=20,
+def main(
+    cluster_config: str = emulation.CLUSTER_ABY3_3PC,
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_labelbinarizer(emulator)
+        emul_labelbinarizer_binary(emulator)
+        emul_labelbinarizer_unseen(emulator)
+        emul_binarizer(emulator)
+        emul_normalizer(emulator)
+        emul_minmaxscaler(emulator)
+        emul_minmaxscaler_partial_fit(emulator)
+        emul_minmaxscaler_zero_variance(emulator)
+        emul_maxabsscaler(emulator)
+        emul_maxabsscaler_zero_maxabs(emulator)
+        emul_kbinsdiscretizer_uniform(emulator)
+        emul_kbinsdiscretizer_uniform_diverse_n_bins(emulator)
+        emul_kbinsdiscretizer_uniform_diverse_n_bins_no_vectorize(emulator)
+        emul_kbinsdiscretizer_quantile(emulator)
+        emul_kbinsdiscretizer_quantile_diverse_n_bins(emulator)
+        emul_kbinsdiscretizer_quantile_diverse_n_bins2(emulator)
+        emul_kbinsdiscretizer_quantile_diverse_n_bins_no_vectorize(emulator)
+        emul_kbinsdiscretizer_quantile_eliminate(emulator)
+        emul_kbinsdiscretizer_quantile_sample_weight(emulator)
+        emul_kbinsdiscretizer_quantile_sample_weight_diverse_n_bins(emulator)
+        emul_kbinsdiscretizer_quantile_sample_weight_diverse_n_bins2(emulator)
+        emul_kbinsdiscretizer_quantile_sample_weight_diverse_n_bins_no_vectorize(
+            emulator
         )
-        emulator.up()
-        emul_labelbinarizer()
-        emul_labelbinarizer_binary()
-        emul_labelbinarizer_unseen()
-        emul_binarizer()
-        emul_normalizer()
-        emul_minmaxscaler()
-        emul_minmaxscaler_partial_fit()
-        emul_minmaxscaler_zero_variance()
-        emul_maxabsscaler()
-        emul_maxabsscaler_zero_maxabs()
-        emul_kbinsdiscretizer_uniform()
-        emul_kbinsdiscretizer_uniform_diverse_n_bins()
-        emul_kbinsdiscretizer_uniform_diverse_n_bins_no_vectorize()
-        emul_kbinsdiscretizer_quantile()
-        emul_kbinsdiscretizer_quantile_diverse_n_bins()
-        emul_kbinsdiscretizer_quantile_diverse_n_bins2()
-        emul_kbinsdiscretizer_quantile_diverse_n_bins_no_vectorize()
-        emul_kbinsdiscretizer_quantile_eliminate()
-        emul_kbinsdiscretizer_quantile_sample_weight()
-        emul_kbinsdiscretizer_quantile_sample_weight_diverse_n_bins()
-        emul_kbinsdiscretizer_quantile_sample_weight_diverse_n_bins2()
-        emul_kbinsdiscretizer_quantile_sample_weight_diverse_n_bins_no_vectorize()
-        emul_kbinsdiscretizer_kmeans()
-        emul_kbinsdiscretizer_kmeans_diverse_n_bins_no_vectorize()
-        emul_onehotEncoder()
-        emul_robustscaler()
-    finally:
-        emulator.down()
+        emul_kbinsdiscretizer_kmeans(emulator)
+        emul_kbinsdiscretizer_kmeans_diverse_n_bins_no_vectorize(emulator)
+        emul_onehotEncoder(emulator)
+        emul_robustscaler(emulator)
+
+
+if __name__ == "__main__":
+    main()

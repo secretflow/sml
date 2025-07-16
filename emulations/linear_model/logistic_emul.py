@@ -12,21 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
-
 import pandas as pd
 from sklearn.datasets import load_breast_cancer, load_wine
 from sklearn.metrics import roc_auc_score
 from sklearn.preprocessing import MinMaxScaler
 
-# Add the library directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../"))
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.linear_model.logistic import LogisticRegression
 
 
-def load_data(multi_class="binary"):
+def load_data(emulator: emulation.Emulator, multi_class="binary"):
     # Create dataset
     if multi_class == "binary":
         X, y = load_breast_cancer(return_X_y=True, as_frame=True)
@@ -76,11 +71,11 @@ def proc(
 
 
 # Test Binary classification
-def emul_LogisticRegression(emulator):
+def emul_LogisticRegression(emulator: emulation.Emulator):
     penalty_list = ["l1", "l2", "elasticnet"]
     print(f"penalty_list={penalty_list}")
 
-    X, y, X_spu, y_spu = load_data(multi_class="binary")
+    X, y, X_spu, y_spu = load_data(emulator, multi_class="binary")
     for i in range(len(penalty_list)):
         penalty = penalty_list[i]
         # Run
@@ -93,8 +88,8 @@ def emul_LogisticRegression(emulator):
 
 
 # Test Multi classification
-def emul_LogisticRegression_multi_classificatio(emulator):
-    X, y, X_spu, y_spu = load_data(multi_class="ovr")
+def emul_LogisticRegression_multi_classificatio(emulator: emulation.Emulator):
+    X, y, X_spu, y_spu = load_data(emulator, multi_class="ovr")
     # Run
     result = emulator.run(proc, static_argnums=(2, 3))(X_spu, y_spu, "l2", "ovr")
     print(
@@ -102,8 +97,8 @@ def emul_LogisticRegression_multi_classificatio(emulator):
     )
 
 
-def emul_LogisticRegression_with_early_stopping(emulator):
-    X, y, X_spu, y_spu = load_data(multi_class="binary")
+def emul_LogisticRegression_with_early_stopping(emulator: emulation.Emulator):
+    X, y, X_spu, y_spu = load_data(emulator, multi_class="binary")
     # Run
     result = emulator.run(proc, static_argnums=(2, 3, 4, 5, 6))(
         X_spu,
@@ -119,18 +114,22 @@ def emul_LogisticRegression_with_early_stopping(emulator):
     assert result[2] < 100
 
 
-if __name__ == "__main__":
-    try:
-        # bandwidth and latency only work for docker mode
-        emulator = emulation.Emulator(
-            emulation.CLUSTER_ABY3_3PC,
-            emulation.Mode.MULTIPROCESS,
-            bandwidth=300,
-            latency=20,
-        )
-        emulator.up()
+def main(
+    cluster_config: str = emulation.CLUSTER_ABY3_3PC,
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
         emul_LogisticRegression(emulator)
         emul_LogisticRegression_multi_classificatio(emulator)
         emul_LogisticRegression_with_early_stopping(emulator)
-    finally:
-        emulator.down()
+
+
+if __name__ == "__main__":
+    main()

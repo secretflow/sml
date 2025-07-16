@@ -15,17 +15,16 @@
 import time
 
 import jax.numpy as jnp
-import spu.libspu as libspu  # type: ignore
 from sklearn import datasets
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.svm.svm import SVM
 
 
-def emul_SVM(mode: emulation.Mode.MULTIPROCESS):
+def emul_SVM(emulator: emulation.Emulator):
     def proc(x0, x1, y0):
         rbf_svm = SVM(kernel="rbf", max_iter=102)
         rbf_svm.fit(x0, y0)
@@ -51,34 +50,40 @@ def emul_SVM(mode: emulation.Mode.MULTIPROCESS):
 
         return X_train, X_test, y_train, y_test
 
-    try:
-        # bandwidth and latency only work for docker mode
-        emulator = emulation.Emulator(
-            emulation.CLUSTER_ABY3_3PC, mode, bandwidth=300, latency=20
-        )
-        emulator.up()
+    time0 = time.time()
+    # load data
+    X_train, X_test, y_train, y_test = load_data()
 
-        time0 = time.time()
-        # load data
-        X_train, X_test, y_train, y_test = load_data()
+    # mark these data to be protected in SPU
+    X_train, X_test, y_train = emulator.seal(X_train, X_test, y_train)
+    result1 = emulator.run(proc)(X_train, X_test, y_train)
+    print("result\n", result1)
+    print("accuracy score", accuracy_score(result1, y_test))
+    print("cost time ", time.time() - time0)
 
-        # mark these data to be protected in SPU
-        X_train, X_test, y_train = emulator.seal(X_train, X_test, y_train)
-        result1 = emulator.run(proc)(X_train, X_test, y_train)
-        print("result\n", result1)
-        print("accuracy score", accuracy_score(result1, y_test))
-        print("cost time ", time.time() - time0)
+    # Compare with sklearn
+    print("sklearn")
+    X_train, X_test, y_train, y_test = load_data()
+    clf_svc = SVC(C=1.0, kernel="rbf", gamma="scale", tol=1e-3)
+    result2 = clf_svc.fit(X_train, y_train).predict(X_test)
+    print("result\n", (result2 > 0).astype(int))
+    print("accuracy score", accuracy_score((result2 > 0).astype(int), y_test))
 
-        # Compare with sklearn
-        print("sklearn")
-        X_train, X_test, y_train, y_test = load_data()
-        clf_svc = SVC(C=1.0, kernel="rbf", gamma="scale", tol=1e-3)
-        result2 = clf_svc.fit(X_train, y_train).predict(X_test)
-        print("result\n", (result2 > 0).astype(int))
-        print("accuracy score", accuracy_score((result2 > 0).astype(int), y_test))
-    finally:
-        emulator.down()
+
+def main(
+    cluster_config: str = emulation.CLUSTER_ABY3_3PC,
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_SVM(emulator)
 
 
 if __name__ == "__main__":
-    emul_SVM(emulation.Mode.MULTIPROCESS)
+    main()
