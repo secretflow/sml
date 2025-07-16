@@ -24,11 +24,13 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
 
 import emulations.utils.emulation as emulation
-from sml.metrics.regression.regression import (d2_tweedie_score,
-                                               explained_variance_score,
-                                               mean_gamma_deviance,
-                                               mean_poisson_deviance,
-                                               mean_squared_error)
+from sml.metrics.regression.regression import (
+    d2_tweedie_score,
+    explained_variance_score,
+    mean_gamma_deviance,
+    mean_poisson_deviance,
+    mean_squared_error,
+)
 
 
 def emul_d2_tweedie_score(emulator: emulation.Emulator):

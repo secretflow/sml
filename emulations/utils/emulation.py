@@ -27,11 +27,8 @@ from typing import Callable, Optional
 
 import spu.utils.distributed as ppd
 import yaml
-import yaml
 from spu import libspu
 from spu.utils.polyfill import Process
-
-from sml.utils.utils import get_logger
 
 from sml.utils.utils import get_logger
 
@@ -224,7 +221,6 @@ class Emulator:
             docker_node_yml["ports"].append(f"{node_port}:{node_port}")
             docker_node_yml["networks"]["spu-emulation"]["ipv4_address"] = str(node_ip)
             self.yaml["services"][re.sub(":", "_", node_id)] = docker_node_yml
-        with open(self.emu_tmp_dir / "docker-compose.yml", "w") as file:
         with open(self.emu_tmp_dir / "docker-compose.yml", "w") as file:
             yaml.dump(self.yaml, file)
 

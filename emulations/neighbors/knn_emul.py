@@ -20,12 +20,6 @@ import jax.numpy as jnp
 import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
 
-# from sklearn.metrics import roc_auc_score, explained_variance_score
-
-# Add the library directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
-
 import emulations.utils.emulation as emulation
 from sml.neighbors.knn import KNNClassifer
 

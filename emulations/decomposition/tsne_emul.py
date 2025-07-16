@@ -35,7 +35,6 @@ def emul_tsne(emulator: emulation.Emulator):
             print("Loading dataset...")
             x, y = make_blobs(n_samples=50, n_features=4, centers=3, random_state=42)
             x = x.astype(np.float64)
-            x = x.astype(np.float64)
             return x, y
 
         def proc(x):
@@ -47,7 +46,6 @@ def emul_tsne(emulator: emulation.Emulator):
                 perplexity=10,
                 max_iter=50,  # Set to 50 for faster unit test execution; to achieve better results, it needs to be set to 150 or above.
                 early_exaggeration=12,
-                init="random",
                 init="random",
             )
             Y_spu_out = model.fit_transform(x, Y_init=Y_init_jax)
@@ -104,7 +102,6 @@ def emul_tsne(emulator: emulation.Emulator):
             print("Loading dataset...")
             x, y = make_blobs(n_samples=50, n_features=4, centers=3, random_state=42)
             x = x.astype(np.float64)
-            x = x.astype(np.float64)
             return x, y
 
         def proc(x):
@@ -113,7 +110,6 @@ def emul_tsne(emulator: emulation.Emulator):
                 perplexity=10,
                 max_iter=50,  # Set to 50 for faster unit test execution; to achieve better results, it needs to be set to 150 or above.
                 early_exaggeration=12,
-                init="pca",
                 init="pca",
             )
             Y_spu_out = model.fit_transform(x)

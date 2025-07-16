@@ -91,7 +91,6 @@ def emul_comprehensive_gridsearch(emulator: emulation.Emulator):
     print("Starting Comprehensive GridSearchCV Emulation.")
     random_seed = 42
     np.random.seed(random_seed)
-    key = random.PRNGKey(random_seed)
     n_samples = 60
     n_features = 8
     n_classes_binary = 2
@@ -107,7 +106,6 @@ def emul_comprehensive_gridsearch(emulator: emulation.Emulator):
     )
     X_clf_bin = jnp.array(X_clf_bin)
     y_clf_bin = jnp.array(y_clf_bin_np)
-    y_clf_bin_reshaped = y_clf_bin.reshape(-1, 1)
     y_clf_bin_negpos = jnp.where(y_clf_bin == 0, -1, 1)
     y_clf_bin_negpos_reshaped = y_clf_bin_negpos.reshape(-1, 1)
     X_clf_multi, y_clf_multi_np = make_classification(
@@ -120,11 +118,6 @@ def emul_comprehensive_gridsearch(emulator: emulation.Emulator):
         random_state=random_seed,
     )
     X_clf_multi = jnp.array(X_clf_multi)
-    y_clf_multi = jnp.array(y_clf_multi_np)
-    y_clf_multi_reshaped = y_clf_multi.reshape(-1, 1)
-    binner = KBinsDiscretizer(n_bins=2, strategy="uniform")
-    binner = KBinsDiscretizer(n_bins=2, strategy="uniform")
-    X_clf_bin_binary_features = binner.fit_transform(X_clf_bin)
     X_reg, y_reg_np = make_regression(
         n_samples=n_samples,
         n_features=n_features,
@@ -140,29 +133,12 @@ def emul_comprehensive_gridsearch(emulator: emulation.Emulator):
         (jnp.array(train_idx), jnp.array(test_idx))
         for train_idx, test_idx in skf.split(X_clf_bin, y_clf_bin_np)
     ]
-    cv_splits_clf_multi = [
-        (jnp.array(train_idx), jnp.array(test_idx))
-        for train_idx, test_idx in skf.split(X_clf_multi, y_clf_multi_np)
-    ]
     kf = KFold(n_splits=cv_folds, shuffle=True, random_state=42)
     cv_splits_reg = [
         (jnp.array(train_idx), jnp.array(test_idx))
         for train_idx, test_idx in kf.split(X_reg)
     ]
 
-    # estimator = LogisticRegression(epochs=3, batch_size=16, class_labels=[0, 1])
-    # param_grid = {'learning_rate': [0.01, 0.1, 0.05], 'C': [1.0, 2.0, 5.0]}
-    # _run_gridsearch_test(
-    #     emulator,
-    #     "LogisticRegression",
-    #     estimator,
-    #     param_grid,
-    #     X_clf_bin,
-    #     y_clf_bin_reshaped,
-    #     'accuracy',
-    #     'classification',
-    #     cv_splits_clf_bin,
-    # )
     estimator = KNNClassifer(n_classes=n_classes_binary)
     param_grid = {"n_neighbors": [2, 3, 4, 5]}
     _run_gridsearch_test(

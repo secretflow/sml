@@ -28,7 +28,6 @@ def emul_perceptron(emulator: emulation.Emulator):
             max_iter=20,
             eta0=1.0,
             penalty="elasticnet",
-            penalty="elasticnet",
             alpha=0.001,
             fit_intercept=True,
             l1_ratio=0.7,
@@ -44,9 +43,7 @@ def emul_perceptron(emulator: emulation.Emulator):
         df = pd.DataFrame(
             iris.data,
             columns=["sepal length", "sepal width", "petal length", "petal width"],
-            columns=["sepal length", "sepal width", "petal length", "petal width"],
         )
-        df["label"] = iris.target
         df["label"] = iris.target
 
         # only use sepal length and sepal width features
