@@ -26,7 +26,7 @@ The preferred way to contribute to SML is to fork the main repository, then subm
 1. Create a GitHub account if you do not have one.
 2. Fork the [project repository](https://github.com/secretflow/sml), you can refer to [this](https://docs.github.com/en/get-started/quickstart/fork-a-repo) for more details.
 3. Develop the feature on **your feature branch** on your computer, using [Git](https://docs.github.com/en/get-started/quickstart/set-up-git) to do the version control.
-4. Following [Before Pull Request](<./CONTRIBUTING.md#Before Pull Request>) to place or test your codes, [these](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork) to create a pull request from your fork.
+4. Follow the instructions in [Before Pull Request](<./CONTRIBUTING.md#Before Pull Request>) to place or test your code, then create a pull request from your fork using [these instructions](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork).
 5. Committers do code review and then merge.
 
 ## Before Pull Request
