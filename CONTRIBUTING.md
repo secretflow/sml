@@ -40,7 +40,7 @@ the latest changes of the main sml repository.
    - `<algorithm>_test.py`: a pytest test file, in which you test your program with **simulator**, then you should report the behavior (like correctness or error rate) under MPC setting.
    - `<algorithm>_emul.py`: similar to the above file, except you will test program with **emulator**, then you can get a sense of efficiency under different MPC protocols.
 3. **Other things**: there are still some small fixes to do.
-   - **Add necessary doc**: your implementation may only have part features, or some changes have been made for limitation of both JAX and SPU, you **MUST** describe these things explicitly!
+   - **Add necessary doc**: your implementation may only have part features, or some changes have been made due to limitations of both JAX and SPU, you **MUST** describe these things explicitly!
    - **Code quality and formatting**: The project uses pre-commit hooks to automatically maintain code quality:
      - **Pre-commit hooks**: Run automatically on each commit to check and fix common issues
      - **Black**: Automatically formats Python code for consistent style
