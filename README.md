@@ -55,7 +55,7 @@ and you should test the **efficiency** using `emulator`.
 
 You can install SML in two ways:
 
-### Option 1: Install from PyPI (Recommended
+### Option 1: Install from PyPI (Recommended)
 
 ```bash
 pip install sf-sml
