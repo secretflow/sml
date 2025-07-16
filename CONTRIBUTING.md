@@ -38,7 +38,7 @@ the latest changes of the main sml repository.
 2. **Place your codes properly**: Generally speaking, for every algorithm, at least 3 files are needed
    - `<algorithm>.py`: implementation of algorithm or new features, it should be a **"jit-able"** program that runs correctly in plaintext (same or near to output from scikit-learn).
    - `<algorithm>_test.py`: a pytest test file, in which you test your program with **simulator**, then you should report the behavior (like correctness or error rate) under MPC setting.
-   - `<algorithm>_emul.py`: similar to the above file, except you will test program with **emulator**, then you can get sense of efficiency under different MPC protocols.
+   - `<algorithm>_emul.py`: similar to the above file, except you will test program with **emulator**, then you can get a sense of efficiency under different MPC protocols.
 3. **Other things**: there are still some small fixes to do.
    - **Add necessary doc**: your implementation may only have part features, or some changes have been made for limitation of both JAX and SPU, you **MUST** describe these things explicitly!
    - **Code quality and formatting**: The project uses pre-commit hooks to automatically maintain code quality:
