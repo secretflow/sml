@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
 import time
 
 import jax.random as random
@@ -21,23 +19,18 @@ import numpy as np
 from sklearn.datasets import make_blobs
 from sklearn.manifold import trustworthiness
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.decomposition.tsne import TSNE
 
 
-def test_tsne(mode: emulation.Mode = emulation.Mode.MULTIPROCESS):
-    conf_path = "sml/decomposition/emulations/3pc.json"
-    emulator = emulation.Emulator(conf_path, mode, bandwidth=300, latency=20)
-
-    def emul_tsne_random():
+def emul_tsne(emulator: emulation.Emulator):
+    def tsne_random():
         print("Start t-SNE emulation...")
 
         def load_data():
             """Loads the dataset."""
             print("Loading dataset...")
             x, y = make_blobs(n_samples=50, n_features=4, centers=3, random_state=42)
-            x = x.astype(np.float64)
             x = x.astype(np.float64)
             return x, y
 
@@ -98,14 +91,13 @@ def test_tsne(mode: emulation.Mode = emulation.Mode.MULTIPROCESS):
 
             traceback.print_exc()
 
-    def emul_tsne_pca():
+    def tsne_pca():
         print("Start t-SNE emulation...")
 
         def load_data():
             """Loads the dataset."""
             print("Loading dataset...")
             x, y = make_blobs(n_samples=50, n_features=4, centers=3, random_state=42)
-            x = x.astype(np.float64)
             x = x.astype(np.float64)
             return x, y
 
@@ -163,13 +155,24 @@ def test_tsne(mode: emulation.Mode = emulation.Mode.MULTIPROCESS):
 
             traceback.print_exc()
 
-    try:
-        emulator.up()
-        emul_tsne_random()
-        emul_tsne_pca()
-    finally:
-        emulator.down()
+    tsne_random()
+    tsne_pca()
+
+
+def main(
+    cluster_config: str = "emulations/decomposition/3pc.json",
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_tsne(emulator)
 
 
 if __name__ == "__main__":
-    test_tsne(emulation.Mode.MULTIPROCESS)
+    main()

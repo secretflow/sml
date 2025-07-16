@@ -12,16 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
-
 import jax.numpy as jnp
 import numpy as np
 from sklearn import metrics
-
-# add ops dir to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
-
 
 import emulations.utils.emulation as emulation
 from sml.metrics.regression.regression import (
@@ -33,7 +26,7 @@ from sml.metrics.regression.regression import (
 )
 
 
-def emul_d2_tweedie_score():
+def emul_d2_tweedie_score(emulator: emulation.Emulator):
     power_list = [-1, 0, 1, 2, 3]
     weight_list = [None, jnp.array([0.5, 0.5, 0.5, 0.5]), jnp.array([0.5, 1, 2, 0.5])]
 
@@ -51,7 +44,7 @@ def emul_d2_tweedie_score():
             np.testing.assert_allclose(sk_result, spu_result, rtol=0, atol=1e-4)
 
 
-def emul_explained_variance_score():
+def emul_explained_variance_score(emulator: emulation.Emulator):
     weight_list = [None, jnp.array([0.5, 0.5, 0.5, 0.5]), jnp.array([0.5, 1, 2, 0.5])]
 
     # Test explained_variance_score
@@ -71,7 +64,7 @@ def emul_explained_variance_score():
         np.testing.assert_allclose(sk_result, spu_result, rtol=0, atol=1e-4)
 
 
-def emul_mean_squared_error():
+def emul_mean_squared_error(emulator: emulation.Emulator):
     weight_list = [None, jnp.array([0.5, 0.5, 0.5, 0.5]), jnp.array([0.5, 1, 2, 0.5])]
 
     # Test mean_squared_error
@@ -87,7 +80,7 @@ def emul_mean_squared_error():
         np.testing.assert_allclose(sk_result, spu_result, rtol=0, atol=1e-4)
 
 
-def emul_mean_poisson_deviance():
+def emul_mean_poisson_deviance(emulator: emulation.Emulator):
     weight_list = [None, jnp.array([0.5, 0.5, 0.5, 0.5]), jnp.array([0.5, 1, 2, 0.5])]
 
     # Test mean_poisson_deviance
@@ -99,7 +92,7 @@ def emul_mean_poisson_deviance():
         np.testing.assert_allclose(sk_result, spu_result, rtol=0, atol=1e-4)
 
 
-def emul_mean_gamma_deviance():
+def emul_mean_gamma_deviance(emulator: emulation.Emulator):
     weight_list = [None, jnp.array([0.5, 0.5, 0.5, 0.5]), jnp.array([0.5, 1, 2, 0.5])]
 
     # Test mean_gamma_deviance
@@ -111,20 +104,24 @@ def emul_mean_gamma_deviance():
         np.testing.assert_allclose(sk_result, spu_result, rtol=0, atol=1e-4)
 
 
+def main(
+    cluster_config: str = emulation.CLUSTER_ABY3_3PC,
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_d2_tweedie_score(emulator)
+        emul_explained_variance_score(emulator)
+        emul_mean_squared_error(emulator)
+        emul_mean_poisson_deviance(emulator)
+        emul_mean_gamma_deviance(emulator)
+
+
 if __name__ == "__main__":
-    try:
-        # bandwidth and latency only work for docker mode
-        emulator = emulation.Emulator(
-            emulation.CLUSTER_ABY3_3PC,
-            emulation.Mode.MULTIPROCESS,
-            bandwidth=300,
-            latency=20,
-        )
-        emulator.up()
-        emul_d2_tweedie_score()
-        emul_explained_variance_score()
-        emul_mean_squared_error()
-        emul_mean_poisson_deviance()
-        emul_mean_gamma_deviance()
-    finally:
-        emulator.down()
+    main()

@@ -15,18 +15,19 @@
 import jax.numpy as jnp
 import numpy as np
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.utils.extmath import svd
 
+CONFIG_PATH = "emulations/utils/3pc_128.json"
 
-def emul_svd(mode: emulation.Mode.MULTIPROCESS):
+
+def emul_svd(emulator: emulation.Emulator):
     print("start svd emulation.")
     np.random.seed(0)
 
     # ONLY test small matrix for usage purpose
     mat1 = jnp.array(np.random.rand(10, 5))
     mat2 = jnp.array(np.random.rand(5, 10))
-    mat3 = jnp.array(np.random.rand(5, 5) + 0.1 * np.eye(5))
 
     def _check_svd_single(mat, power_iter=100):
         print("start svd emulation test, with shape=", mat.shape)
@@ -49,20 +50,25 @@ def emul_svd(mode: emulation.Mode.MULTIPROCESS):
             np.dot(jax_u, jax_vt), np.dot(u, vt), rtol=0.1, atol=0.1
         )
 
-    try:
-        conf_path = "sml/utils/emulations/3pc_128.json"
-        emulator = emulation.Emulator(conf_path, mode, bandwidth=300, latency=20)
-        emulator.up()
+    _check_svd_single(mat1)
+    _check_svd_single(mat2)
+    print("svd emulation pass.")
 
-        _check_svd_single(mat1)
-        _check_svd_single(mat2)
-        _check_svd_single(mat3)
 
-        print("svd emulation pass.")
-
-    finally:
-        emulator.down()
+def main(
+    cluster_config: str = CONFIG_PATH,
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_svd(emulator)
 
 
 if __name__ == "__main__":
-    emul_svd(emulation.Mode.MULTIPROCESS)
+    main()

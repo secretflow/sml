@@ -12,21 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
 import time
 
 import numpy as np
 from sklearn.datasets import load_iris
 from sklearn.feature_selection import chi2 as chi2_sklearn
 
-# Add the library directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.feature_selection.univariate_selection import chi2
 
 
-def emul_Chi2(mode: emulation.Mode.MULTIPROCESS):
+def emul_Chi2(emulator: emulation.Emulator):
     print("start chi2 stats emulation")
 
     def load_data():
@@ -38,11 +34,6 @@ def emul_Chi2(mode: emulation.Mode.MULTIPROCESS):
         return chi2_stats, p_value
 
     try:
-        # bandwidth and latency only work for docker mode
-        emulator = emulation.Emulator(
-            emulation.CLUSTER_ABY3_3PC, mode, bandwidth=300, latency=20
-        )
-        emulator.up()
         # load data
         x, y = load_data()
         label_lst = np.unique(y)
@@ -88,9 +79,22 @@ def emul_Chi2(mode: emulation.Mode.MULTIPROCESS):
         )
     except Exception as e:
         print(e)
-    finally:
-        emulator.down()
+
+
+def main(
+    cluster_config: str = emulation.CLUSTER_ABY3_3PC,
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_Chi2(emulator)
 
 
 if __name__ == "__main__":
-    emul_Chi2(emulation.Mode.MULTIPROCESS)
+    main()

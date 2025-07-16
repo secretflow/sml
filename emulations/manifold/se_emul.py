@@ -19,73 +19,76 @@ import numpy as np
 from sklearn.manifold import spectral_embedding
 from sklearn.neighbors import kneighbors_graph
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.manifold.se import SE
 
 
-def emul_se(mode: emulation.Mode.MULTIPROCESS):
-    try:
-        emulator = emulation.Emulator(
-            emulation.CLUSTER_ABY3_3PC, mode, bandwidth=300, latency=20
+def emul_se(emulator: emulation.Emulator):
+    def se(sX, num_samples, num_features, k, num_components):
+        embedding = SE(
+            n_components=num_components,
+            n_neighbors=k,
+            n_samples=num_samples,
+            n_features=num_features,
         )
-        emulator.up()
+        X_transformed = embedding.fit_transform(sX)
+        return X_transformed
 
-        def se(sX, num_samples, num_features, k, num_components):
-            embedding = SE(
-                n_components=num_components,
-                n_neighbors=k,
-                n_samples=num_samples,
-                n_features=num_features,
-            )
-            X_transformed = embedding.fit_transform(sX)
-            return X_transformed
+    # Set sample size and dimensions
+    num_samples = 20  # Number of samples, se can meet larger num_samples, such as 150
+    num_features = 4  # Sample dimension, se can meet larger num_features, such as 12
+    k = 6  # Number of nearest neighbors
+    num_components = 3  # Dimension after dimensionality reduction
 
-        # Set sample size and dimensions
-        num_samples = (
-            20  # Number of samples, se can meet larger num_samples, such as 150
-        )
-        num_features = (
-            4  # Sample dimension, se can meet larger num_features, such as 12
-        )
-        k = 6  # Number of nearest neighbors
-        num_components = 3  # Dimension after dimensionality reduction
+    # Generate random input
+    seed = int(time.time())
+    key = jax.random.PRNGKey(seed)
+    X = jax.random.uniform(
+        key, shape=(num_samples, num_features), minval=0.0, maxval=1.0
+    )
 
-        # Generate random input
-        seed = int(time.time())
-        key = jax.random.PRNGKey(seed)
-        X = jax.random.uniform(
-            key, shape=(num_samples, num_features), minval=0.0, maxval=1.0
-        )
+    sX = emulator.seal(X)
+    ans = emulator.run(
+        se,
+        static_argnums=(
+            1,
+            2,
+            3,
+            4,
+        ),
+    )(sX, num_samples, num_features, k, num_components)
 
-        sX = emulator.seal(X)
-        ans = emulator.run(
-            se,
-            static_argnums=(
-                1,
-                2,
-                3,
-                4,
-            ),
-        )(sX, num_samples, num_features, k, num_components)
+    # sklearn test
+    affinity_matrix = kneighbors_graph(
+        np.array(X), n_neighbors=k, mode="distance", include_self=False
+    )
 
-        # sklearn test
-        affinity_matrix = kneighbors_graph(
-            X, n_neighbors=k, mode="distance", include_self=False
-        )
+    # Make the matrix symmetric
+    affinity_dense = affinity_matrix.toarray()
+    affinity_matrix = 0.5 * (affinity_dense + affinity_dense.T)
+    # print(affinity_matrix)
+    embedding = spectral_embedding(
+        affinity_matrix, n_components=num_components, random_state=None
+    )
 
-        # Make the matrix symmetric
-        affinity_matrix = 0.5 * (affinity_matrix + affinity_matrix.T)
-        # print(affinity_matrix)
-        embedding = spectral_embedding(
-            affinity_matrix, n_components=num_components, random_state=None
-        )
+    # Since the final calculation result is calculated by the eigenvector, the accuracy cannot reach 1e-3
+    np.testing.assert_allclose(jnp.abs(embedding), jnp.abs(ans), rtol=0, atol=1e-2)
 
-        # Since the final calculation result is calculated by the eigenvector, the accuracy cannot reach 1e-3
-        np.testing.assert_allclose(jnp.abs(embedding), jnp.abs(ans), rtol=0, atol=1e-2)
 
-    finally:
-        emulator.down()
+def main(
+    cluster_config: str = emulation.CLUSTER_ABY3_3PC,
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_se(emulator)
 
 
 if __name__ == "__main__":
-    emul_se(emulation.Mode.MULTIPROCESS)
+    main()

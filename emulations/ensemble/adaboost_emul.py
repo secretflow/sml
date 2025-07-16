@@ -18,15 +18,14 @@ from sklearn.datasets import load_iris
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.tree import DecisionTreeClassifier
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.ensemble.adaboost import AdaBoostClassifier as sml_Adaboost
 from sml.tree.tree import DecisionTreeClassifier as sml_dtc
 
 MAX_DEPTH = 3
-CONFIG_FILE = emulation.CLUSTER_ABY3_3PC
 
 
-def emul_ada(mode=emulation.Mode.MULTIPROCESS):
+def emul_ada(emulator: emulation.Emulator):
     def proc_wrapper(
         estimator,
         n_estimators,
@@ -65,56 +64,63 @@ def emul_ada(mode=emulation.Mode.MULTIPROCESS):
         X, y = new_features[:, ::3], iris_label[:]
         return X, y
 
-    try:
-        # bandwidth and latency only work for docker mode
-        emulator = emulation.Emulator(CONFIG_FILE, mode, bandwidth=300, latency=20)
-        emulator.up()
+    # load mock data
+    X, y = load_data()
+    n_labels = jnp.unique(y).shape[0]
 
-        # load mock data
-        X, y = load_data()
-        n_labels = jnp.unique(y).shape[0]
+    # compare with sklearn
+    base_estimator = DecisionTreeClassifier(max_depth=3)  # 基分类器
+    ada = AdaBoostClassifier(
+        estimator=base_estimator,
+        n_estimators=3,
+        learning_rate=1.0,
+        algorithm="SAMME",
+    )
 
-        # compare with sklearn
-        base_estimator = DecisionTreeClassifier(max_depth=3)  # 基分类器
-        ada = AdaBoostClassifier(
-            estimator=base_estimator,
-            n_estimators=3,
-            learning_rate=1.0,
-            algorithm="SAMME",
-        )
+    start = time.time()
+    ada = ada.fit(X, y)
+    score_plain = ada.score(X, y)
+    end = time.time()
+    print(f"Running time in SKlearn: {end - start:.2f}s")
 
-        start = time.time()
-        ada = ada.fit(X, y)
-        score_plain = ada.score(X, y)
-        end = time.time()
-        print(f"Running time in SKlearn: {end - start:.2f}s")
+    # mark these data to be protected in SPU
+    X_spu, y_spu = emulator.seal(X, y)
 
-        # mark these data to be protected in SPU
-        X_spu, y_spu = emulator.seal(X, y)
+    # run
+    dtc = sml_dtc("gini", "best", 3, 3)
+    proc = proc_wrapper(
+        estimator=dtc,
+        n_estimators=3,
+        learning_rate=1.0,
+        algorithm="discrete",
+        epsilon=1e-5,
+    )
+    start = time.time()
 
-        # run
-        dtc = sml_dtc("gini", "best", 3, 3)
-        proc = proc_wrapper(
-            estimator=dtc,
-            n_estimators=3,
-            learning_rate=1.0,
-            algorithm="discrete",
-            epsilon=1e-5,
-        )
-        start = time.time()
+    result = emulator.run(proc)(X_spu, y_spu)
+    end = time.time()
+    score_encrpted = jnp.mean((result == y))
+    print(f"Running time in SPU: {end - start:.2f}s")
 
-        result = emulator.run(proc)(X_spu, y_spu)
-        end = time.time()
-        score_encrpted = jnp.mean(result == y)
-        print(f"Running time in SPU: {end - start:.2f}s")
+    # print acc
+    print(f"Accuracy in SKlearn: {score_plain:.2f}")
+    print(f"Accuracy in SPU: {score_encrpted:.2f}")
 
-        # print acc
-        print(f"Accuracy in SKlearn: {score_plain:.2f}")
-        print(f"Accuracy in SPU: {score_encrpted:.2f}")
 
-    finally:
-        emulator.down()
+def main(
+    cluster_config: str = emulation.CLUSTER_ABY3_3PC,
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_ada(emulator)
 
 
 if __name__ == "__main__":
-    emul_ada(emulation.Mode.MULTIPROCESS)
+    main()

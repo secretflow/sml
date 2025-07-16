@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
 import time
 
 import jax.numpy as jnp
@@ -21,12 +19,11 @@ import jax.random as random
 import numpy as np
 from sklearn.preprocessing import QuantileTransformer as SklearnQuantileTransformer
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.preprocessing.quantile_transformer import QuantileTransformer
 
 
-def test_quantile_transformer(mode: emulation.Mode = emulation.Mode.MULTIPROCESS):
+def emul_quantile_transformer(emulator: emulation.Emulator):
 
     N_QUANTILES = 100
     RANDOM_STATE = 42
@@ -103,9 +100,10 @@ def test_quantile_transformer(mode: emulation.Mode = emulation.Mode.MULTIPROCESS
         )
         print(f"Inverse transform reconstruction check ({output_dist}) PASSED.")
 
-    def emul_uniform_test(emulator, X_plaintext):
+    def uniform_test(emulator, X_plaintext):
         """Runs the emulation test specifically for the 'uniform' distribution."""
         print("\n===== Running Test: Uniform Distribution =====")
+        output_dist = "uniform"
         output_dist = "uniform"
 
         print("Sealing data for uniform test...")
@@ -131,41 +129,33 @@ def test_quantile_transformer(mode: emulation.Mode = emulation.Mode.MULTIPROCESS
         )
         print("===== Test PASSED: Uniform Distribution =====")
 
-    emulator = None
-    try:
-        print(f"Setting up emulator for mode: {mode}...")
-        emulator = emulation.Emulator(
-            emulation.CLUSTER_ABY3_3PC, mode, bandwidth=300, latency=20
-        )
-        emulator.up()
-        print("Emulator is up and running.")
+    print("Preparing common plaintext data...")
+    key = random.PRNGKey(RANDOM_STATE)
 
-        print("Preparing common plaintext data...")
-        key = random.PRNGKey(RANDOM_STATE)
+    data = random.normal(key, (N_SAMPLES, N_FEATURES))
+    data = data.at[:, 0].set(jnp.exp(data[:, 0] / 2))
+    data = data.at[:, 1].set(data[:, 1] * 5 + 10)
+    X_plaintext = jnp.array(data, dtype=jnp.float32)
+    assert not jnp.isnan(X_plaintext).any(), "Input data generation resulted in NaNs!"
+    print(f"Plaintext data prepared: shape={X_plaintext.shape}")
 
-        data = random.normal(key, (N_SAMPLES, N_FEATURES))
-        data = data.at[:, 0].set(jnp.exp(data[:, 0] / 2))
-        data = data.at[:, 1].set(data[:, 1] * 5 + 10)
-        X_plaintext = jnp.array(data, dtype=jnp.float32)
-        assert not jnp.isnan(
-            X_plaintext
-        ).any(), "Input data generation resulted in NaNs!"
-        print(f"Plaintext data prepared: shape={X_plaintext.shape}")
-
-        emul_uniform_test(emulator, X_plaintext)
-
-    except Exception as e:
-        print(f"\n!!! An error occurred during emulation test: {e} !!!")
-        import traceback
-
-        traceback.print_exc()
-    finally:
-        if emulator:
-            print("\nShutting down emulator...")
-            emulator.down()
-            print("Emulator shut down successfully.")
+    uniform_test(emulator, X_plaintext)
 
 
-# --- Main execution block ---
+def main(
+    cluster_config: str = emulation.CLUSTER_ABY3_3PC,
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_quantile_transformer(emulator)
+
+
 if __name__ == "__main__":
-    test_quantile_transformer(emulation.Mode.MULTIPROCESS)
+    main()

@@ -16,7 +16,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-import sml.utils.emulation as emulation
+import emulations.utils.emulation as emulation
 from sml.utils.utils import sml_reveal
 
 
@@ -70,7 +70,7 @@ def reveal_while_loop(x):
     return x
 
 
-def emul_reveal(mode: emulation.Mode.MULTIPROCESS):
+def emul_reveal(emulator: emulation.Emulator):
     print("start reveal emulation.")
 
     def _check_reveal_single(emulator):
@@ -117,9 +117,12 @@ def emul_reveal(mode: emulation.Mode.MULTIPROCESS):
         x_float_seal = emulator.seal(x_float)
 
         # spu test
-        xx_int_spu, xx_float_spu, reveal_x_log_int_spu, reveal_x_log_float_spu = (
-            emulator.run(reveal_func_list)(x_int_seal, x_float_seal)
-        )
+        (
+            xx_int_spu,
+            xx_float_spu,
+            reveal_x_log_int_spu,
+            reveal_x_log_float_spu,
+        ) = emulator.run(reveal_func_list)(x_int_seal, x_float_seal)
         # For FM64, fxp=18, SPU will compute log(x) with large error which confirm that yy is computed in plaintext.
         int_diff = np.abs(xx_int_spu - reveal_x_log_int_spu)
         assert np.any(int_diff > 1), f"max diff: {np.max(int_diff)}"
@@ -145,21 +148,27 @@ def emul_reveal(mode: emulation.Mode.MULTIPROCESS):
 
         print("reveal_while_loop pass.")
 
-    try:
-        # ABY3, FM64, fxp=18
-        conf_path = emulation.CLUSTER_ABY3_3PC
-        emulator = emulation.Emulator(conf_path, mode, bandwidth=300, latency=20)
-        emulator.up()
+    _check_reveal_single(emulator)
+    _check_reveal_list(emulator)
+    _check_reveal_while_loop(emulator)
 
-        _check_reveal_single(emulator)
-        _check_reveal_list(emulator)
-        _check_reveal_while_loop(emulator)
+    print("reveal emulation pass.")
 
-        print("reveal emulation pass.")
 
-    finally:
-        emulator.down()
+def main(
+    cluster_config: str = emulation.CLUSTER_ABY3_3PC,
+    mode: emulation.Mode = emulation.Mode.MULTIPROCESS,
+    bandwidth: int = 300,
+    latency: int = 20,
+):
+    with emulation.start_emulator(
+        cluster_config,
+        mode,
+        bandwidth,
+        latency,
+    ) as emulator:
+        emul_reveal(emulator)
 
 
 if __name__ == "__main__":
-    emul_reveal(emulation.Mode.MULTIPROCESS)
+    main()
