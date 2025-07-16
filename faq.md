@@ -82,6 +82,5 @@
 3. Why the program I write runs correctly in plaintext, but behaves differently under MPC?
 
     **Ans**: it depends.
-      - Huge error: you can check whether **overflow/underflow** is happened(often occurs when linear algebra ops such as `jax.numpy.linalg.*` are used),
-       whether incidentally use **floating-point random generator** in SPU.
+      - Huge error: you can check whether **overflow/underflow** has happened (often occurs when linear algebra ops such as `jax.numpy.linalg.*` are used), whether incidentally use **floating-point random generator** in SPU.
       - Mild error: you can switch to **larger ring** and more **fxp**.
