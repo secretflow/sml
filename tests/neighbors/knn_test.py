@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
-import sys
 from collections import defaultdict
 
 import jax.numpy as jnp
@@ -20,9 +18,6 @@ import numpy as np
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
 from sklearn.neighbors import KNeighborsClassifier
-
-# Add the sml directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
 
 from sml.neighbors.knn import KNNClassifer
 
