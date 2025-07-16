@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
-
 import pandas as pd
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
@@ -22,8 +19,6 @@ from sklearn.datasets import load_breast_cancer, load_wine
 from sklearn.metrics import roc_auc_score
 from sklearn.preprocessing import MinMaxScaler
 
-# Add the library directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../"))
 from sml.linear_model.logistic import LogisticRegression
 
 

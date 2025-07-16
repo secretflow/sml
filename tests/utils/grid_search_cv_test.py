@@ -13,19 +13,14 @@
 # limitations under the License.
 
 import copy
-import os
-import sys
 
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from sklearn.datasets import make_classification, make_regression
-from sklearn.model_selection import KFold, StratifiedKFold
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../"))
-
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
+from sklearn.datasets import make_classification, make_regression
+from sklearn.model_selection import KFold, StratifiedKFold
 
 from sml.ensemble.adaboost import AdaBoostClassifier
 from sml.ensemble.forest import RandomForestClassifier
