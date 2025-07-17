@@ -85,7 +85,7 @@ ensure_newline_before_comments = true
 
 [tool.mypy]
 ignore_missing_imports = true
-no_strict_optional = true
+strict_optional = false
 warn_return_any = false
 warn_unused_configs = true
 disallow_untyped_defs = false
