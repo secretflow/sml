@@ -23,3 +23,15 @@ from sml.preprocessing.preprocessing import (
     RobustScaler,
 )
 from sml.preprocessing.quantile_transformer import QuantileTransformer
+
+__all__ = [
+    "Binarizer",
+    "KBinsDiscretizer",
+    "LabelBinarizer",
+    "MaxAbsScaler",
+    "MinMaxScaler",
+    "Normalizer",
+    "OneHotEncoder",
+    "RobustScaler",
+    "QuantileTransformer",
+]

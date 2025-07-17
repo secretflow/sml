@@ -78,7 +78,6 @@ from ._version import version as __version__
 
 ## Configuration Files
 
-- **`.flake8`**: flake8 configuration and rules
 - **`.pre-commit-config.yaml`**: Tool execution and arguments
 
 ## Troubleshooting

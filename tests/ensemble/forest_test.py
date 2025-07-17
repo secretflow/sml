@@ -56,7 +56,6 @@ def test_forest():
         iris = load_iris()
         iris_data, iris_label = jnp.array(iris.data), jnp.array(iris.target)
         n_samples, n_features_in = iris_data.shape
-        n_labels = len(jnp.unique(iris_label))
         sorted_features = jnp.sort(iris_data, axis=0)
         new_threshold = (sorted_features[:-1, :] + sorted_features[1:, :]) / 2
         new_features = jnp.greater_equal(
@@ -72,7 +71,6 @@ def test_forest():
 
     # load mock data
     X, y = load_data()
-    n_labels = jnp.unique(y).shape[0]
 
     # compare with sklearn
     rf = RandomForestClassifier(
@@ -85,7 +83,6 @@ def test_forest():
     )
     rf = rf.fit(X, y)
     score_plain = rf.score(X, y)
-    tree_predictions = jnp.array([tree.predict(X) for tree in rf.estimators_])
 
     # run
     proc = proc_wrapper(
@@ -96,7 +93,7 @@ def test_forest():
         max_depth=3,
         bootstrap=True,
         max_samples=0.7,
-        n_labels=n_labels,
+        n_labels=jnp.unique(y).shape[0],
     )
 
     result = spsim.sim_jax(sim, proc)(X, y)

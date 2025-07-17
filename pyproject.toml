@@ -33,6 +33,7 @@ dev = [
     "isort>=5.13.2",
     "flake8>=7.3.0",
     "flake8-absolute-import>=1.0.0",
+    "flake8-pyproject",
     "autoflake>=2.3.1",
     "pyupgrade>=3.16.0",
     "mypy",
@@ -95,20 +96,13 @@ extend-ignore = [
     "W503",  # line break before binary operator
     "E402",  # module level import not at top of file
     "E501",  # line too long
-    "F401",  # module imported but unused
-    "F841",  # local variable assigned but never used
     "F541",  # f-string is missing placeholders
-    "E711",  # comparison to None should be 'is' or 'is not'
     "E266",  # too many leading '#' for block comment
-    "E722",  # do not use bare except
     "E902",  # TokenError or IndentationError
     "E741",  # ambiguous variable name
-    "E712",  # comparison to True should be 'is' or 'is not'
     "E731",  # do not assign a lambda expression, use a def
     "F403",  # 'from module import *' used; unable to detect undefined names
     "F405",  # name may be undefined, or defined from star imports
-    "F811",  # redefinition of unused name
-    "F901",  # raise NotImplemented should be raise NotImplementedError
     "W293",  # blank line contains whitespace
 ]
 exclude = [

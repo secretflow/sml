@@ -224,9 +224,7 @@ class DataSetsFactory:
         mock_decomposition_sample_sizes: list[int] = [100, 1000],
         random_state: int = 107,
     ) -> None:
-        assert (
-            use_mock or use_open
-        ) == True, "use_mock and use_open cannot be both False"
+        assert use_mock or use_open, "use_mock and use_open cannot be both False"
 
         assert len(mock_sample_sizes) == len(
             mock_feature_sizes

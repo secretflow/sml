@@ -58,7 +58,7 @@ class DecisionTreeClassifier:
         return self
 
     def predict(self, X):
-        assert self.T != None, "the model has not been trained yet."
+        assert self.T is not None, "the model has not been trained yet."
         return odti(X, self.T, self.max_depth)
 
 

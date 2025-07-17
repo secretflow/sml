@@ -40,7 +40,6 @@ def test_tree():
         iris_data, iris_label = jnp.array(iris.data), jnp.array(iris.target)
         # sorted_features: n_samples * n_features_in
         n_samples, n_features_in = iris_data.shape
-        n_labels = len(jnp.unique(iris_label))
         sorted_features = jnp.sort(iris_data, axis=0)
         new_threshold = (sorted_features[:-1, :] + sorted_features[1:, :]) / 2
         new_features = jnp.greater_equal(

@@ -43,8 +43,6 @@ def test_quantile():
 
         return proc
 
-    n_samples, n_features = 100, 2
-
     def generate_data():
         from jax import random
 

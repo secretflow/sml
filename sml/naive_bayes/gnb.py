@@ -168,7 +168,7 @@ class GaussianNB:
         """
 
         self.n_sample = len(y)
-        if self.first_ == True:
+        if self.first_:
             return self._first_partial_fit(X, y)
         else:
             return self._partial_fit(X, y)
@@ -208,7 +208,7 @@ class GaussianNB:
         new_var = new_var / n_new
 
         # n_past == 0
-        if self.first_ == True:
+        if self.first_:
             # correct precision problem
             new_var = jnp.where(new_var < 0.0, 0.0, new_var)
             return new_mu, new_var
@@ -333,7 +333,7 @@ class GaussianNB:
         result: array-like of shape (n_samples,)
             The predicted classes of testing samples.
         """
-        assert self.first_ == False, f"Not fit on any data yet!"
+        assert not self.first_, f"Not fit on any data yet!"
         jll = self._joint_log_likelihood(X)
         return self.classes_[jnp.argmax(jll, axis=1)]
 

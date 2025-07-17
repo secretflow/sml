@@ -147,7 +147,6 @@ def test_knn_sep():
     neigh_uni.fit(X_train, y_train)
 
     sklearn_predictions = neigh_uni.predict(X_test)
-    sklearn_train_pred = neigh_uni.predict(X_train)
     print(f"sklearn train label: {y_train}")
 
     assert predictions_uniform == sklearn_predictions.tolist()

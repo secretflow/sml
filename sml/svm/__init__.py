@@ -13,3 +13,5 @@
 # limitations under the License.
 
 from sml.svm.svm import SVM
+
+__all__ = ["SVM"]

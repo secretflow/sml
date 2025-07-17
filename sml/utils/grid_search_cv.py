@@ -193,7 +193,6 @@ class GridSearchCV:
             self: object. Returns the instance itself.
         """
         X, y = jnp.asarray(X), jnp.asarray(y)
-        n_candidates = len(self.param_combinations)
         results = defaultdict(list)
 
         cv_splitter = self._get_cv_splitter(X, y)()

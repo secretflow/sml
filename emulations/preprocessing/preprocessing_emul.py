@@ -140,7 +140,7 @@ def emul_onehotEncoder(emulator: emulation.Emulator):
     sk_onehotEncoder.fit(sk_X)
     sk_transformed = sk_onehotEncoder.transform(sk_Y)
     sk_inv_transformed = sk_onehotEncoder.inverse_transform(sk_transformed)
-    sk_inv_transformed = np.where(sk_inv_transformed == None, 0.0, sk_inv_transformed)
+    sk_inv_transformed = np.where(sk_inv_transformed is None, 0.0, sk_inv_transformed)
 
     X, Y = emulator.seal(X, Y)
     spu_transformed, spu_inv_transformed = emulator.run(onehotEncode)(X, Y)
@@ -280,7 +280,6 @@ def emul_minmaxscaler_partial_fit(emulator: emulation.Emulator):
     X_2d = rng.randn(n_samples, n_features) * scales + offsets
     X = X_2d
 
-    chunk_size = 2
     transformer = MinMaxScaler()
     for batch in range(50):
         transformer = transformer.partial_fit(X[batch * 2 : batch * 2 + 2])

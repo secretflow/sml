@@ -161,7 +161,7 @@ class _BinaryGaussianProcessClassifierLaplace:
         if self.kernel is None:  # Use an RBF kernel as default
             self.kernel_ = RBF()
         else:
-            raise NotImplemented("Only RBF kernel is supported now.")
+            raise NotImplementedError("Only RBF kernel is supported now.")
 
 
 jax.tree_util.register_pytree_node_class(_BinaryGaussianProcessClassifierLaplace)
