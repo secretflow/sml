@@ -16,7 +16,7 @@ from enum import Enum
 import jax.numpy as jnp
 import jax.scipy as jsci
 
-from ..utils import svd
+from sml.utils import svd
 
 
 class Solver(Enum):

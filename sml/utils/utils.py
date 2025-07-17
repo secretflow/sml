@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import logging
-from typing import List, Tuple, Union
 
 import numpy as np
 from spu.experimental import reveal as spu_reveal
@@ -34,8 +33,8 @@ def get_logger(name):
 
 
 def sml_reveal(
-    x: Union[np.ndarray, List[np.ndarray], Tuple[np.ndarray]],
-) -> Union[np.ndarray, List[np.ndarray]]:
+    x: np.ndarray | list[np.ndarray] | tuple[np.ndarray],
+) -> np.ndarray | list[np.ndarray]:
     if isinstance(x, list) or isinstance(x, tuple):
         return [spu_reveal(item) for item in x]
     else:

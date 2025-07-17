@@ -14,7 +14,7 @@
 
 import jax.numpy as jnp
 
-from ..svm.smo import SMO
+from sml.svm.smo import SMO
 
 
 class SVM:

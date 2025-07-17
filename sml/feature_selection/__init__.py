@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .univariate_selection import chi2
+from sml.feature_selection.univariate_selection import chi2

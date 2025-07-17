@@ -18,8 +18,8 @@ from jax.lax.linalg import cholesky
 from jax.scipy.linalg import cho_solve, solve
 from jax.scipy.special import erf, expit
 
-from .kernels import RBF
-from .ovo_ovr import OneVsRestClassifier
+from sml.gaussian_process.kernels import RBF
+from sml.gaussian_process.ovo_ovr import OneVsRestClassifier
 
 LAMBDAS = jnp.array([0.41, 0.4, 0.37, 0.44, 0.39])[:, jnp.newaxis]
 COEFS = jnp.array(

@@ -21,9 +21,9 @@ import pathlib
 import re
 import subprocess
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
 from enum import Enum
-from typing import Callable, Optional
 
 import spu.utils.distributed as ppd
 import yaml
@@ -85,12 +85,12 @@ class Emulator:
         self,
         cluster_config: str,
         mode: Mode = Mode.MULTIPROCESS,
-        bandwidth: Optional[int] = None,
-        latency: Optional[int] = None,
+        bandwidth: int | None = None,
+        latency: int | None = None,
     ) -> None:
         assert mode in Mode, "Invalid emulator mode"
         self.mode = mode
-        with open(cluster_config, "r") as file:
+        with open(cluster_config) as file:
             self.conf = json.load(file)
         self.bandwidth = bandwidth
         self.latency = latency
@@ -245,8 +245,8 @@ class Emulator:
 def start_emulator(
     cluster_config: str,
     mode: Mode = Mode.MULTIPROCESS,
-    bandwidth: Optional[int] = None,
-    latency: Optional[int] = None,
+    bandwidth: int | None = None,
+    latency: int | None = None,
 ):
     """
     Context manager for emulator lifecycle management.

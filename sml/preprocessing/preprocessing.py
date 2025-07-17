@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List
 
 import jax
 import jax.numpy as jnp
@@ -1371,7 +1370,7 @@ class OneHotEncoder:
 
     def __init__(
         self,
-        categories: List[List],
+        categories: list[list],
     ):
         """
         Initialize one-hot encoder with privacy-preserving configurations

@@ -99,7 +99,7 @@ def emul_ada(emulator: emulation.Emulator):
 
     result = emulator.run(proc)(X_spu, y_spu)
     end = time.time()
-    score_encrpted = jnp.mean((result == y))
+    score_encrpted = jnp.mean(result == y)
     print(f"Running time in SPU: {end - start:.2f}s")
 
     # print acc
