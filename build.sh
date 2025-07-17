@@ -130,9 +130,7 @@ echo "platform: $platform_name"
 python_version=py$(detect_python_version)
 echo "python: $python_version"
 
-sed -i "s/^plat-name = .*/plat-name = $platform_name/" setup.cfg
-sed -i "s/^python-tag = .*/python-tag = $python_version/" setup.cfg
-
+sed -e "s/^plat-name = .*/plat-name = $platform_name/" -e "s/^python-tag = .*/python-tag = $python_version/" setup.cfg >setup.cfg.tmp && mv setup.cfg.tmp setup.cfg
 
 SCRIPT_PATH=$(dirname "$0")
 cd "$SCRIPT_PATH"
