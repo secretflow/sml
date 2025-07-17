@@ -14,3 +14,5 @@
 
 from sml.ensemble.adaboost import AdaBoostClassifier
 from sml.ensemble.forest import RandomForestClassifier
+
+__all__ = ["AdaBoostClassifier", "RandomForestClassifier"]

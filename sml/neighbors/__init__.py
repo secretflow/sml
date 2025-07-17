@@ -13,3 +13,5 @@
 # limitations under the License.
 
 from sml.neighbors.knn import KNNClassifer
+
+__all__ = ["KNNClassifer"]

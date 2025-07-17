@@ -119,7 +119,7 @@ class LabelBinarizer:
                 f"neg_label={self.neg_label} must be strictly less than "
                 f"pos_label={self.pos_label}."
             )
-        if unique == True:
+        if unique:
             self.classes_ = y
         else:
             # The output of jax needs to be tensor with known size.
@@ -504,7 +504,7 @@ class MinMaxScaler:
                 % str(feature_range)
             )
         first_pass = not hasattr(self, "n_samples_seen_")
-        if contain_nan == False:
+        if not contain_nan:
             data_min = jnp.min(X, axis=0)
             data_max = jnp.max(X, axis=0)
         else:
@@ -517,7 +517,7 @@ class MinMaxScaler:
             data_max = jnp.maximum(self.data_max_, data_max)
             self.n_samples_seen_ += X.shape[0]
         data_range = data_max - data_min
-        if zero_variance == False:
+        if not zero_variance:
             self.scale_ = (feature_range[1] - feature_range[0]) / data_range
         else:
             self.scale_ = (feature_range[1] - feature_range[0]) / jnp.where(
@@ -653,7 +653,7 @@ class MaxAbsScaler:
             and maximum.
         """
         first_pass = not hasattr(self, "n_samples_seen_")
-        if contain_nan == False:
+        if not contain_nan:
             max_abs = jnp.max(jnp.abs(X), axis=0)
         else:
             max_abs = jnp.nanmax(jnp.abs(X), axis=0)
@@ -663,7 +663,7 @@ class MaxAbsScaler:
             max_abs = jnp.maximum(self.max_abs_, max_abs)
             self.n_samples_seen_ += X.shape[0]
         self.max_abs_ = max_abs
-        if zero_maxabs == False:
+        if not zero_maxabs:
             self.scale_ = max_abs
         else:
             self.scale_ = jnp.where(max_abs == 0, 1, max_abs)
@@ -961,11 +961,11 @@ class KBinsDiscretizer:
             ### remove the small interval
             ### unqiue_count is used to record the number of unique bin edges for each feature
             ### which is used in transform function.
-            if remove_bin == True and self.strategy in ("quantile", "kmeans"):
+            if remove_bin and self.strategy in ("quantile", "kmeans"):
                 bin_edges, unqiue_count = _remove_bin_func(bin_edges, remove_ref)
                 self.unqiue_count = unqiue_count
 
-        elif vectorize == True:
+        elif vectorize:
             diverse_n_bins = self.diverse_n_bins
             ### directly using jnp.linspace will cause dynamic shape problem,
             ### so we need to use jnp.arange with a public value n_bins
@@ -1061,7 +1061,7 @@ class KBinsDiscretizer:
             ### remove the small interval
             ### unqiue_count is used to record the number of unique bin edges for each feature
             ### which is used in transform function.
-            if remove_bin == True and self.strategy in ("quantile", "kmeans"):
+            if remove_bin and self.strategy in ("quantile", "kmeans"):
                 bin_edges, unqiue_count = _remove_bin_func(bin_edges, remove_ref)
                 self.unqiue_count = unqiue_count
             else:
@@ -1206,7 +1206,7 @@ class KBinsDiscretizer:
             ### remove the small interval
             ### unqiue_count is used to record the number of unique bin edges for each feature
             ### which is used in transform function.
-            if remove_bin == True and self.strategy in ("quantile", "kmeans"):
+            if remove_bin and self.strategy in ("quantile", "kmeans"):
                 bin_edges, unqiue_count = _remove_bin_func(bin_edges, remove_ref)
                 self.unqiue_count = unqiue_count
             else:
@@ -1234,7 +1234,7 @@ class KBinsDiscretizer:
         bin_edges = self.bin_edges_
 
         if self.diverse_n_bins is not None or (
-            self.remove_bin == True and self.strategy in ("quantile", "kmeans")
+            self.remove_bin and self.strategy in ("quantile", "kmeans")
         ):
             unqiue_count = self.unqiue_count
 

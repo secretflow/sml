@@ -13,3 +13,5 @@
 # limitations under the License.
 
 from sml.feature_selection.univariate_selection import chi2
+
+__all__ = ["chi2"]

@@ -95,12 +95,12 @@ def _solve_simplex(
         def cal_pivcol_found_True(T, pivcol, phase, tol, complete):
             pivrow_found, pivrow = _pivot_row(T, pivcol, phase, tol, max_val)
 
-            pivrow_isnot_found = pivrow_found == False
+            pivrow_isnot_found = not pivrow_found
             complete = jnp.where(pivrow_isnot_found, True, complete)
 
             return pivrow, complete
 
-        pivcol_is_found = pivcol_found == True
+        pivcol_is_found = pivcol_found
         pivrow_True, complete_True = cal_pivcol_found_True(
             T, pivcol, phase, tol, complete
         )
@@ -109,7 +109,7 @@ def _solve_simplex(
 
         complete = jnp.where(pivcol_is_found, complete_True, complete)
 
-        complete_is_False = complete == False
+        complete_is_False = not complete
         apply_T, apply_basis = _apply_pivot(T, basis, pivrow, pivcol)
         T = jnp.where(complete_is_False, apply_T, T)
         basis = jnp.where(complete_is_False, apply_basis, basis)
