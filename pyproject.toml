@@ -43,7 +43,6 @@ write_to = "sml/_version.py"
 fallback_version = "0.1.0.dev0"
 local_scheme = "no-local-version"
 version_scheme = "advanced_schema:timestamp_version_scheme"
-# version_scheme = "python-simplified-semver"
 
 
 [tool.pytest.ini_options]
