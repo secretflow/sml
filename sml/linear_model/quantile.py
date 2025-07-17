@@ -14,7 +14,7 @@
 
 import jax.numpy as jnp
 
-from .utils._linprog_simplex import _linprog_simplex
+from sml.linear_model.utils._linprog_simplex import _linprog_simplex
 
 
 class QuantileRegressor:

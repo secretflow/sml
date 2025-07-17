@@ -16,21 +16,16 @@ import copy
 import time
 
 import jax.numpy as jnp
-import jax.random as random
 import numpy as np
 from sklearn.datasets import make_classification, make_regression
 from sklearn.model_selection import KFold, StratifiedKFold
 
 import emulations.utils.emulation as emulation
-from sml.ensemble.adaboost import AdaBoostClassifier
-from sml.ensemble.forest import RandomForestClassifier
-from sml.gaussian_process._gpc import GaussianProcessClassifier
 from sml.linear_model.glm import _GeneralizedLinearRegressor
 from sml.linear_model.pla import Perceptron
 from sml.linear_model.ridge import Ridge
 from sml.naive_bayes.gnb import GaussianNB
 from sml.neighbors.knn import KNNClassifer
-from sml.preprocessing.preprocessing import KBinsDiscretizer
 from sml.svm.svm import SVM
 from sml.utils.grid_search_cv import GridSearchCV
 

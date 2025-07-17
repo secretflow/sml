@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .nmf import NMF
-from .pca import PCA, Method
-from .tsne import TSNE
+from sml.decomposition.nmf import NMF
+from sml.decomposition.pca import PCA, Method
+from sml.decomposition.tsne import TSNE

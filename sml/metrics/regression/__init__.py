@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .regression import (
+from sml.metrics.regression.regression import (
     d2_tweedie_score,
     explained_variance_score,
     mean_gamma_deviance,

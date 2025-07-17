@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .tree import DecisionTreeClassifier
+from sml.tree.tree import DecisionTreeClassifier

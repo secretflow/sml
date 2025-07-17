@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple
 
 import jax
 import jax.numpy as jnp
@@ -21,7 +20,7 @@ from spu.ops.groupby import groupby_sorted
 
 def binary_clf_curve(
     sorted_pairs: jnp.ndarray,
-) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Calculate true and false positives per binary classification
     threshold (can be used for roc curve or precision/recall curve).
     Results may include trailing zeros.
@@ -62,7 +61,7 @@ def binary_clf_curve(
     return fps, tps, -thresholds
 
 
-def roc_curve(sorted_pairs: jnp.array) -> Tuple[jnp.array, jnp.array, jnp.array]:
+def roc_curve(sorted_pairs: jnp.array) -> tuple[jnp.array, jnp.array, jnp.array]:
     """Compute Receiver operating characteristic (ROC).
 
     Compared to sklearn implementation, this implementation eliminates most conditionals and ill-conditionals checking.

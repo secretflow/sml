@@ -73,7 +73,7 @@ def emul_perceptron(emulator: emulation.Emulator):
     )
     result_sk = sk_pla.fit(x, y).predict(x)
     result_sk = result_sk.reshape(result_sk.shape[0], 1)
-    acc_sk = jnp.sum((result_sk == y)) / n_samples * 100
+    acc_sk = jnp.sum(result_sk == y) / n_samples * 100
 
     # mark these data to be protected in SPU
     x_spu, y_spu = emulator.seal(x, y)
@@ -81,7 +81,7 @@ def emul_perceptron(emulator: emulation.Emulator):
     # run
     result = emulator.run(proc)(x_spu, y_spu)
     result = result.reshape(result.shape[0], 1)
-    acc_ = jnp.sum((result == y)) / n_samples * 100
+    acc_ = jnp.sum(result == y) / n_samples * 100
 
     # print acc
     print(f"Accuracy in SKlearn: {acc_sk:.2f}%")

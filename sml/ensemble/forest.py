@@ -17,7 +17,7 @@ import random
 
 import jax.numpy as jnp
 
-from ..tree.tree import DecisionTreeClassifier as sml_dtc
+from sml.tree.tree import DecisionTreeClassifier as sml_dtc
 
 
 class RandomForestClassifier:

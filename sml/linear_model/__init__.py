@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .glm import (
+from sml.linear_model.glm import (
     GammaRegressor,
     PoissonRegressor,
     TweedieRegressor,
     _GeneralizedLinearRegressor,
 )
-from .logistic import LogisticRegression
-from .pla import Perceptron
-from .quantile import QuantileRegressor
-from .ridge import Ridge, Solver
-from .sgd_classifier import SGDClassifier
+from sml.linear_model.logistic import LogisticRegression
+from sml.linear_model.pla import Perceptron
+from sml.linear_model.quantile import QuantileRegressor
+from sml.linear_model.ridge import Ridge, Solver
+from sml.linear_model.sgd_classifier import SGDClassifier

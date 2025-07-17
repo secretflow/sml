@@ -16,7 +16,7 @@
 import jax.numpy as jnp
 from jax import lax
 
-from .pca import PCA
+from sml.decomposition.pca import PCA
 
 
 class TSNE:

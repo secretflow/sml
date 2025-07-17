@@ -12,5 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .adaboost import AdaBoostClassifier
-from .forest import RandomForestClassifier
+from sml.ensemble.adaboost import AdaBoostClassifier
+from sml.ensemble.forest import RandomForestClassifier

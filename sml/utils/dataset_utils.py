@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -60,12 +59,12 @@ METRIC_OPEN_DATASETS = []
 
 def preprocess_dataframe(
     df: pd.DataFrame,
-    bin_feas: List[str] = [],
-    bin_nums: List[int] = [],
-    onehot_feas: List[str] = [],
+    bin_feas: list[str] = [],
+    bin_nums: list[int] = [],
+    onehot_feas: list[str] = [],
     categ_drop_thres: int = 10,
     int_onehot_thres: int = 10,
-    skip_cols: List[str] = ["_label"],
+    skip_cols: list[str] = ["_label"],
 ) -> pd.DataFrame:
     """A function to pre-process the dataframe.
 
@@ -205,8 +204,8 @@ def make_data_record(values, name, meta) -> DataRecord:
 def make_data_meta(
     is_mock: bool,
     train_shape: tuple,
-    test_shape: Optional[tuple] = None,
-    others: Optional[dict] = None,
+    test_shape: tuple | None = None,
+    others: dict | None = None,
 ) -> DataMeta:
     return DataMeta(is_mock, train_shape, test_shape=test_shape, others=others)
 
@@ -217,12 +216,12 @@ class DataSetsFactory:
         use_open: bool = True,
         test_size: float = 0.2,
         use_mock: bool = False,
-        mock_sample_sizes: List[int] = [10_000, 100_000],
-        mock_feature_sizes: List[int] = [10, 20],
-        mock_multi_classes: List[int] = [3, 4],
-        mock_clustring_centers: List[int] = [3, 6],
-        mock_decomposition_factors: List[int] = [2, 4],
-        mock_decomposition_sample_sizes: List[int] = [100, 1000],
+        mock_sample_sizes: list[int] = [10_000, 100_000],
+        mock_feature_sizes: list[int] = [10, 20],
+        mock_multi_classes: list[int] = [3, 4],
+        mock_clustring_centers: list[int] = [3, 6],
+        mock_decomposition_factors: list[int] = [2, 4],
+        mock_decomposition_sample_sizes: list[int] = [100, 1000],
         random_state: int = 107,
     ) -> None:
         assert (

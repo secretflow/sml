@@ -16,9 +16,14 @@ import warnings
 
 import jax.numpy as jnp
 
-from ..linear_model.utils.link import *
-from ..linear_model.utils.loss import *
-from ..linear_model.utils.solver import *
+from sml.linear_model.utils.link import IdentityLink, LogLink
+from sml.linear_model.utils.loss import (
+    HalfGammaLoss,
+    HalfPoissonLoss,
+    HalfSquaredLoss,
+    HalfTweedieLoss,
+)
+from sml.linear_model.utils.solver import LBFGSSolver, NewtonCholeskySolver
 
 
 class _GeneralizedLinearRegressor:

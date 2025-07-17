@@ -30,7 +30,6 @@ import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
 
 # Add the project root to Python path
 project_root = Path(__file__).parent.parent
@@ -58,11 +57,11 @@ class EmulationRunner:
     def __init__(
         self,
         mode: str = "multiprocess",
-        cluster_config: Optional[str] = None,
-        bandwidth: Optional[int] = None,
-        latency: Optional[int] = None,
+        cluster_config: str | None = None,
+        bandwidth: int | None = None,
+        latency: int | None = None,
         slowest_tests_count: int = 5,
-        target_module: Optional[str] = None,
+        target_module: str | None = None,
         verbose: bool = False,
         timeout: int = 300,
     ):
@@ -97,9 +96,9 @@ class EmulationRunner:
         self.target_module = target_module
         self.verbose = verbose
         self.timeout = timeout
-        self.results: List[TestResult] = []
+        self.results: list[TestResult] = []
 
-    def discover_emulation_files(self) -> List[str]:
+    def discover_emulation_files(self) -> list[str]:
         """
         Discover all emulation files in the emulations directory.
 
@@ -420,7 +419,7 @@ class EmulationRunner:
         total_duration = sum(r.duration for r in self.results)
 
         # Group results by module
-        module_results: Dict[str, List[TestResult]] = {}
+        module_results: dict[str, list[TestResult]] = {}
         for result in self.results:
             if result.module_path not in module_results:
                 module_results[result.module_path] = []
@@ -453,9 +452,7 @@ class EmulationRunner:
             status_icon = (
                 "✅"
                 if module_success == module_total
-                else "❌"
-                if module_success == 0
-                else "⚠️"
+                else "❌" if module_success == 0 else "⚠️"
             )
             print(f"\n{status_icon} {module_path}")
             print(
@@ -512,25 +509,25 @@ def main():
     Examples:
       # Run with default parameters(all emulations will be run with default configs)
       python emulations/run_emulations.py
-      
+
       # Run with custom parameters
       python emulations/run_emulations.py --mode=docker --bandwidth=500 --latency=10
-      
+
       # Specify cluster configuration
       python emulations/run_emulations.py --cluster_config=path/to/config.json
-      
+
       # List available emulation files only
       python emulations/run_emulations.py --list-only
-      
+
       # Run a specific module only
       python emulations/run_emulations.py --module=emulations.cluster.kmeans_emul
-      
+
       # Verbose output with top 10 slowest tests
       python emulations/run_emulations.py --verbose --slowest-tests=10
-      
+
       # Run with custom timeout (e.g., 600 seconds)
       python emulations/run_emulations.py --timeout=600
-      
+
       # Run with no timeout limit (useful for long-running tests)
       python emulations/run_emulations.py --timeout=0
     """

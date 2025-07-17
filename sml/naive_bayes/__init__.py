@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .gnb import GaussianNB
+from sml.naive_bayes.gnb import GaussianNB

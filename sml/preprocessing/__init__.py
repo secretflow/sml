@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .preprocessing import (
+from sml.preprocessing.preprocessing import (
     Binarizer,
     KBinsDiscretizer,
     LabelBinarizer,
@@ -22,4 +22,4 @@ from .preprocessing import (
     OneHotEncoder,
     RobustScaler,
 )
-from .quantile_transformer import QuantileTransformer
+from sml.preprocessing.quantile_transformer import QuantileTransformer

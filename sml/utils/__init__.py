@@ -12,6 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import dataset_utils, extmath
-from .extmath import randomized_svd, svd
-from .fxp_approx import *
+from sml.utils import dataset_utils, extmath
+from sml.utils.extmath import randomized_svd, svd
+from sml.utils.fxp_approx import (
+    SigType,
+    sigmoid,
+    sigmoid_df,
+    sigmoid_ls7,
+    sigmoid_mix,
+    sigmoid_real,
+    sigmoid_seg3,
+    sigmoid_sr,
+    sigmoid_t1,
+    sigmoid_t3,
+    sigmoid_t5,
+)
