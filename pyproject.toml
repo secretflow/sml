@@ -39,6 +39,7 @@ Repository = "https://github.com/secretflow/sml"
 exclude = ["emulations*", "tests*"]
 
 [tool.setuptools_scm]
+# Automatically generate version number from git tags
 write_to = "sml/_version.py"
 fallback_version = "0.1.0.dev0"
 local_scheme = "no-local-version"
