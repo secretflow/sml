@@ -70,6 +70,8 @@ The project includes pre-commit hooks that automatically run code quality checks
   - Skip hooks (not recommended): `git commit --no-verify`
 - **Benefits**: Ensures consistent code style, catches issues early, reduces manual formatting work
 
+**📖 For detailed information about all pre-commit tools and their configuration, see [docs/pre-commit-tools.md](./docs/pre-commit-tools.md)**
+
 If hooks fail during commit, fix the reported issues, stage the changes (`git add .`), and commit again.
 
 ## Advanced Topics
