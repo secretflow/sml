@@ -16,9 +16,9 @@ import warnings
 
 import jax.numpy as jnp
 
-from ..linear_model.utils.link import *
-from ..linear_model.utils.loss import *
-from ..linear_model.utils.solver import *
+from sml.linear_model.utils.link import *
+from sml.linear_model.utils.loss import *
+from sml.linear_model.utils.solver import *
 
 
 class _GeneralizedLinearRegressor:

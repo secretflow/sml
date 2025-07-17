@@ -14,7 +14,7 @@
 
 import jax.numpy as jnp
 
-from .link import IdentityLink, LogLink
+from sml.linear_model.utils.link import IdentityLink, LogLink
 
 
 # TODO: can move this to root utils, if other module needs loss function.

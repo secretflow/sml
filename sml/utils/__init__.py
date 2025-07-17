@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import dataset_utils, extmath
-from .extmath import randomized_svd, svd
-from .fxp_approx import *
+from sml.utils import dataset_utils, extmath
+from sml.utils.extmath import randomized_svd, svd
+from sml.utils.fxp_approx import *

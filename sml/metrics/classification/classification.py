@@ -12,22 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, Tuple
 
 import jax
 import jax.numpy as jnp
 from spu.ops.groupby import groupby, groupby_sum
 
+from sml.metrics.classification.auc import binary_clf_curve, binary_roc_auc
 from sml.preprocessing.preprocessing import label_binarize
-
-from .auc import binary_clf_curve, binary_roc_auc
 
 
 def brier_score_loss(
     y_true: jnp.ndarray,
     y_proba: jnp.ndarray,
-    sample_weight: Optional[jnp.ndarray] = None,
-    pos_label: Optional[int] = None,
+    sample_weight: jnp.ndarray | None = None,
+    pos_label: int | None = None,
 ) -> float:
     """
     Compute the Brier score loss.
@@ -92,7 +90,7 @@ def create_sorted_label_score_pair(y_true: jnp.array, y_score: jnp.array):
 
 def bin_counts(
     y_true: jnp.ndarray, y_pred: jnp.ndarray, thresholds: jnp.ndarray
-) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """First, digitize y_pred using thresholds.
     Second, perform groupby sum to compute number of positive/negative samples in each bin.
     Being in bin i means thresholds[i-1] <= x < thresholds[i].

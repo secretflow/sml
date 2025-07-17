@@ -14,7 +14,7 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
-from . import (
+from sml import (
     cluster,
     decomposition,
     ensemble,
