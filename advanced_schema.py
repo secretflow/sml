@@ -20,8 +20,6 @@ from setuptools_scm.version import ScmVersion, simplified_semver_version
 
 
 def timestamp_version_scheme(version: ScmVersion) -> str:
-    print("timestamp_version_scheme", version)
-
     version_str = simplified_semver_version(version)
 
     timestamp = datetime.now().strftime("%Y%m%d")

@@ -54,7 +54,7 @@ detect_arch() {
 }
 
 get_macos_version() {
-    if [ "$(detect_os)" = "darwin"]; then
+    if [ "$(detect_os)" = "darwin" ]; then
         local version=$(sw_vers -productVersion)
         echo "$version" | sed 's/\([0-9]*\)\.\([0-9]*\).*/\1_\2/'
     else
@@ -82,7 +82,6 @@ detect_platform() {
         ;;
         darwin)
             local mac_ver=$(get_macos_version)
-            log_verbose "检测到macOS版本: $mac_ver"
             case "$arch" in
                 aarch64)
                     echo "macosx_${mac_ver}_arm64"
@@ -136,7 +135,7 @@ sed -i "s/^python-tag = .*/python-tag = $python_version/" setup.cfg
 
 
 SCRIPT_PATH=$(dirname "$0")
-cd $SCRIPT_PATH
+cd "$SCRIPT_PATH"
 
 if [ -z "$PYTHONPATH" ]; then
     export PYTHONPATH=$(pwd)
@@ -144,8 +143,4 @@ else
     export PYTHONPATH=$(pwd):$PYTHONPATH
 fi
 
-if python -m build --wheel; then
-    exit 0
-else
-    exit 1
-fi
+python -m build --wheel
