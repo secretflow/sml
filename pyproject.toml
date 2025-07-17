@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools-scm[toml]>=6.2"]
+requires = ["setuptools>=45", "wheel", "setuptools-scm[toml]>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -51,10 +51,12 @@ Repository = "https://github.com/secretflow/sml"
 [tool.setuptools.packages.find]
 exclude = ["emulations*", "tests*"]
 
-[tool.setuptools-scm]
+[tool.setuptools_scm]
 # Automatically generate version number from git tags
 write_to = "sml/_version.py"
 fallback_version = "0.1.0.dev0"
+local_scheme = "no-local-version"
+version_scheme = "python-simplified-semver"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
