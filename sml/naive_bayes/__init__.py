@@ -13,3 +13,5 @@
 # limitations under the License.
 
 from sml.naive_bayes.gnb import GaussianNB
+
+__all__ = ["GaussianNB"]

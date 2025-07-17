@@ -13,3 +13,5 @@
 # limitations under the License.
 
 from sml.tree.tree import DecisionTreeClassifier
+
+__all__ = ["DecisionTreeClassifier"]

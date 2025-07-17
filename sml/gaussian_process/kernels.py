@@ -68,7 +68,7 @@ class RBF:
     #     return K
 
     def __call__(self, X, Y=None):
-        if Y == None:
+        if Y is None:
             Y = X
         K = jnp.zeros((X.shape[0], Y.shape[0]), dtype=jnp.float32)
         for i in range(X.shape[0]):

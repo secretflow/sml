@@ -19,3 +19,11 @@ from sml.metrics.regression.regression import (
     mean_poisson_deviance,
     mean_squared_error,
 )
+
+__all__ = [
+    "d2_tweedie_score",
+    "explained_variance_score",
+    "mean_gamma_deviance",
+    "mean_poisson_deviance",
+    "mean_squared_error",
+]

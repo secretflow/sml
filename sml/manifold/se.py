@@ -142,7 +142,7 @@ class SE:
 
         self.L_ = self.D_ - self.affinity_matrix_
         self.D2_ = jnp.diag(jnp.reciprocal(jnp.sqrt(jnp.diag(self.D_))))
-        if norm_laplacian == True:
+        if norm_laplacian:
             # normalization
             self.L_ = jnp.dot(self.D2_, self.L_)
             self.L_ = jnp.dot(self.L_, self.D2_)

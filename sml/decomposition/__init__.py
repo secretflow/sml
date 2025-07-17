@@ -15,3 +15,5 @@
 from sml.decomposition.nmf import NMF
 from sml.decomposition.pca import PCA, Method
 from sml.decomposition.tsne import TSNE
+
+__all__ = ["NMF", "PCA", "Method", "TSNE"]

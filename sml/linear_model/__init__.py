@@ -23,3 +23,16 @@ from sml.linear_model.pla import Perceptron
 from sml.linear_model.quantile import QuantileRegressor
 from sml.linear_model.ridge import Ridge, Solver
 from sml.linear_model.sgd_classifier import SGDClassifier
+
+__all__ = [
+    "GammaRegressor",
+    "PoissonRegressor",
+    "TweedieRegressor",
+    "_GeneralizedLinearRegressor",
+    "LogisticRegression",
+    "Perceptron",
+    "QuantileRegressor",
+    "Ridge",
+    "Solver",
+    "SGDClassifier",
+]

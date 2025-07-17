@@ -13,3 +13,5 @@
 # limitations under the License.
 
 from sml.cluster.kmeans import KMEANS
+
+__all__ = ["KMEANS"]

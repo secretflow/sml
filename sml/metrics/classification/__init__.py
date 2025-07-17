@@ -13,3 +13,5 @@
 # limitations under the License.
 
 from sml.metrics.classification import classification
+
+__all__ = ["classification"]
