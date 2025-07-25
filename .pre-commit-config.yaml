@@ -50,3 +50,11 @@ repos:
     hooks:
       - id: flake8
         additional_dependencies: [flake8-absolute-import, flake8-pyproject]
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.16.3
+    hooks:
+      - id: gitleaks
+  - repo: https://github.com/pylint-dev/pylint
+    rev: v2.17.2
+    hooks:
+      - id: pylint
