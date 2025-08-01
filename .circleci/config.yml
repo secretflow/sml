@@ -1,0 +1,80 @@
+version: 2.1
+
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - build_package
+      - test_python:
+          matrix:
+            parameters:
+              python_version: ["3.10"]
+          requires:
+            - build_package
+
+executors:
+  python_executor:
+    parameters:
+      python_version:
+        type: string
+        default: "3.10"
+    docker:
+      - image: cimg/python:<< parameters.python_version >>
+    resource_class: 2xlarge+
+
+jobs:
+  test_python:
+    parameters:
+      python_version:
+        type: string
+    executor:
+      name: python_executor
+      python_version: << parameters.python_version >>
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-uv-{{ checksum "uv.lock" }}
+            - v1-uv-
+      - run:
+          name: Run tests
+          command: |
+            uv venv
+            source .venv/bin/activate
+            uv pip install .[dev]
+            uv run pytest tests/ -v --tb=short --junitxml=test-results/junit.xml
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
+          destination: test-results
+
+  build_package:
+    executor: python_executor
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-uv-{{ checksum "uv.lock" }}
+            - v1-uv-
+      - run:
+          name: Install dependencies
+          command: |
+            uv venv
+            source .venv/bin/activate
+            uv pip install .[dev]
+      - save_cache:
+          paths:
+            - ~/.cache/uv
+          key: v1-uv-{{ checksum "uv.lock" }}
+      - run:
+          name: Build package
+          command: |
+            uv build
+      - run:
+          name: Check package
+          command: |
+            uv run twine check dist/*
+      - store_artifacts:
+          path: dist/
+          destination: dist
