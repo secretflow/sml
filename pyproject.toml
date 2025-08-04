@@ -39,6 +39,10 @@ dev = [
     "mypy",
     "pydocstyle",
 
+    # Package building and publishing
+    "twine",
+    "build",
+
     # Emulations and tests dependencies
     "pandas==1.5.3",
     "scikit-learn==1.5.2",

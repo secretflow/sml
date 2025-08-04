@@ -783,9 +783,9 @@ def test_onehotEncoder(sim):
     sk_onehotEncoder.fit(sk_X)
     sk_transformed = sk_onehotEncoder.transform(sk_Y)
     sk_inv_transformed = sk_onehotEncoder.inverse_transform(sk_transformed)
-    sk_inv_transformed = np.where(sk_inv_transformed is None, 0.0, sk_inv_transformed)
-    spu_transformed, spu_inv_transformed = spsim.sim_jax(sim, onehotEncode)(X, Y)
     sk_inv_transformed = sk_inv_transformed.astype(np.float64)
+    sk_inv_transformed = np.where(np.isnan(sk_inv_transformed), 0.0, sk_inv_transformed)
+    spu_transformed, spu_inv_transformed = spsim.sim_jax(sim, onehotEncode)(X, Y)
     spu_inv_transformed = spu_inv_transformed.astype(np.float64)
 
     np.testing.assert_allclose(sk_transformed, spu_transformed, rtol=1e-3, atol=1e-3)
