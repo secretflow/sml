@@ -90,7 +90,6 @@ class GaussianNB:
 
     @classmethod
     def tree_unflatten(cls, static_data, dynamic_data):
-
         (
             n_sample,
             n_features,

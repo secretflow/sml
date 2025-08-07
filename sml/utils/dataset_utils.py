@@ -166,7 +166,7 @@ class DataRecord:
         self.meta = meta
 
     def __str__(self):
-        return f"DataRecord(name={self.name}, " f"meta={self.meta})"
+        return f"DataRecord(name={self.name}, meta={self.meta})"
 
     def __repr__(self):
         return self.__str__()
@@ -226,17 +226,17 @@ class DataSetsFactory:
     ) -> None:
         assert use_mock or use_open, "use_mock and use_open cannot be both False"
 
-        assert len(mock_sample_sizes) == len(
-            mock_feature_sizes
-        ), "mock_sample_sizes and mock_feature_sizes should have the same length"
+        assert len(mock_sample_sizes) == len(mock_feature_sizes), (
+            "mock_sample_sizes and mock_feature_sizes should have the same length"
+        )
 
         assert len(mock_sample_sizes) == len(mock_multi_classes)
         assert len(mock_sample_sizes) == len(mock_clustring_centers)
         assert len(mock_decomposition_factors) == len(mock_decomposition_sample_sizes)
         # TODO: use large sample size for decomposition
-        assert (
-            mock_decomposition_sample_sizes[-1] <= 5000
-        ), "decomposition sample size should be small numbers now."
+        assert mock_decomposition_sample_sizes[-1] <= 5000, (
+            "decomposition sample size should be small numbers now."
+        )
 
         # Note: name starting with "mock_" are mock datasets for efficiency test
         self.use_mock = use_mock
