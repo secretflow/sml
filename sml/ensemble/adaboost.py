@@ -268,7 +268,7 @@ class AdaBoostClassifier:
                 self.estimators_,
                 self.estimator_weight_,
                 self.estimator_flags_,
-                strict=False,
+                strict=True,
             )
         )
 
