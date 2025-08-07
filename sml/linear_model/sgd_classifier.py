@@ -48,12 +48,12 @@ class SGDClassifier:
         assert penalty != "l1", "not support L1 penalty for now"
         if penalty == Penalty.L2:
             assert l2_norm > 0, f"l2_norm should >0 if use L2 penalty"
-        assert reg_type in [
-            e.value for e in RegType
-        ], f"reg_type should in {[e.value for e in RegType]}, but got {reg_type}"
-        assert penalty in [
-            e.value for e in Penalty
-        ], f"penalty should in {[e.value for e in Penalty]}, but got {reg_type}"
+        assert reg_type in [e.value for e in RegType], (
+            f"reg_type should in {[e.value for e in RegType]}, but got {reg_type}"
+        )
+        assert penalty in [e.value for e in Penalty], (
+            f"penalty should in {[e.value for e in Penalty]}, but got {reg_type}"
+        )
 
         self._epochs = epochs
         self._learning_rate = learning_rate

@@ -54,12 +54,12 @@ class AdaBoostClassifier:
         algorithm,
         epsilon=1e-5,
     ):
-        assert isinstance(
-            estimator, sml_dtc
-        ), "Estimator other than sml_dtc is not supported."
-        assert (
-            n_estimators is not None and n_estimators > 0
-        ), "n_estimators should not be None and must > 0."
+        assert isinstance(estimator, sml_dtc), (
+            "Estimator other than sml_dtc is not supported."
+        )
+        assert n_estimators is not None and n_estimators > 0, (
+            "n_estimators should not be None and must > 0."
+        )
         assert algorithm == "discrete", (
             "Only support SAMME discrete algorithm. "
             "In scikit-learn, the Real Boosting Algorithm (SAMME.R) will be deprecated. "
@@ -139,9 +139,7 @@ class AdaBoostClassifier:
 
             if sample_weight.shape[0] != n_samples:
                 raise ValueError(
-                    "sample_weight.shape == {}, expected {}!".format(
-                        sample_weight.shape, (n_samples,)
-                    )
+                    f"sample_weight.shape == {sample_weight.shape}, expected {(n_samples,)}!"
                 )
 
         return sample_weight
@@ -267,7 +265,10 @@ class AdaBoostClassifier:
             )
             * flag
             for estimator, w, flag in zip(
-                self.estimators_, self.estimator_weight_, self.estimator_flags_
+                self.estimators_,
+                self.estimator_weight_,
+                self.estimator_flags_,
+                strict=True,
             )
         )
 

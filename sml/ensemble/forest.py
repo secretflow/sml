@@ -71,15 +71,15 @@ class RandomForestClassifier:
     ):
         assert criterion == "gini", "criteria other than gini is not supported."
         assert splitter == "best", "splitter other than best is not supported."
-        assert (
-            n_estimators is not None and n_estimators > 0
-        ), "n_estimators should not be None and must > 0."
-        assert (
-            max_depth is not None and max_depth > 0
-        ), "max_depth should not be None and must > 0."
-        assert isinstance(
-            bootstrap, bool
-        ), "bootstrap should be a boolean value (True or False)"
+        assert n_estimators is not None and n_estimators > 0, (
+            "n_estimators should not be None and must > 0."
+        )
+        assert max_depth is not None and max_depth > 0, (
+            "max_depth should not be None and must > 0."
+        )
+        assert isinstance(bootstrap, bool), (
+            "bootstrap should be a boolean value (True or False)"
+        )
 
         self.n_estimators = n_estimators
         self.max_features = max_features
@@ -95,14 +95,14 @@ class RandomForestClassifier:
 
     def _calculate_max_samples(self, max_samples, n_samples):
         if isinstance(max_samples, int):
-            assert (
-                max_samples <= n_samples
-            ), "max_samples should not exceed n_samples when it's an integer"
+            assert max_samples <= n_samples, (
+                "max_samples should not exceed n_samples when it's an integer"
+            )
             return max_samples
         elif isinstance(max_samples, float):
-            assert (
-                0 < max_samples <= 1
-            ), "max_samples should be in the range (0, 1] when it's a float"
+            assert 0 < max_samples <= 1, (
+                "max_samples should be in the range (0, 1] when it's a float"
+            )
             return int(max_samples * n_samples)
         else:
             return n_samples
@@ -128,15 +128,15 @@ class RandomForestClassifier:
 
     def _calculate_max_features(self, max_features, n_features):
         if isinstance(max_features, int):
-            assert (
-                0 < max_features <= n_features
-            ), "0 < max_features <= n_features when it's an integer"
+            assert 0 < max_features <= n_features, (
+                "0 < max_features <= n_features when it's an integer"
+            )
             return max_features
 
         elif isinstance(max_features, float):
-            assert (
-                0 < max_features <= 1
-            ), "max_features should be in the range (0, 1] when it's a float"
+            assert 0 < max_features <= 1, (
+                "max_features should be in the range (0, 1] when it's a float"
+            )
             return int(max_features * n_features)
 
         elif isinstance(max_features, str):

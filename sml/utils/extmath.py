@@ -125,7 +125,9 @@ def randomized_svd(
     assert random_matrix.shape == (
         A.shape[1],
         n_components + n_oversamples,
-    ), f"Expected random_matrix to be ({A.shape[1]}, {n_components + n_oversamples}) array, got {random_matrix.shape}"
+    ), (
+        f"Expected random_matrix to be ({A.shape[1]}, {n_components + n_oversamples}) array, got {random_matrix.shape}"
+    )
     Omega = random_matrix / scale[0]
     Q = rsvd_iteration(A, Omega, scale[1], n_iter)
     B = jnp.dot(Q.T, A)
@@ -209,9 +211,8 @@ def serial_jacobi_evd(A, max_jacobi_iter=5):
         selected_pairs = _generate_ring_sequence(n)
 
         for pair in selected_pairs:
-
             # Combine rotation matrices for selected pairs
-            ks, ls = zip(*pair)
+            ks, ls = zip(*pair, strict=True)
             k_list = jnp.array(ks)
             l_list = jnp.array(ls)
             mask = jnp.not_equal(A[k_list, l_list], 0)
