@@ -87,13 +87,13 @@ class Perceptron:
         assert alpha > 0, f"alpha should >0"
         assert patience > 0, f"patience should >0"
         assert batch_size > 0 or batch_size == -1, f"batch size should >0 or -1"
-        assert penalty in [
-            e.value for e in Penalty
-        ], f"penalty should in {[e.value for e in Penalty]}, but got {penalty}"
+        assert penalty in [e.value for e in Penalty], (
+            f"penalty should in {[e.value for e in Penalty]}, but got {penalty}"
+        )
         if penalty == "elasticnet":
-            assert (
-                l1_ratio > 0 and l1_ratio < 1
-            ), f"l1_ratio should >0 and <1 if use ElasticNet (L1+L2)"
+            assert l1_ratio > 0 and l1_ratio < 1, (
+                f"l1_ratio should >0 and <1 if use ElasticNet (L1+L2)"
+            )
 
         self.max_iter = max_iter
         self.eta0 = eta0

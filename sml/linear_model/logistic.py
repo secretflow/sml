@@ -122,19 +122,19 @@ class LogisticRegression:
         assert solver == "sgd", "only support sgd solver for now"
         assert C > 0, f"C should >0"
         assert early_stopping_threshold >= 0, f"early_stopping_threshold should >0"
-        assert early_stopping_metric in [
-            e.value for e in EarlyStoppingMetric
-        ], f"early_stopping_metric should in {[e.value for e in EarlyStoppingMetric]}, but got {early_stopping_metric}"
+        assert early_stopping_metric in [e.value for e in EarlyStoppingMetric], (
+            f"early_stopping_metric should in {[e.value for e in EarlyStoppingMetric]}, but got {early_stopping_metric}"
+        )
         if penalty == Penalty.Elastic:
-            assert (
-                0 <= l1_ratio <= 1
-            ), f"l1_ratio should in `[0, 1]` if use Elastic penalty"
-        assert penalty in [
-            e.value for e in Penalty
-        ], f"penalty should in {[e.value for e in Penalty]}, but got {penalty}"
-        assert sig_type in [
-            e.value for e in SigType
-        ], f"sig_type should in {[e.value for e in SigType]}, but got {sig_type}"
+            assert 0 <= l1_ratio <= 1, (
+                f"l1_ratio should in `[0, 1]` if use Elastic penalty"
+            )
+        assert penalty in [e.value for e in Penalty], (
+            f"penalty should in {[e.value for e in Penalty]}, but got {penalty}"
+        )
+        assert sig_type in [e.value for e in SigType], (
+            f"sig_type should in {[e.value for e in SigType]}, but got {sig_type}"
+        )
         assert class_weight is None, f"not support class_weight for now"
         assert multi_class in [
             "binary",
@@ -360,9 +360,9 @@ class LogisticRegression:
                 num_feat = x.shape[1]
                 w = self.weights[i]
                 assert w.shape[0] == num_feat + 1, f"w shape is mismatch to x={x.shape}"
-                assert (
-                    len(w.shape) == 1 or w.shape[1] == 1
-                ), "w should be list or 1D array"
+                assert len(w.shape) == 1 or w.shape[1] == 1, (
+                    "w should be list or 1D array"
+                )
                 bias = w[-1, 0]
                 w = jnp.resize(w, (num_feat, 1))
                 pred = jnp.matmul(x, w) + bias

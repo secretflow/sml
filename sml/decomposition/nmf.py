@@ -179,11 +179,15 @@ class NMF:
         assert self._random_matrixA.shape == (
             self._n_components,
             X.shape[1],
-        ), f"Expected random_matrixA to be ({self._n_components}, {X.shape[1]}) array, got {self._random_matrixA.shape}"
+        ), (
+            f"Expected random_matrixA to be ({self._n_components}, {X.shape[1]}) array, got {self._random_matrixA.shape}"
+        )
         assert self._random_matrixB.shape == (
             X.shape[0],
             self._n_components,
-        ), f"Expected random_matrixA to be ({X.shape[0]}, {self._n_components}) array, got {self._random_matrixB.shape}"
+        ), (
+            f"Expected random_matrixA to be ({X.shape[0]}, {self._n_components}) array, got {self._random_matrixB.shape}"
+        )
 
         # init matrix W&H
         if self._update_H:

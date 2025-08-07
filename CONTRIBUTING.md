@@ -43,11 +43,9 @@ the latest changes of the main sml repository.
    - **Add necessary doc**: your implementation may only have part features, or some changes have been made due to limitations of both JAX and SPU, you **MUST** describe these things explicitly!
    - **Code quality and formatting**: The project uses pre-commit hooks to automatically maintain code quality:
      - **Pre-commit hooks**: Run automatically on each commit to check and fix common issues
-     - **Black**: Automatically formats Python code for consistent style
-     - **isort**: Sorts and organizes import statements
-     - **autoflake**: Removes unused imports and variables
+     - **Ruff**: Modern, fast Python linter and formatter that replaces Black, isort, autoflake, pyupgrade, and flake8
      - **Other checks**: Trailing whitespace, file endings, YAML/TOML syntax, debug statements
-     - Manual formatting: If needed, you can also run `black` and `isort` manually on your files
+     - Manual formatting: If needed, you can also run `ruff format` and `ruff check --fix` manually on your files
      - Run all checks: `pre-commit run --all-files` to check all files at once
 
 ## Code Quality Automation
@@ -55,7 +53,7 @@ the latest changes of the main sml repository.
 The project includes pre-commit hooks that automatically run code quality checks and formatting on every commit:
 
 - **Automatic setup**: Pre-commit hooks are already installed and configured in the repository
-- **What it does**: Automatically formats code (Black, isort), removes unused imports (autoflake), checks file quality, and detects common issues
+- **What it does**: Automatically formats code (Ruff), checks code quality, and detects common issues
 - **Usage**:
   - Hooks run automatically on `git commit`
   - Manual run: `pre-commit run --all-files`

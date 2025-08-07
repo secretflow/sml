@@ -180,9 +180,9 @@ class QuantileRegressor:
         - If there is no intercept, the method simply computes the dot product between `X` and the coefficients.
         """
 
-        assert (
-            self.coef_ is not None and self.intercept_ is not None
-        ), "Model has not been fitted yet. Please fit the model before predicting."
+        assert self.coef_ is not None and self.intercept_ is not None, (
+            "Model has not been fitted yet. Please fit the model before predicting."
+        )
 
         n_features = len(self.coef_)
         assert X.shape[1] == n_features, (

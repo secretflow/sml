@@ -47,7 +47,7 @@ def generate_param_combinations(param_grid):
     param_names = list(param_grid.keys())
     value_lists = list(param_grid.values())
     for value_combination in itertools.product(*value_lists):
-        params = dict(zip(param_names, value_combination))
+        params = dict(zip(param_names, value_combination, strict=True))
         yield params
 
 
@@ -229,7 +229,7 @@ class GridSearchCV:
         self.best_score_ = mean_test_scores[self.best_index_]
 
         best_params_values = jnp.take(self.param_values, self.best_index_, axis=0)
-        self.best_params_ = dict(zip(self.param_keys, best_params_values))
+        self.best_params_ = dict(zip(self.param_keys, best_params_values, strict=True))
 
         if self.refit:
             self.best_estimator_ = copy.deepcopy(self.estimator)

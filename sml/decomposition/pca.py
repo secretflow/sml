@@ -72,9 +72,9 @@ class PCA:
         """
         # parameter check.
         assert n_components > 0, f"n_components should >0"
-        assert method in [
-            e.value for e in Method
-        ], f"method should in {[e.value for e in Method]}, but got {method}"
+        assert method in [e.value for e in Method], (
+            f"method should in {[e.value for e in Method]}, but got {method}"
+        )
 
         self._n_components = n_components
         self._n_oversamples = n_oversamples  # used in rsvd
@@ -165,7 +165,6 @@ class PCA:
             self._variances = jnp.array(variances)
 
         elif self._method == Method.PCA_jacobi:
-
             cov_matrix = jnp.cov(X_centered, rowvar=False)
 
             result = extmath.serial_jacobi_evd(
@@ -205,9 +204,9 @@ class PCA:
         X_transformed : array, shape (n_samples, n_components)
             Transformed data.
         """
-        assert (
-            len(X.shape) == 2
-        ), f"Expected X_transformed to be 2 dimensional array, got {X.shape}"
+        assert len(X.shape) == 2, (
+            f"Expected X_transformed to be 2 dimensional array, got {X.shape}"
+        )
 
         X = X - self._mean
         return jnp.dot(X, self._components)
@@ -223,9 +222,9 @@ class PCA:
         X_original : array, shape (n_samples, n_features)
             Data in the original space.
         """
-        assert (
-            len(X_transformed.shape) == 2
-        ), f"Expected X_transformed to be 2 dimensional array, got {X_transformed.shape}"
+        assert len(X_transformed.shape) == 2, (
+            f"Expected X_transformed to be 2 dimensional array, got {X_transformed.shape}"
+        )
 
         X_original = jnp.dot(X_transformed, self._components.T) + self._mean
 

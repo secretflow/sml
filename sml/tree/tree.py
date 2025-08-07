@@ -47,9 +47,9 @@ class DecisionTreeClassifier:
     def __init__(self, criterion, splitter, max_depth, n_labels):
         assert criterion == "gini", "criteria other than gini is not supported."
         assert splitter == "best", "splitter other than best is not supported."
-        assert (
-            max_depth is not None and max_depth > 0
-        ), "max_depth should not be None and must > 0."
+        assert max_depth is not None and max_depth > 0, (
+            "max_depth should not be None and must > 0."
+        )
         self.max_depth = max_depth
         self.n_labels = n_labels
 

@@ -82,7 +82,6 @@ class _BinaryGaussianProcessClassifierLaplace:
         return ins
 
     def fit(self, X, y):
-
         self.X_train_ = jnp.asarray(X)
 
         self.y_train = y
@@ -235,9 +234,9 @@ class GaussianProcessClassifier:
         self.n_classes = n_classes
         self.base_estimator_ = base_estimator
 
-        assert (
-            self.n_classes > 1
-        ), "GaussianProcessClassifier requires 2 or more distinct classes"
+        assert self.n_classes > 1, (
+            "GaussianProcessClassifier requires 2 or more distinct classes"
+        )
 
     def tree_flatten(self):
         static_data = (
