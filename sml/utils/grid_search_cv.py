@@ -47,7 +47,7 @@ def generate_param_combinations(param_grid):
     param_names = list(param_grid.keys())
     value_lists = list(param_grid.values())
     for value_combination in itertools.product(*value_lists):
-        params = dict(zip(param_names, value_combination, strict=False))
+        params = dict(zip(param_names, value_combination, strict=True))
         yield params
 
 
