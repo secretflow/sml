@@ -229,7 +229,7 @@ class GridSearchCV:
         self.best_score_ = mean_test_scores[self.best_index_]
 
         best_params_values = jnp.take(self.param_values, self.best_index_, axis=0)
-        self.best_params_ = dict(zip(self.param_keys, best_params_values, strict=False))
+        self.best_params_ = dict(zip(self.param_keys, best_params_values, strict=True))
 
         if self.refit:
             self.best_estimator_ = copy.deepcopy(self.estimator)
