@@ -212,7 +212,7 @@ def serial_jacobi_evd(A, max_jacobi_iter=5):
 
         for pair in selected_pairs:
             # Combine rotation matrices for selected pairs
-            ks, ls = zip(*pair, strict=False)
+            ks, ls = zip(*pair, strict=True)
             k_list = jnp.array(ks)
             l_list = jnp.array(ls)
             mask = jnp.not_equal(A[k_list, l_list], 0)
