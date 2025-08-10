@@ -14,6 +14,7 @@
 
 
 import jax.numpy as jnp
+import jax.random as jr
 import numpy as np
 import spu.libspu as libspu
 import spu.utils.simulation as spsim
@@ -22,15 +23,15 @@ from sklearn.metrics import rand_score as sk_rand_score
 
 from sml.metrics.cluster.cluster import adjusted_rand_score, rand_score
 
+key = jr.PRNGKey(42)
+
 
 def test_cluster():
-    sim = spsim.Simulator.simple(2, libspu.ProtocolKind.SEMI2K, libspu.FieldType.FM64)
+    sim = spsim.Simulator.simple(2, libspu.ProtocolKind.SEMI2K, libspu.FieldType.FM128)
 
-    def proc(labels_true, labels_pred):
+    def proc(labels_true, labels_pred, n_classes, n_clusters):
         sk_ri = sk_rand_score(labels_true, labels_pred)
         sk_ari = sk_adjusted_rand_score(labels_true, labels_pred)
-        n_classes = int(jnp.unique(labels_true).shape[0])
-        n_clusters = int(jnp.unique(labels_pred).shape[0])
         spu_ri = spsim.sim_jax(sim, rand_score, static_argnums=(2, 3))(
             labels_true, labels_pred, n_classes, n_clusters
         )
@@ -44,34 +45,58 @@ def test_cluster():
             np.testing.assert_allclose(pair[0], pair[1], rtol=1e-3, atol=1e-3)
 
     # --- Test perfect match ---
-    labels_true = jnp.array([0, 0, 1, 1], dtype=jnp.int32)
-    labels_pred = jnp.array([0, 0, 1, 1], dtype=jnp.int32)
-    check(*proc(labels_true, labels_pred))
+    labels_true = jnp.array([0, 0, 1, 1])
+    labels_pred = jnp.array([0, 0, 1, 1])
+    check(*proc(labels_true, labels_pred, 2, 2))
 
     # --- Test another perfect match ---
-    labels_true = jnp.array([0, 0, 1, 1], dtype=jnp.int32)
-    labels_pred = jnp.array([2, 2, 0, 0], dtype=jnp.int32)
-    check(*proc(labels_true, labels_pred))
+    labels_true = jnp.array([0, 0, 1, 1])
+    labels_pred = jnp.array([1, 1, 0, 0])
+    check(*proc(labels_true, labels_pred, 2, 2))
 
     # --- Test total mismatch ---
-    labels_true = jnp.array([0, 1, 2], dtype=jnp.int32)
-    labels_pred = jnp.array([0, 0, 0], dtype=jnp.int32)
-    check(*proc(labels_true, labels_pred))
+    labels_true = jnp.array([0, 1, 2])
+    labels_pred = jnp.array([0, 0, 0])
+    check(*proc(labels_true, labels_pred, 3, 1))
 
-    labels_true = jnp.array([0, 1], dtype=jnp.int32)
-    labels_pred = jnp.array([0, 0], dtype=jnp.int32)
-    check(*proc(labels_true, labels_pred))
+    labels_true = jnp.array([0, 1])
+    labels_pred = jnp.array([0, 0])
+    check(*proc(labels_true, labels_pred, 2, 1))
 
     # --- Test partial match ---
-    labels_true = jnp.array([0, 0, 1, 2], dtype=jnp.int32)
-    labels_pred = jnp.array([0, 0, 1, 1], dtype=jnp.int32)
-    check(*proc(labels_true, labels_pred))
+    labels_true = jnp.array([0, 0, 1, 2])
+    labels_pred = jnp.array([0, 0, 1, 1])
+    check(*proc(labels_true, labels_pred, 3, 2))
 
     # --- Test with more than 2 clusters ---
-    labels_true = jnp.array([0, 1, 2, 3], dtype=jnp.int32)
-    labels_pred = jnp.array([1, 2, 3, 0], dtype=jnp.int32)
-    check(*proc(labels_true, labels_pred))
+    labels_true = jnp.array([0, 1, 2, 3])
+    labels_pred = jnp.array([1, 2, 3, 0])
+    check(*proc(labels_true, labels_pred, 4, 4))
 
-    labels_true = jnp.array([0, 0, 1, 2], dtype=jnp.int32)
-    labels_pred = jnp.array([2, 0, 2, 5], dtype=jnp.int32)
-    check(*proc(labels_true, labels_pred))
+    labels_true = jnp.array([0, 1, 2, 3, 4, 2, 0, 2, 5])
+    labels_pred = jnp.array([2, 0, 2, 5, 0, 1, 2, 3, 4])
+    check(*proc(labels_true, labels_pred, 6, 6))
+
+    # --- Test scenarios where n_classes and n_clusters exceed the data range ---
+    labels_true = jnp.array([0, 1, 2, 3, 4, 2, 0, 2, 5])
+    labels_pred = jnp.array([2, 0, 2, 5, 0, 1, 2, 3, 4])
+    check(*proc(labels_true, labels_pred, 6, 10))
+    check(*proc(labels_true, labels_pred, 8, 6))
+    check(*proc(labels_true, labels_pred, 8, 10))
+
+    # --- Large Test Cases (Require FM128)---
+    def generate_large_test_case(n_classes, n_clusters, size):
+        global key
+        key, subkey1 = jr.split(key)
+        labels_true = jr.randint(subkey1, shape=(size,), minval=0, maxval=n_classes)
+        key, subkey2 = jr.split(key)
+        labels_pred = jr.randint(subkey2, shape=(size,), minval=0, maxval=n_clusters)
+        return labels_true, labels_pred
+
+    labels_true, labels_pred = generate_large_test_case(20, 20, 500)
+    print(f"labels_true: {labels_true}, labels_pred: {labels_pred}")
+    check(*proc(labels_true, labels_pred, 20, 20))
+
+    labels_true, labels_pred = generate_large_test_case(25, 25, 1000)
+    print(f"labels_true: {labels_true}, labels_pred: {labels_pred}")
+    check(*proc(labels_true, labels_pred, 25, 25))

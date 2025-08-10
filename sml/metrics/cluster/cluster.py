@@ -13,6 +13,9 @@
 # limitations under the License.
 
 import jax.numpy as jnp
+from jax import config
+
+config.update("jax_enable_x64", True)
 
 
 def contingency_matrix(
@@ -21,10 +24,9 @@ def contingency_matrix(
     n_classes: int,
     n_clusters: int,
     eps=None,
-    dtype=jnp.int32,
 ):
     """
-    Compute the contingency matrix between two clusterings.
+    Compute the contingency matrix between two clusters.
 
     The contingency matrix is a matrix where the element at (i, j) represents
     the number of samples that are in true class i and predicted cluster j.
@@ -48,29 +50,22 @@ def contingency_matrix(
     eps : optional, default=None
         Small value to add to each entry of the contingency matrix (for smoothing).
 
-    dtype : jnp.dtype, default=jnp.int32
-        Data type of the returned contingency matrix.
-
     Returns
     -------
     contingency : jnp.ndarray, shape (n_classes, n_clusters)
         Contingency matrix counting co-occurrences of true and predicted labels.
     """
 
-    classes, class_idx = jnp.unique(labels_true, return_inverse=True, size=n_classes)
-    clusters, cluster_idx = jnp.unique(
-        labels_pred, return_inverse=True, size=n_clusters
-    )
-
     # Flatten (class, cluster) index into single integer
-    idx = class_idx * jnp.int32(n_clusters) + cluster_idx
+    idx = labels_true * jnp.int64(n_clusters) + labels_pred
 
-    # bincount with explicit length to fix output shape at compile time
-    counts = jnp.bincount(idx, length=n_classes * n_clusters).astype(dtype)
+    # Fast Bincount-like operation
+    counts = jnp.zeros(n_classes * n_clusters)
+    counts = counts.at[idx].add(1)
     contingency = counts.reshape((n_classes, n_clusters))
 
     if eps is not None:
-        contingency = contingency + jnp.array(eps, dtype=dtype)
+        contingency = contingency + jnp.array(eps)
 
     return contingency
 
@@ -79,7 +74,7 @@ def pair_confusion_matrix(
     labels_true: jnp.ndarray, labels_pred: jnp.ndarray, n_classes: int, n_clusters: int
 ):
     """
-    Compute a 2x2 pair confusion matrix from clustering labels.
+    Compute a 2x2 pair confusion matrix from cluster labels.
 
     The pair confusion matrix counts pairs of samples in the following categories:
         - True Negative (TN): pairs not in same true class nor predicted cluster
@@ -108,23 +103,20 @@ def pair_confusion_matrix(
                               [FN, TP]]
     """
 
-    n_samples = jnp.int32(labels_true.shape[0])
+    n_samples = jnp.int64(labels_true.shape[0])
 
-    contingency = contingency_matrix(
-        labels_true, labels_pred, n_classes, n_clusters, dtype=jnp.int32
-    )
+    contingency = contingency_matrix(labels_true, labels_pred, n_classes, n_clusters)
 
     n_c = jnp.ravel(contingency.sum(axis=1))
     n_k = jnp.ravel(contingency.sum(axis=0))
 
     sum_squares = (contingency**2).sum()
 
-    C = jnp.zeros((2, 2), dtype=jnp.int32)
+    C = jnp.zeros((2, 2))
     C = C.at[1, 1].set(sum_squares - n_samples)
     C = C.at[0, 1].set((n_k**2).sum() - sum_squares)
     C = C.at[1, 0].set((n_c**2).sum() - sum_squares)
     C = C.at[0, 0].set(n_samples**2 - C[0, 1] - C[1, 0] - sum_squares)
-
     return C
 
 
@@ -132,7 +124,7 @@ def rand_score(
     labels_true: jnp.ndarray, labels_pred: jnp.ndarray, n_classes: int, n_clusters: int
 ):
     """
-    Compute the Rand index, a measure of similarity between two clusterings.
+    Compute the Rand index, a measure of similarity between two clusters.
 
     The Rand index is the ratio of the number of agreeing pairs (same or different clusters)
     over the total number of pairs.
@@ -168,7 +160,7 @@ def adjusted_rand_score(
     labels_true: jnp.ndarray, labels_pred: jnp.ndarray, n_classes: int, n_clusters: int
 ):
     """
-    Compute the Adjusted Rand Index (ARI) between two clusterings.
+    Compute the Adjusted Rand Index (ARI) between two clusters.
 
     ARI corrects the Rand index for chance, with value 0 expected for random labelings,
     and 1 for perfect match.
@@ -177,9 +169,11 @@ def adjusted_rand_score(
     ----------
     labels_true : jnp.ndarray, shape (n_samples,)
         True class labels.
+        The values of labels_true are in the range of 0 to n_classes-1.
 
     labels_pred : jnp.ndarray, shape (n_samples,)
         Predicted cluster labels.
+        The values of labels_pred are in the range of 0 to n_clusters-1.
 
     n_classes : int
         Number of distinct true classes.
