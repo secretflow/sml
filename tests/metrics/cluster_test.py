@@ -94,9 +94,7 @@ def test_cluster():
         return labels_true, labels_pred
 
     labels_true, labels_pred = generate_large_test_case(20, 20, 500)
-    print(f"labels_true: {labels_true}, labels_pred: {labels_pred}")
     check(*proc(labels_true, labels_pred, 20, 20))
 
     labels_true, labels_pred = generate_large_test_case(25, 25, 1000)
-    print(f"labels_true: {labels_true}, labels_pred: {labels_pred}")
     check(*proc(labels_true, labels_pred, 25, 25))

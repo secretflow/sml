@@ -33,11 +33,13 @@ def contingency_matrix(
 
     Parameters
     ----------
-    labels_true : jnp.ndarray, shape (n_samples,)
+    labels_true : jnp.ndarray, shape (n_classes,)
         True class labels.
+        The values of labels_true are in the range of 0 to n_classes-1.
 
-    labels_pred : jnp.ndarray, shape (n_samples,)
+    labels_pred : jnp.ndarray, shape (n_clusters,)
         Predicted cluster labels.
+        The values of labels_pred are in the range of 0 to n_clusters-1.
 
     n_classes : int
         Number of distinct true classes.
@@ -84,17 +86,21 @@ def pair_confusion_matrix(
 
     Parameters
     ----------
-    labels_true : jnp.ndarray, shape (n_samples,)
+    labels_true : jnp.ndarray, shape (n_classes,)
         True class labels.
+        The values of labels_true are in the range of 0 to n_classes-1.
 
-    labels_pred : jnp.ndarray, shape (n_samples,)
+    labels_pred : jnp.ndarray, shape (n_clusters,)
         Predicted cluster labels.
+        The values of labels_pred are in the range of 0 to n_clusters-1.
 
     n_classes : int
-        Number of true classes.
+        Number of distinct true classes.
+        SPU cannot support dynamic shape, so this parameter needs to be designated.
 
     n_clusters : int
-        Number of predicted clusters.
+        Number of distinct predicted clusters.
+        SPU cannot support dynamic shape, so this parameter needs to be designated.
 
     Returns
     -------
@@ -131,17 +137,21 @@ def rand_score(
 
     Parameters
     ----------
-    labels_true : jnp.ndarray, shape (n_samples,)
+    labels_true : jnp.ndarray, shape (n_classes,)
         True class labels.
+        The values of labels_true are in the range of 0 to n_classes-1.
 
-    labels_pred : jnp.ndarray, shape (n_samples,)
+    labels_pred : jnp.ndarray, shape (n_clusters,)
         Predicted cluster labels.
+        The values of labels_pred are in the range of 0 to n_clusters-1.
 
     n_classes : int
-        Number of true classes.
+        Number of distinct true classes.
+        SPU cannot support dynamic shape, so this parameter needs to be designated.
 
     n_clusters : int
-        Number of predicted clusters.
+        Number of distinct predicted clusters.
+        SPU cannot support dynamic shape, so this parameter needs to be designated.
 
     Returns
     -------
@@ -167,11 +177,11 @@ def adjusted_rand_score(
 
     Parameters
     ----------
-    labels_true : jnp.ndarray, shape (n_samples,)
+    labels_true : jnp.ndarray, shape (n_classes,)
         True class labels.
         The values of labels_true are in the range of 0 to n_classes-1.
 
-    labels_pred : jnp.ndarray, shape (n_samples,)
+    labels_pred : jnp.ndarray, shape (n_clusters,)
         Predicted cluster labels.
         The values of labels_pred are in the range of 0 to n_clusters-1.
 
