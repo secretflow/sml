@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import jax.numpy as jnp
+from jax.typing import ArrayLike
 
 
 def qr_Householder(A):
@@ -275,3 +276,39 @@ def serial_jacobi_evd(A, max_jacobi_iter=5):
 
     eigenvalues = jnp.diag(A)
     return eigenvalues, eigenvectors
+
+
+def standardize(data: ArrayLike, axis=0, ddof=1, eps=1e-20) -> ArrayLike:
+    """
+    Standardize (Z-score normalize) an array along a given axis.
+
+    Standardization is performed as:
+        z = (x - μ) / σ
+    where μ is the mean and σ is the standard deviation with
+    Bessel's correction applied when ddof=1 (default).
+
+    Parameters
+    ----------
+    data : array_like
+        Input data. Can be any JAX array or any object convertible to one.
+    axis : int or tuple of ints, optional
+        Axis or axes along which the means and standard deviations are
+        computed. Default is 0 (column-wise standardization).
+        If None, the array is flattened before computation.
+    ddof : int, optional
+        Delta degrees of freedom for the standard deviation.
+        The divisor used in the computation is N - ddof, where N is the
+        number of elements along the given axis. Default is 1, yielding
+        the sample standard deviation.
+    eps : float, optional
+        A small constant added to the standard deviation to avoid
+        division by zero. Default is 1e-20.
+
+    Returns
+    -------
+    standardized : jnp.ndarray
+        The standardized array, with the same shape as `data`.
+    """
+    mean = jnp.mean(data, axis=axis, keepdims=True)
+    std = jnp.std(data, axis=axis, keepdims=True, ddof=ddof) + eps
+    return (data - mean) / std
