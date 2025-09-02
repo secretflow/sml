@@ -22,7 +22,7 @@ from sml.utils.extmath import standardize
 
 
 @partial(jax.jit, static_argnames=("standardized"))
-def pearsonr(X: ArrayLike, standardized: bool = True):
+def pearsonr(X: ArrayLike, standardized: bool = False):
     """
     Compute Pearson correlation coefficient matrix for a given dataset.
 
@@ -32,16 +32,16 @@ def pearsonr(X: ArrayLike, standardized: bool = True):
 
     Parameters
     ----------
-    X : jnp.ndarray
-        Input data matrix of shape (n_samples, n_features) or (n_features, n_samples)
-        depending on the orientation. Each row/column represents a variable.
-    standardized : bool, default=True
+    X : ArrayLike
+        Input data matrix of shape (n_samples, n_features).
+        Each row represents a sample, and each column represents a feature.
+    standardized : bool, default=False
         Whether the input data is already standardized (mean=0, std=1).
         If False, the data will be standardized using z-score normalization.
 
     Returns
     -------
-    corr : jnp.ndarray
+    corr : ArrayLike
         Pearson correlation coefficient matrix of shape (n_features, n_features).
         Each element [i, j] represents the correlation between variable i and variable j.
         Values range from -1 (perfect negative correlation) to 1 (perfect positive correlation).

@@ -33,8 +33,9 @@ def test_pearsonr(standardized: bool, n_samples: int, n_features: int):
     key = jax.random.PRNGKey(seed)
     X = jax.random.normal(key, (n_samples, n_features))
     X_jax = standardize(X) if standardized else X
+
     R_jax = pearsonr(X_jax, standardized)
-    R_np = _numpy_pearsonr(np.asarray(X))
+    R_np = _numpy_pearsonr(np.asarray(X_jax))
     np.testing.assert_allclose(np.asarray(R_jax), R_np, atol=1e-6)
 
     # test in spu

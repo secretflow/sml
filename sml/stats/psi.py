@@ -58,14 +58,47 @@ def psi(
     distribution has not changed significantly, while a high PSI indicates a significant
     shift in the population distribution.
 
-    Args:
-        actual_data: Actual data samples with shape (n_samples, n_features)
-        expect_data: Expected data samples with shape (n_samples, n_features)
-        bins: Bin edges with shape (n_bins+1, n_features)
-        eps: Small epsilon value to avoid division by zero
+    Parameters
+    ----------
+    actual_data : ArrayLike
+        Actual data samples with shape (n_samples, n_features)
+    expect_data : ArrayLike
+        Expected data samples with shape (n_samples, n_features)
+    bins : ArrayLike
+        Bin edges with shape (n_bins+1, n_features)
+    eps : float, default=1e-8
+        Small epsilon value to avoid division by zero
 
-    Returns:
+    Returns
+    -------
+    psi_values : ArrayLike
         PSI values for each feature with shape (n_features,)
+
+        Interpretation:
+        - PSI < 0.1: No significant change
+        - 0.1 ≤ PSI < 0.2: Slight change
+        - 0.2 ≤ PSI < 0.5: Moderate change
+        - PSI ≥ 0.5: Significant change
+
+    Notes
+    -----
+    The Population Stability Index (PSI) is calculated as:
+    PSI = Σ (actual_proportion - expected_proportion) * ln(actual_proportion / expected_proportion)
+
+    This metric is widely used in credit scoring and risk modeling to monitor
+    population drift over time. It compares the distribution of a variable
+    between a development sample (expected) and a current sample (actual).
+
+    Examples
+    --------
+    >>> import jax.numpy as jnp
+    >>> from sml.stats import psi
+    >>> # Create sample data
+    >>> actual_data = jnp.array([[1.0, 2.0], [2.0, 3.0], [3.0, 4.0]])
+    >>> expect_data = jnp.array([[1.5, 2.5], [2.5, 3.5]])
+    >>> bins = jnp.array([[0.0, 1.0], [2.0, 3.0], [4.0, 5.0]])
+    >>> psi_values = psi(actual_data, expect_data, bins)
+    >>> print(psi_values)
     """
     # Ensure 2D arrays
     actual_data = jnp.atleast_2d(actual_data)
@@ -93,7 +126,7 @@ def psi(
     expect_dist = jnp.where(expect_dist == 0, eps, expect_dist)
 
     # Compute PSI values
-    # PSI = Σ (actual_proportion - expected_proportion) * ln(actual_proportion / expected_proportion)
+    # PSI = Σ (actual_proportion - expected_proportion) * jnp.log(actual_dist / expect_dist)
     psi_values = jnp.sum(
         (actual_dist - expect_dist) * jnp.log(actual_dist / expect_dist), axis=0
     )

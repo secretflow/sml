@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import jax
 import jax.numpy as jnp
 from jax.typing import ArrayLike
 
@@ -312,3 +313,20 @@ def standardize(data: ArrayLike, axis=0, ddof=1, eps=1e-20) -> ArrayLike:
     mean = jnp.mean(data, axis=axis, keepdims=True)
     std = jnp.std(data, axis=axis, keepdims=True, ddof=ddof) + eps
     return (data - mean) / std
+
+
+def newton_inv(x: jnp.ndarray, iter_round: int = 20):
+    """
+    computing the inverse of a matrix by newton iteration.
+    https://aalexan3.math.ncsu.edu/articles/mat-inv-rep.pdf
+    """
+    assert x.ndim == 2 and x.shape[0] == x.shape[1], "x must be a square matrix"
+    n = x.shape[0]
+    E = jnp.eye(n, dtype=x.dtype)
+
+    X0 = (1.0 / jnp.trace(x)) * E
+
+    def body_fun(_, X):
+        return X @ (2 * E - x @ X)
+
+    return jax.lax.fori_loop(0, iter_round, body_fun, X0)

@@ -21,10 +21,11 @@ from sml.stats import vif
 from sml.utils.extmath import standardize
 
 
-def _statsmodels_vif(data: jnp.ndarray):
+def _statsmodels_vif(data: jnp.ndarray, standardized: bool):
     from statsmodels.stats.outliers_influence import variance_inflation_factor as sm_vif
 
-    data = standardize(data)
+    if not standardized:
+        data = standardize(data)
 
     cols = data.shape[1]
     ret = np.array([sm_vif(data, i) for i in range(cols)])
@@ -40,8 +41,8 @@ def test_vif(standardized: bool, n_samples: int, n_features: int):
     X_jax = standardize(X) if standardized else X
 
     R_jax = vif(X_jax, standardized)
-    R_scipy = _statsmodels_vif(X)
-    np.testing.assert_allclose(np.asarray(R_jax), R_scipy, atol=1e-6)
+    R_ss = _statsmodels_vif(X_jax, standardized)
+    np.testing.assert_allclose(np.asarray(R_jax), R_ss, atol=1e-6)
 
     # test in spu
     import spu.libspu as libspu
@@ -52,4 +53,4 @@ def test_vif(standardized: bool, n_samples: int, n_features: int):
 
     sim = spsim.Simulator.simple(2, libspu.ProtocolKind.SEMI2K, libspu.FieldType.FM64)
     res = spsim.sim_jax(sim, proc)(X_jax)
-    np.testing.assert_allclose(res, R_scipy, atol=1e-3)
+    np.testing.assert_allclose(res, R_ss, atol=1e-3)

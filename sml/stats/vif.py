@@ -18,7 +18,7 @@ import jax
 import jax.numpy as jnp
 from jax.typing import ArrayLike
 
-from sml.utils.extmath import standardize
+from sml.utils.extmath import newton_inv, standardize
 
 
 @partial(jax.jit, static_argnames=("standardized"))
@@ -36,7 +36,7 @@ def vif(X: ArrayLike, standardized: bool = False):
 
     Parameters
     ----------
-    X : jnp.ndarray
+    X : ArrayLike
         Input data matrix of shape (n_samples, n_features) where each column
         represents a predictor variable.
     standardized : bool, default=False
@@ -45,7 +45,7 @@ def vif(X: ArrayLike, standardized: bool = False):
 
     Returns
     -------
-    vif_values : jnp.ndarray
+    vif_values : ArrayLike
         Array of VIF values with shape (n_features,). Each element represents
         the VIF for the corresponding predictor variable.
 
@@ -79,6 +79,6 @@ def vif(X: ArrayLike, standardized: bool = False):
 
     rows = X.shape[0]
     xTx = X.T @ X
-    x_inv = jnp.linalg.inv(xTx)
+    x_inv = newton_inv(xTx)
     res = jnp.diagonal(x_inv) * (rows - 1)
     return res
