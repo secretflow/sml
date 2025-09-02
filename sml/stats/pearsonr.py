@@ -15,14 +15,12 @@
 from functools import partial
 
 import jax
-import jax.numpy as jnp
-from jax.typing import ArrayLike
 
 from sml.utils.extmath import standardize
 
 
 @partial(jax.jit, static_argnames=("standardized"))
-def pearsonr(X: ArrayLike, standardized: bool = False):
+def pearsonr(X: jax.Array, standardized: bool = False) -> jax.Array:
     """
     Compute Pearson correlation coefficient matrix for a given dataset.
 
@@ -71,5 +69,4 @@ def pearsonr(X: ArrayLike, standardized: bool = False):
     xTx = X.T @ X
     corr = xTx / (rows - 1)
 
-    eye = jnp.eye(corr.shape[0])
-    return jnp.where(eye, 1.0, corr)
+    return corr

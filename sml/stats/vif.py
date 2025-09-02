@@ -16,13 +16,12 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-from jax.typing import ArrayLike
 
 from sml.utils.extmath import newton_inv, standardize
 
 
 @partial(jax.jit, static_argnames=("standardized"))
-def vif(X: ArrayLike, standardized: bool = False):
+def vif(X: jax.Array, standardized: bool = False) -> jax.Array:
     """
     Compute Variance Inflation Factor (VIF) for multicollinearity detection.
 

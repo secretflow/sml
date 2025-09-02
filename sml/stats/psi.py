@@ -14,10 +14,9 @@
 
 import jax
 import jax.numpy as jnp
-from jax.typing import ArrayLike
 
 
-def _compute_distribution(data: ArrayLike, bin_edges: ArrayLike, n_bins: int):
+def _compute_distribution(data: jax.Array, bin_edges: jax.Array, n_bins: int):
     """Compute the sample distribution proportion for each bin using pure JAX and vmap"""
 
     def _count_feature(feature_data, feature_bins):
@@ -45,11 +44,11 @@ def _compute_distribution(data: ArrayLike, bin_edges: ArrayLike, n_bins: int):
 
 
 def psi(
-    actual_data: ArrayLike,
-    expect_data: ArrayLike,
-    bins: ArrayLike,
+    actual_data: jax.Array,
+    expect_data: jax.Array,
+    bins: jax.Array,
     eps: float = 1e-8,
-) -> ArrayLike:
+) -> jax.Array:
     """
     Compute Population Stability Index (PSI) between actual and expected data.
 
