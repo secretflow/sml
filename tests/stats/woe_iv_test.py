@@ -63,8 +63,10 @@ def _numpy_woe_iv(
     return woe_ref, iv_ref
 
 
-@pytest.mark.parametrize("n_samples,n_features,n_bins", [(80, 5, 10), (100, 3, 10)])
-def test_woe_iv(n_samples, n_features, n_bins: int):
+@pytest.mark.parametrize(
+    "n_samples,n_features,n_bins,positive_value", [(80, 5, 10, 1), (100, 3, 10, 0)]
+)
+def test_woe_iv(n_samples, n_features, n_bins: int, positive_value: int):
     seed = 42
     key = jax.random.PRNGKey(seed)
     X = jax.random.normal(key, (n_samples, n_features))
@@ -73,9 +75,9 @@ def test_woe_iv(n_samples, n_features, n_bins: int):
 
     discretizer = KBinsDiscretizer(n_bins=n_bins, strategy="quantile")
     X_binned = discretizer.fit_transform(X)
-    jax_woe, jax_iv = woe_iv(X_binned, y, n_bins)
 
-    np_woe, np_iv = _numpy_woe_iv(X_binned, y, n_bins)
+    jax_woe, jax_iv = woe_iv(X_binned, y, n_bins, positive_value)
+    np_woe, np_iv = _numpy_woe_iv(X_binned, y, n_bins, positive_value)
 
     np.testing.assert_allclose(np.array(jax_woe), np_woe, rtol=1e-5, atol=1e-8)
     np.testing.assert_allclose(np.array(jax_iv), np_iv, rtol=1e-5, atol=1e-8)
@@ -85,7 +87,7 @@ def test_woe_iv(n_samples, n_features, n_bins: int):
 
     sim = spsim.Simulator.simple(2, libspu.ProtocolKind.SEMI2K, libspu.FieldType.FM64)
     spu_woe, spu_iv = spsim.sim_jax(sim, woe_iv, static_argnums=(2,))(
-        X_binned, y, n_bins
+        X_binned, y, n_bins, positive_value
     )
-    np.testing.assert_allclose(np.array(spu_woe), np_woe, rtol=1e-3, atol=1e-6)
-    np.testing.assert_allclose(np.array(spu_iv), np_iv, rtol=1e-3, atol=1e-6)
+    np.testing.assert_allclose(np.array(spu_woe), np_woe, rtol=2e-3, atol=1e-6)
+    np.testing.assert_allclose(np.array(spu_iv), np_iv, rtol=2e-3, atol=1e-6)

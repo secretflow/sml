@@ -21,7 +21,6 @@ from sml.preprocessing.preprocessing import KBinsDiscretizer
 from sml.stats.woe_iv import woe_iv
 
 
-# Calculate reference using numpy
 def _numpy_woe_iv(
     X_binned: np.ndarray, y: np.ndarray, n_bins: int, positive_value: int = 1
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -65,10 +64,6 @@ def _numpy_woe_iv(
 
 
 def emul_woe_iv(emulator: emulation.Emulator):
-    def check(spu_result, ref_result):
-        np.testing.assert_allclose(spu_result[0], ref_result[0], rtol=1e-3, atol=1e-3)
-        np.testing.assert_allclose(spu_result[1], ref_result[1], rtol=1e-3, atol=1e-3)
-
     # Test with synthetic data
     seed = 42
     key = jax.random.PRNGKey(seed)
@@ -83,14 +78,16 @@ def emul_woe_iv(emulator: emulation.Emulator):
     discretizer = KBinsDiscretizer(n_bins=n_bins, strategy="quantile")
     X_binned = discretizer.fit_transform(X)
 
-    ref_result = _numpy_woe_iv(np.array(X_binned), np.array(y), n_bins)
+    positive_value = 1
+    ref_result = _numpy_woe_iv(np.array(X_binned), np.array(y), n_bins, positive_value)
 
     # Run SPU computation
     spu_result = emulator.run(woe_iv, static_argnums=(2, 3))(
-        emulator.seal(X_binned), emulator.seal(y), n_bins, 1
+        emulator.seal(X_binned), emulator.seal(y), n_bins, positive_value
     )
 
-    check(spu_result, ref_result)
+    np.testing.assert_allclose(spu_result[0], ref_result[0], rtol=1e-3, atol=1e-3)
+    np.testing.assert_allclose(spu_result[1], ref_result[1], rtol=1e-3, atol=1e-3)
 
 
 def main(
