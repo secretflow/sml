@@ -279,7 +279,7 @@ def serial_jacobi_evd(A, max_jacobi_iter=5):
     return eigenvalues, eigenvectors
 
 
-def standardize(data: ArrayLike, axis=0, ddof=1, eps=1e-20) -> ArrayLike:
+def standardize(data: jax.Array, axis=0, ddof=1, eps=1e-20) -> ArrayLike:
     """
     Standardize (Z-score normalize) an array along a given axis.
 
@@ -290,7 +290,7 @@ def standardize(data: ArrayLike, axis=0, ddof=1, eps=1e-20) -> ArrayLike:
 
     Parameters
     ----------
-    data : array_like
+    data : ArrayLike
         Input data. Can be any JAX array or any object convertible to one.
     axis : int or tuple of ints, optional
         Axis or axes along which the means and standard deviations are
@@ -307,7 +307,7 @@ def standardize(data: ArrayLike, axis=0, ddof=1, eps=1e-20) -> ArrayLike:
 
     Returns
     -------
-    standardized : jnp.ndarray
+    standardized : ArrayLike
         The standardized array, with the same shape as `data`.
     """
     mean = jnp.mean(data, axis=axis, keepdims=True)
@@ -315,7 +315,7 @@ def standardize(data: ArrayLike, axis=0, ddof=1, eps=1e-20) -> ArrayLike:
     return (data - mean) / std
 
 
-def newton_inv(x: jnp.ndarray, iter_round: int = 20):
+def newton_inv(x: jax.Array, iter_round: int = 20):
     """
     computing the inverse of a matrix by newton iteration.
     https://aalexan3.math.ncsu.edu/articles/mat-inv-rep.pdf

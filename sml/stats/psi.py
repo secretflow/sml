@@ -17,24 +17,26 @@ import jax.numpy as jnp
 
 
 def _compute_distribution(data: jax.Array, bin_edges: jax.Array, n_bins: int):
-    """Compute the sample distribution proportion for each bin using pure JAX and vmap"""
+    """Compute the sample distribution proportion for each bin using vectorized tensor operations"""
 
-    def _count_feature(feature_data, feature_bins):
-        """Count samples in each bin for a single feature"""
-        # Find bin indices using searchsorted
-        bin_indices = jnp.searchsorted(feature_bins, feature_data, side="right") - 1
+    # Compute bin indices for all features at once using broadcasting
+    # data shape: (n_samples, n_features)
+    # bin_edges shape: (n_bins+1, n_features)
+    # After broadcasting: (n_samples, n_features, n_bins+1)
+    bin_indices = (data[..., None] >= bin_edges.T[None, ...]).sum(axis=-1) - 1
 
-        # Clip indices to ensure they are within valid range [0, n_bins-1]
-        # Values < 0 go to bin 0, values >= n_bins go to bin n_bins-1
-        bin_indices = jnp.clip(bin_indices, 0, n_bins - 1)
+    # Clip indices to ensure they are within valid range [0, n_bins-1]
+    # Values < 0 go to bin 0, values >= n_bins go to bin n_bins-1
+    bin_indices = jnp.clip(bin_indices, 0, n_bins - 1)
 
-        # Count samples in each bin using bincount
-        counts = jnp.bincount(bin_indices, length=n_bins)
+    # Create one-hot encoding for bin indices
+    # bin_indices shape: (n_samples, n_features)
+    # one_hot shape: (n_samples, n_features, n_bins)
+    one_hot = jax.nn.one_hot(bin_indices, n_bins)
 
-        return counts
-
-    # Use vmap to apply the counting function to all features
-    all_features = jax.vmap(_count_feature, in_axes=(1, 1), out_axes=1)(data, bin_edges)
+    # Sum along samples axis to get counts for each bin and feature
+    # all_features shape: (n_features, n_bins)
+    all_features = jnp.sum(one_hot, axis=0).T
 
     # Compute distribution proportions
     n_samples = data.shape[0]

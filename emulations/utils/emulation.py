@@ -54,7 +54,6 @@ SAMPLE_DOCKER_NODE_CONFIG = {
     "ports": [],
     "volumes": [f"{SML_HOME.parent.resolve()}:/home/admin/dev/"],
     "command": 'sh -c "@0"',
-    "command": 'sh -c "@0"',
     "networks": {"spu-emulation": {"ipv4_address": None}},
     "cap_add": ["NET_ADMIN"],
 }
@@ -191,7 +190,9 @@ class Emulator:
         self.emu_tmp_dir.mkdir(parents=True, exist_ok=True)
 
         # generate docker compose yaml
-        for node_id, node_ip in zip(self.conf["nodes"].keys(), self.network.hosts()):
+        for node_id, node_ip in zip(
+            self.conf["nodes"].keys(), self.network.hosts(), strict=True
+        ):
             # the first address has been used for docker subnet gateway
             node_ip += 1
             _, node_port = self.conf["nodes"][node_id].split(":")
@@ -229,6 +230,7 @@ class Emulator:
             zip(
                 self.conf["devices"]["SPU"]["config"]["spu_internal_addrs"],
                 self.network.hosts(),
+                strict=True,
             )
         ):
             # the first address has been used for docker subnet gateway
