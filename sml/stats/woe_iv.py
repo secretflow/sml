@@ -97,33 +97,35 @@ def woe_iv(
     # Handle edge case where all samples are of one class
     epsilon = 1e-10
 
-    # Use vmap to apply WOE calculation to each feature
-    def _calc_feature(x_col):
-        """Calculate WOE for a single feature column."""
-        # Count positive and negative samples in each bin
-        pos_counts = jnp.bincount(x_col, weights=y_binary, length=n_bins)
-        neg_counts = jnp.bincount(x_col, weights=1 - y_binary, length=n_bins)
+    # Create one-hot encoding for bin indices
+    # X_binned shape: (n_samples, n_features)
+    # one_hot shape: (n_samples, n_features, n_bins)
+    one_hot = jax.nn.one_hot(X_binned, n_bins)
 
-        # Calculate percentages
-        pos_pct = pos_counts / (total_pos + epsilon)
-        neg_pct = neg_counts / (total_neg + epsilon)
+    # Calculate positive and negative counts using vectorized operations
+    # Broadcast y_binary to match one_hot dimensions for positive counts
+    # y_binary shape: (n_samples,) -> (n_samples, 1, 1) -> (n_samples, n_features, n_bins)
+    y_binary_expanded = y_binary[:, None, None]
+    pos_counts_matrix = one_hot * y_binary_expanded
+    neg_counts_matrix = one_hot * (1 - y_binary_expanded)
 
-        # Calculate WOE for each bin
-        woe_values = jnp.log((neg_pct + epsilon) / (pos_pct + epsilon))
+    # Sum along samples axis to get counts for each feature and bin
+    # Result shape: (n_features, n_bins)
+    pos_counts = jnp.sum(pos_counts_matrix, axis=0)
+    neg_counts = jnp.sum(neg_counts_matrix, axis=0)
 
-        # Handle bins with zero samples (WOE = 0)
-        total_counts = pos_counts + neg_counts
-        woe_values = jnp.where(total_counts > 0, woe_values, 0.0)
+    # Calculate percentages
+    pos_pct = pos_counts / (total_pos + epsilon)
+    neg_pct = neg_counts / (total_neg + epsilon)
 
-        # Calculate Information Value (IV)
-        iv = jnp.sum((neg_pct - pos_pct) * woe_values)
+    # Calculate WOE for each bin
+    woe_values_all = jnp.log((neg_pct + epsilon) / (pos_pct + epsilon))
 
-        return woe_values, iv
+    # Handle bins with zero samples (WOE = 0)
+    total_counts = pos_counts + neg_counts
+    woe_values_all = jnp.where(total_counts > 0, woe_values_all, 0.0)
 
-    # Use vmap to apply to all features
-    woe_vmap = jax.vmap(_calc_feature, in_axes=1, out_axes=0)
-
-    # Apply to all features
-    woe_values_all, iv_values_all = woe_vmap(X_binned)
+    # Calculate Information Value (IV) for each feature
+    iv_values_all = jnp.sum((neg_pct - pos_pct) * woe_values_all, axis=1)
 
     return woe_values_all, iv_values_all

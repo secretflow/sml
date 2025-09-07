@@ -86,7 +86,7 @@ def test_woe_iv(n_samples, n_features, n_bins: int, positive_value: int):
     import spu.utils.simulation as spsim
 
     sim = spsim.Simulator.simple(2, libspu.ProtocolKind.SEMI2K, libspu.FieldType.FM64)
-    spu_woe, spu_iv = spsim.sim_jax(sim, woe_iv, static_argnums=(2,))(
+    spu_woe, spu_iv = spsim.sim_jax(sim, woe_iv, static_argnums=(2, 3))(
         X_binned, y, n_bins, positive_value
     )
     np.testing.assert_allclose(np.array(spu_woe), np_woe, rtol=2e-3, atol=1e-6)
