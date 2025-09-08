@@ -8,7 +8,7 @@ description = "Secretflow Secure Machine Learning"
 readme = "README.md"
 license = "Apache-2.0"
 authors = [
-    {name = "SecretFlow Team", email = "secretflow-contact@service.alipay.com"}
+    { name = "SecretFlow Team", email = "secretflow-contact@service.alipay.com" },
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -16,9 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
 ]
 requires-python = ">=3.10,<3.12"
-dependencies = [
-    "spu==0.9.4.dev20250618",
-]
+dependencies = ["spu==0.9.4.dev20250618"]
 dynamic = ["version"]
 
 [project.optional-dependencies]
@@ -40,6 +38,7 @@ dev = [
     # Emulations and tests dependencies
     "pandas==1.5.3",
     "scikit-learn==1.5.2",
+    "statsmodels>=0.11.1",
 ]
 
 [project.urls]
@@ -75,13 +74,13 @@ target-version = "py310"
 [tool.ruff.lint]
 # Enable recommended rules plus some additional ones
 select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings  
-    "F",   # pyflakes
-    "UP",  # pyupgrade
-    "I",   # isort
-    "B",   # flake8-bugbear
-    "C4",  # flake8-comprehensions
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings  
+    "F",  # pyflakes
+    "UP", # pyupgrade
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
 ]
 
 # Ignore rules that conflict with the current codebase style
@@ -108,7 +107,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"sml/__init__.py" = ["F401"]  # Allow unused imports in __init__.py
+"sml/__init__.py" = ["F401"] # Allow unused imports in __init__.py
 
 [tool.ruff.format]
 # Enable the formatter
@@ -131,22 +130,22 @@ disallow_untyped_defs = false
 [tool.pydocstyle]
 convention = "numpy"
 add-ignore = [
-    "D100",  # Missing docstring in public module
-    "D101",  # Missing docstring in public class
-    "D102",  # Missing docstring in public method
-    "D103",  # Missing docstring in public function
-    "D104",  # Missing docstring in public package
-    "D200",  # One-line docstring should fit on one line
-    "D202",  # No blank lines allowed after function docstring
-    "D205",  # 1 blank line required between summary line and description
-    "D301",  # Use r""" if any backslashes in a docstring
-    "D400",  # First line should end with a period
-    "D401",  # First line should be in imperative mood
-    "D403",  # First word of the first line should be properly capitalized
-    "D406",  # Section name should end with a newline
-    "D407",  # Missing dashed underline after section
-    "D409",  # Section underline should match the length of its name
-    "D410",  # Missing blank line after section
-    "D411",  # Missing blank line before section
-    "D412",  # No blank lines allowed between a section header and its content
+    "D100", # Missing docstring in public module
+    "D101", # Missing docstring in public class
+    "D102", # Missing docstring in public method
+    "D103", # Missing docstring in public function
+    "D104", # Missing docstring in public package
+    "D200", # One-line docstring should fit on one line
+    "D202", # No blank lines allowed after function docstring
+    "D205", # 1 blank line required between summary line and description
+    "D301", # Use r""" if any backslashes in a docstring
+    "D400", # First line should end with a period
+    "D401", # First line should be in imperative mood
+    "D403", # First word of the first line should be properly capitalized
+    "D406", # Section name should end with a newline
+    "D407", # Missing dashed underline after section
+    "D409", # Section underline should match the length of its name
+    "D410", # Missing blank line after section
+    "D411", # Missing blank line before section
+    "D412", # No blank lines allowed between a section header and its content
 ]

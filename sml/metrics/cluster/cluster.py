@@ -13,9 +13,6 @@
 # limitations under the License.
 
 import jax.numpy as jnp
-from jax import config
-
-config.update("jax_enable_x64", True)
 
 
 def contingency_matrix(
@@ -59,7 +56,7 @@ def contingency_matrix(
     """
 
     # Flatten (class, cluster) index into single integer
-    idx = labels_true * jnp.int64(n_clusters) + labels_pred
+    idx = labels_true * n_clusters + labels_pred
 
     # Fast Bincount-like operation
     counts = jnp.zeros(n_classes * n_clusters)
@@ -109,7 +106,7 @@ def pair_confusion_matrix(
                               [FN, TP]]
     """
 
-    n_samples = jnp.int64(labels_true.shape[0])
+    n_samples = labels_true.shape[0]
 
     contingency = contingency_matrix(labels_true, labels_pred, n_classes, n_clusters)
 

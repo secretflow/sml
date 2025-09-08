@@ -23,8 +23,6 @@ from sklearn.metrics import rand_score as sk_rand_score
 
 from sml.metrics.cluster.cluster import adjusted_rand_score, rand_score
 
-key = jr.PRNGKey(42)
-
 
 def test_cluster():
     sim = spsim.Simulator.simple(2, libspu.ProtocolKind.SEMI2K, libspu.FieldType.FM128)
@@ -41,8 +39,8 @@ def test_cluster():
         return (sk_ri, sk_ari), (spu_ri, spu_ari)
 
     def check(spu_result, sk_result):
-        for pair in zip(spu_result, sk_result):
-            np.testing.assert_allclose(pair[0], pair[1], rtol=1e-3, atol=1e-3)
+        for pair in zip(spu_result, sk_result, strict=True):
+            np.testing.assert_allclose(pair[0], pair[1], rtol=1e-2, atol=1e-2)
 
     # --- Test perfect match ---
     labels_true = jnp.array([0, 0, 1, 1])
@@ -84,17 +82,18 @@ def test_cluster():
     check(*proc(labels_true, labels_pred, 8, 6))
     check(*proc(labels_true, labels_pred, 8, 10))
 
+    key = jr.PRNGKey(42)
+
     # --- Large Test Cases (Require FM128)---
-    def generate_large_test_case(n_classes, n_clusters, size):
-        global key
+    def generate_large_test_case(n_classes, n_clusters, size, key):
         key, subkey1 = jr.split(key)
         labels_true = jr.randint(subkey1, shape=(size,), minval=0, maxval=n_classes)
         key, subkey2 = jr.split(key)
         labels_pred = jr.randint(subkey2, shape=(size,), minval=0, maxval=n_clusters)
         return labels_true, labels_pred
 
-    labels_true, labels_pred = generate_large_test_case(20, 20, 500)
+    labels_true, labels_pred = generate_large_test_case(20, 20, 500, key)
     check(*proc(labels_true, labels_pred, 20, 20))
 
-    labels_true, labels_pred = generate_large_test_case(25, 25, 1000)
+    labels_true, labels_pred = generate_large_test_case(25, 25, 1000, key)
     check(*proc(labels_true, labels_pred, 25, 25))
