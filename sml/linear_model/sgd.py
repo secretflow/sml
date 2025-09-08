@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
 from collections.abc import Callable
 from enum import Enum
 from functools import partial
@@ -21,10 +20,11 @@ import jax
 import jax.numpy as jnp
 
 from sml.utils.fxp_approx import SigType, sigmoid
+from sml.utils.utils import sml_reveal
 
 
 class Penalty(Enum):
-    NONE = "None"
+    NONE = "none"
     L1 = "l1"  # not supported
     L2 = "l2"
 
@@ -34,20 +34,8 @@ class Strategy(Enum):
     POLICY_SGD = "policy_sgd"
 
 
-@partial(jax.jit, static_argnames=("base", "num_feat"))
-def _init_w(base: float, num_feat: int) -> jax.Array:
-    # last one is bias
-    return jnp.full((num_feat + 1, 1), base, dtype=jnp.float32)
-
-
-@partial(jax.jit, static_argnames=("eps_norm", "eps_scale"))
-def _convergence(
-    old_w: jax.Array, cur_w: jax.Array, eps_norm: float, eps_scale: float
-) -> bool:
-    max_delta = jnp.max(jnp.abs(cur_w - old_w)) * eps_scale
-    max_w = jnp.maximum(jnp.max(jnp.abs(cur_w)), jnp.finfo(cur_w.dtype).eps)
-
-    return (max_delta / max_w) < eps_norm
+class EarlyStoppingMetric(Enum):
+    WEIGHT = "weight"
 
 
 def _compute_2norm(grad, eps=1e-4):
@@ -122,16 +110,16 @@ class BaseSGD:
         batch_size: int = 1024,
         penalty: str | Penalty = Penalty.NONE,
         l2_norm: float = 0.5,
-        epsilon: float = 1e-3,
         decay_epoch: int | None = None,
         decay_rate: float | None = None,
+        early_stopping_threshold: bool = 0.0,
+        early_stopping_metric: EarlyStoppingMetric = EarlyStoppingMetric.WEIGHT,
         strategy: Strategy = Strategy.NAIVE_SGD,
     ):
         penalty = Penalty(penalty)
         assert epochs > 0, f"epochs<{epochs}> should >0"
         assert learning_rate > 0, f"learning_rate<{learning_rate}> should >0"
         assert batch_size > 0, f"batch_size<{batch_size}> should >0"
-        assert epsilon >= 0, f"epsilon<{epsilon}> should >0"
         assert penalty != Penalty.L1, "not support L1 penalty for now"
         if penalty == Penalty.L2:
             assert l2_norm > 0, f"l2_norm<{l2_norm}> should >0 if use L2 penalty"
@@ -144,18 +132,16 @@ class BaseSGD:
         self._batch_size = batch_size
         self._penalty = penalty
         self._l2_norm = l2_norm
-        self._epsilon = epsilon
         self._decay_epoch = decay_epoch
         self._decay_rate = decay_rate
         self._strategy = strategy
-
-        if epsilon > 0:
-            self._eps_scale = 2 ** math.floor(-math.log2(epsilon))
-            self._eps_norm = epsilon * self._eps_scale
+        self._early_stopping_metric = early_stopping_metric
+        self._early_stopping_threshold = early_stopping_threshold
+        self._early_stopping_needed = early_stopping_threshold > 0
 
     def _get_learning_rate(self, epoch_idx: int) -> float:
         if self._decay_rate is not None:
-            rate = self._decay_rate ** math.floor(epoch_idx / self._decay_epoch)
+            rate = self._decay_rate ** jnp.floor(epoch_idx / self._decay_epoch)
             return self._learning_rate * rate
         else:
             return self._learning_rate
@@ -165,29 +151,48 @@ class BaseSGD:
         batch_size = min(self._batch_size, n_samples)
         total_batch = int(n_samples / batch_size)
 
-        weights = _init_w(0, n_features)
-        for idx in range(self._epochs):
-            old_w = weights
-            weights = _update_weights(
+        weights = jnp.zeros((n_features + 1, 1))
+        weights_last = weights
+        epoch = 0
+        need_stop = False
+
+        def cond_fun(carry):
+            _weights, _weights_last, epoch, need_stop = carry
+            return jnp.logical_and(epoch < self._epochs, jnp.logical_not(need_stop))
+
+        def body_fun(carry):
+            weights, weights_last, epoch, need_stop = carry
+            weights_last = weights
+            learning_rate = self._get_learning_rate(epoch)
+            weights = weights = _update_weights(
                 X,
                 y,
                 weights,
                 activation=activation,
                 total_batch=total_batch,
                 batch_size=batch_size,
-                learning_rate=self._get_learning_rate(idx),
+                learning_rate=learning_rate,
                 penalty=self._penalty,
                 l2_norm=self._l2_norm,
                 strategy=self._strategy,
             )
+            if self._early_stopping_needed:
+                if self._early_stopping_metric == EarlyStoppingMetric.WEIGHT:
+                    test_criteria = jnp.max(jnp.abs(weights - weights_last))
+                    stop = test_criteria < self._early_stopping_threshold
+                else:
+                    raise NotImplementedError(
+                        f"early_stopping_metric={self._early_stopping_metric} is not supported"
+                    )
+                # WARNING: Reveal the need_stop to plaintext here
+                need_stop = sml_reveal(stop)
+            else:
+                need_stop = False
+            return (weights, weights_last, epoch + 1, need_stop)
 
-            if (
-                self._epsilon > 0
-                and idx > 0
-                and _convergence(old_w, weights, self._eps_norm, self._eps_scale)
-            ):
-                # early stop
-                break
+        weights, weights_last, epoch, need_stop = jax.lax.while_loop(
+            cond_fun, body_fun, (weights, weights_last, epoch, need_stop)
+        )
 
         self.n_features_ = n_features
         self.weights_ = weights
@@ -214,9 +219,10 @@ class SGDClassifier(BaseSGD):
         batch_size: int = 1024,
         penalty: str | Penalty = Penalty.NONE,
         l2_norm: float = 0.5,
-        epsilon: float = 1e-3,
         decay_epoch: int | None = None,
         decay_rate: float | None = None,
+        early_stopping_threshold: bool = 0.0,
+        early_stopping_metric: EarlyStoppingMetric = EarlyStoppingMetric.WEIGHT,
         sig_type: SigType = SigType.T1,
         strategy: str | Strategy = Strategy.NAIVE_SGD,
     ):
@@ -240,9 +246,10 @@ class SGDClassifier(BaseSGD):
             batch_size=batch_size,
             penalty=penalty,
             l2_norm=l2_norm,
-            epsilon=epsilon,
             decay_epoch=decay_epoch,
             decay_rate=decay_rate,
+            early_stopping_threshold=early_stopping_threshold,
+            early_stopping_metric=early_stopping_metric,
             strategy=strategy,
         )
 
@@ -265,9 +272,10 @@ class SGDRegressor(BaseSGD):
         batch_size: int = 1024,
         penalty: str | Penalty = Penalty.NONE,
         l2_norm: float = 0.5,
-        epsilon: float = 1e-3,
         decay_epoch: int | None = None,
         decay_rate: float | None = None,
+        early_stopping_threshold: bool = 0.0,
+        early_stopping_metric: EarlyStoppingMetric = EarlyStoppingMetric.WEIGHT,
     ):
         super().__init__(
             epochs=epochs,
@@ -275,9 +283,10 @@ class SGDRegressor(BaseSGD):
             batch_size=batch_size,
             penalty=penalty,
             l2_norm=l2_norm,
-            epsilon=epsilon,
             decay_epoch=decay_epoch,
             decay_rate=decay_rate,
+            early_stopping_threshold=early_stopping_threshold,
+            early_stopping_metric=early_stopping_metric,
         )
 
     def fit(self, X: jax.Array, y: jax.Array) -> "SGDRegressor":
