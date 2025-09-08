@@ -67,7 +67,6 @@ def _update_weights(
     l2_norm: float,
     strategy: Strategy,
 ) -> jax.Array:
-    assert x.shape[0] >= total_batch * batch_size, "total batch is too large"
     num_feat = x.shape[1]
     assert w.shape[0] == num_feat + 1, "w shape is mismatch to x"
     assert len(w.shape) == 1 or w.shape[1] == 1, "w should be list or 1D array"
@@ -76,8 +75,13 @@ def _update_weights(
     for idx in range(total_batch):
         begin = idx * batch_size
         end = (idx + 1) * batch_size
+        if end > x.shape[0]:
+            end = x.shape[0]
+        this_batch_size = end - begin
         # padding one col for bias in w
-        x_slice = jnp.concatenate([x[begin:end], jnp.ones((batch_size, 1))], axis=1)
+        x_slice = jnp.concatenate(
+                (x[begin:end, :], jnp.ones((this_batch_size, 1))), axis=1
+            )
         y_slice = y[begin:end, :]
 
         pred = jnp.matmul(x_slice, w)
@@ -149,7 +153,7 @@ class BaseSGD:
     def _fit(self, X: jax.Array, y: jax.Array, activation: Callable):
         n_samples, n_features = X.shape
         batch_size = min(self._batch_size, n_samples)
-        total_batch = int(n_samples / batch_size)
+        total_batch = int((n_samples + batch_size - 1) / batch_size)
 
         weights = jnp.zeros((n_features + 1, 1))
         weights_last = weights
