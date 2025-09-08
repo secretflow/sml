@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import jax
 import jax.numpy as jnp
+from jax.typing import ArrayLike
 
 
 def qr_Householder(A):
@@ -275,3 +277,56 @@ def serial_jacobi_evd(A, max_jacobi_iter=5):
 
     eigenvalues = jnp.diag(A)
     return eigenvalues, eigenvectors
+
+
+def standardize(data: jax.Array, axis=0, ddof=1, eps=1e-20) -> ArrayLike:
+    """
+    Standardize (Z-score normalize) an array along a given axis.
+
+    Standardization is performed as:
+        z = (x - μ) / σ
+    where μ is the mean and σ is the standard deviation with
+    Bessel's correction applied when ddof=1 (default).
+
+    Parameters
+    ----------
+    data : ArrayLike
+        Input data. Can be any JAX array or any object convertible to one.
+    axis : int or tuple of ints, optional
+        Axis or axes along which the means and standard deviations are
+        computed. Default is 0 (column-wise standardization).
+        If None, the array is flattened before computation.
+    ddof : int, optional
+        Delta degrees of freedom for the standard deviation.
+        The divisor used in the computation is N - ddof, where N is the
+        number of elements along the given axis. Default is 1, yielding
+        the sample standard deviation.
+    eps : float, optional
+        A small constant added to the standard deviation to avoid
+        division by zero. Default is 1e-20.
+
+    Returns
+    -------
+    standardized : ArrayLike
+        The standardized array, with the same shape as `data`.
+    """
+    mean = jnp.mean(data, axis=axis, keepdims=True)
+    std = jnp.std(data, axis=axis, keepdims=True, ddof=ddof) + eps
+    return (data - mean) / std
+
+
+def newton_inv(x: jax.Array, iter_round: int = 20):
+    """
+    computing the inverse of a matrix by newton iteration.
+    https://aalexan3.math.ncsu.edu/articles/mat-inv-rep.pdf
+    """
+    assert x.ndim == 2 and x.shape[0] == x.shape[1], "x must be a square matrix"
+    n = x.shape[0]
+    E = jnp.eye(n, dtype=x.dtype)
+
+    X0 = (1.0 / jnp.trace(x)) * E
+
+    def body_fun(_, X):
+        return X @ (2 * E - x @ X)
+
+    return jax.lax.fori_loop(0, iter_round, body_fun, X0)
