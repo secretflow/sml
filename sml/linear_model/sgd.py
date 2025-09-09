@@ -80,8 +80,8 @@ def _update_weights(
         this_batch_size = end - begin
         # padding one col for bias in w
         x_slice = jnp.concatenate(
-                (x[begin:end, :], jnp.ones((this_batch_size, 1))), axis=1
-            )
+            (x[begin:end, :], jnp.ones((this_batch_size, 1))), axis=1
+        )
         y_slice = y[begin:end, :]
 
         pred = jnp.matmul(x_slice, w)

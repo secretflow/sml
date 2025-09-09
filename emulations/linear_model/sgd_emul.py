@@ -25,7 +25,6 @@ def emul_SGDClassifier(emulator: emulation.Emulator):
             epochs=1,
             learning_rate=0.1,
             batch_size=1024,
-            penalty="None",
             l2_norm=0.0,
         )
 
@@ -55,7 +54,6 @@ def emul_SGDRegressor(emulator: emulation.Emulator):
             epochs=1,
             learning_rate=0.1,
             batch_size=1024,
-            penalty="None",
             l2_norm=0.0,
         )
 
