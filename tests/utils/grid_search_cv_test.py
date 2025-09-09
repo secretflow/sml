@@ -30,7 +30,7 @@ from sml.linear_model.logistic import LogisticRegression
 from sml.linear_model.pla import Perceptron
 from sml.linear_model.quantile import QuantileRegressor
 from sml.linear_model.ridge import Ridge
-from sml.linear_model.sgd_classifier import SGDClassifier
+from sml.linear_model.sgd import SGDClassifier
 from sml.naive_bayes.gnb import GaussianNB
 from sml.neighbors.knn import KNNClassifer
 from sml.svm.svm import SVM
