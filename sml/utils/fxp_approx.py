@@ -30,22 +30,36 @@ class SigType(Enum):
     REAL = "real"
 
 
-# taylor series referenced from:
-# https://mortendahl.github.io/2017/04/17/private-deep-learning-with-mpc/
-def sigmoid_t1(x):
+def sigmoid_t1(x, limit: bool = True):
+    """
+    taylor series referenced from:
+    https://mortendahl.github.io/2017/04/17/private-deep-learning-with-mpc/
+    """
     T0 = 1.0 / 2
     T1 = 1.0 / 4
-    return T0 + x * T1
+    ret = T0 + x * T1
+    if limit:
+        return jnp.select([ret < 0, ret > 1], [0, 1], ret)
+    else:
+        return ret
 
 
-def sigmoid_t3(x):
+def sigmoid_t3(x, limit: bool = True):
     T3 = -1.0 / 48
-    return sigmoid_t1(x) + jnp.power(x, 3) * T3
+    ret = sigmoid_t1(x) + jnp.power(x, 3) * T3
+    if limit:
+        return jnp.select([x < -2, x > 2], [0, 1], ret)
+    else:
+        return ret
 
 
-def sigmoid_t5(x):
+def sigmoid_t5(x, limit: bool = True):
     T5 = 1.0 / 480
-    return sigmoid_t3(x) + jnp.power(x, 5) * T5
+    ret = sigmoid_t3(x) + jnp.power(x, 5) * T5
+    if limit:
+        return jnp.select([ret < 0, ret > 1], [0, 1], ret)
+    else:
+        return ret
 
 
 # f(x) = 0.5 + 0.125x if -4 <= x <= 4
@@ -101,7 +115,7 @@ def sigmoid_real(x):
     return 1 / (1 + jnp.exp(-x))
 
 
-def sigmoid(x, sig_type):
+def sigmoid(x, sig_type: SigType):
     if sig_type is SigType.T1:
         return sigmoid_t1(x)
     elif sig_type is SigType.T3:

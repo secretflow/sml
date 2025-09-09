@@ -22,7 +22,7 @@ from sml.linear_model.logistic import LogisticRegression
 from sml.linear_model.pla import Perceptron
 from sml.linear_model.quantile import QuantileRegressor
 from sml.linear_model.ridge import Ridge, Solver
-from sml.linear_model.sgd_classifier import SGDClassifier
+from sml.linear_model.sgd import SGDClassifier, SGDRegressor
 
 __all__ = [
     "GammaRegressor",
@@ -35,4 +35,5 @@ __all__ = [
     "Ridge",
     "Solver",
     "SGDClassifier",
+    "SGDRegressor",
 ]

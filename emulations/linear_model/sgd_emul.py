@@ -12,31 +12,60 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
+
 import emulations.utils.emulation as emulation
-from sml.linear_model.sgd_classifier import SGDClassifier
+from sml.linear_model.sgd import SGDClassifier, SGDRegressor
 from sml.utils.dataset_utils import load_mock_datasets
 
 
 def emul_SGDClassifier(emulator: emulation.Emulator):
-    def proc(x, y):
+    def proc(x: np.ndarray, y: np.ndarray):
         model = SGDClassifier(
             epochs=1,
             learning_rate=0.1,
             batch_size=1024,
-            reg_type="logistic",
-            penalty="None",
             l2_norm=0.0,
         )
 
         y = y.reshape((y.shape[0], 1))
 
-        return model.fit(x, y).predict_proba(x)
+        return model.fit(x, y).predict(x)
 
     # load mock data
     x, y = load_mock_datasets(
         n_samples=50000,
         n_features=100,
         task_type="bi_classification",
+        need_split_train_test=False,
+    )
+
+    # mark these data to be protected in SPU
+    x, y = emulator.seal(x, y)
+
+    # run
+    result = emulator.run(proc)(x, y)
+    print(result)
+
+
+def emul_SGDRegressor(emulator: emulation.Emulator):
+    def proc(x: np.ndarray, y: np.ndarray):
+        model = SGDRegressor(
+            epochs=1,
+            learning_rate=0.1,
+            batch_size=1024,
+            l2_norm=0.0,
+        )
+
+        y = y.reshape((y.shape[0], 1))
+
+        return model.fit(x, y).predict(x)
+
+    # load mock data
+    x, y = load_mock_datasets(
+        n_samples=50000,
+        n_features=100,
+        task_type="regression",
         need_split_train_test=False,
     )
 
@@ -61,6 +90,7 @@ def main(
         latency,
     ) as emulator:
         emul_SGDClassifier(emulator)
+        emul_SGDRegressor(emulator)
 
 
 if __name__ == "__main__":
