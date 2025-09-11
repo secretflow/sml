@@ -13,9 +13,11 @@
 # limitations under the License.
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 import pytest
 
+from sml.preprocessing.chimerge_discretizer import ChiMergeDiscretizer
 from sml.preprocessing.preprocessing import KBinsDiscretizer
 from sml.stats.psi import psi
 
@@ -26,10 +28,15 @@ def _numpy_psi(actual: np.ndarray, expect: np.ndarray, bins: np.ndarray) -> np.n
     def _compute_feature_distribution(
         data: np.ndarray, feature_bins: np.ndarray, n_bins: int
     ) -> np.ndarray:
-        """Compute the distribution for a single feature"""
-        indices = np.digitize(data, feature_bins, right=True) - 1
-        indices = np.clip(indices, 0, n_bins - 1)
-        hist = np.bincount(indices, minlength=n_bins)
+        """Compute the distribution for a single feature using JAX-compatible logic"""
+        # Use broadcasting to compare each data point with all bin edges
+        data_expanded = data[:, None]  # (n_samples, 1)
+        bin_edges_expanded = feature_bins[None, :]  # (1, n_bins+1)
+
+        # Compute bin indices using the same logic as JAX
+        bin_indices = (data_expanded >= bin_edges_expanded).sum(axis=-1) - 1
+        bin_indices = np.clip(bin_indices, 0, n_bins - 1)
+        hist = np.bincount(bin_indices.flatten(), minlength=n_bins)
 
         # Calculate percentages without adding epsilon here
         pct = hist / np.sum(hist)
@@ -56,9 +63,12 @@ def _numpy_psi(actual: np.ndarray, expect: np.ndarray, bins: np.ndarray) -> np.n
     return np.array(psi_values)
 
 
-@pytest.mark.parametrize("n_samples,n_features,n_bins", [(80, 5, 10), (100, 3, 10)])
+@pytest.mark.parametrize(
+    "n_samples,n_features,n_bins,method",
+    [(80, 5, 10, "kbins"), (100, 3, 10, "chimerge")],
+)
 @pytest.mark.parametrize("offset", [0, 10])
-def test_psi(n_samples: int, n_features: int, n_bins: int, offset: int):
+def test_psi(n_samples: int, n_features: int, n_bins: int, offset: int, method: str):
     # Generate random data
     seed = 42
     key = jax.random.PRNGKey(seed)
@@ -66,8 +76,18 @@ def test_psi(n_samples: int, n_features: int, n_bins: int, offset: int):
     expect = jax.random.normal(key, (n_samples, n_features)) + offset
 
     # Create discretizer
-    discretizer = KBinsDiscretizer(n_bins=n_bins, strategy="quantile")
-    discretizer.fit(expect)
+    if method == "kbins":
+        discretizer = KBinsDiscretizer(n_bins=n_bins, strategy="quantile")
+        discretizer.fit(expect)
+    elif method == "chimerge":
+        key, subkey = jax.random.split(key)
+        y = jax.random.bernoulli(subkey, p=0.5, shape=(n_samples,))
+        y = y.astype(jnp.int32)
+        discretizer = ChiMergeDiscretizer(n_bins=n_bins, init_bins=30)
+        discretizer.fit(expect, y)
+    else:
+        raise ValueError(f"not support method: {method}")
+
     bin_edges = discretizer.bin_edges_
 
     res_jax = psi(actual, expect, bin_edges)
