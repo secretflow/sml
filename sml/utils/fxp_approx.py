@@ -71,9 +71,7 @@ def sigmoid_seg3(x):
     cond2 = x > 4
     cond3 = ~(cond1 | cond2)  # -4 <= x <= 4
 
-    return (cond1 * 0.0 +
-            cond2 * 1.0 +
-            cond3 * (0.5 + x * 0.125))
+    return cond2 * 1.0 + cond3 * (0.5 + x * 0.125)
 
 
 # https://dergipark.org.tr/en/download/article-file/54559
