@@ -48,9 +48,7 @@ def sigmoid_t3(x, limit: bool = True):
     T3 = -1.0 / 48
     ret = sigmoid_t1(x) + jnp.power(x, 3) * T3
     if limit:
-        ret = jnp.where(x < -2, 0, ret)
-        ret = jnp.where(x > 2, 1, ret)
-        return ret
+        return jnp.where(x < -2, 0, jnp.where(x > 2, 1, ret))
     else:
         return ret
 
