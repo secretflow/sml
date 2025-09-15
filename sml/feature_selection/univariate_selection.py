@@ -51,7 +51,7 @@ def _sf(x, df, max_iter=3):
         raise ValueError("Domain error, df must be positive")
 
     cond1 = x < 0
-    cond2 = (x == 0) & ~cond1
+    cond2 = x == 0
     cond3 = (x < df) & ~cond1 & ~cond2
     cond4 = ~(cond1 | cond2 | cond3)  # default case
 
