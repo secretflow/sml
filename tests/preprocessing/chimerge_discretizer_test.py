@@ -29,10 +29,63 @@ from sml.preprocessing.chimerge_discretizer import (
 
 
 def _generate_datas(n_samples: int, n_features: int, seed: int = 42):
+    """Generate synthetic data for testing ChiMerge discretization algorithm.
+
+    This function creates a dataset with both correlated and independent features
+    to better evaluate the ChiMerge algorithm's performance. Half of the features
+    are strongly correlated with the target variable y, while the other half are
+    independent noise features.
+
+    The correlated features are generated with different distributions for each
+    class of y:
+    - For y=0: features follow a normal distribution with mean -1
+    - For y=1: features follow a normal distribution with mean +1
+
+    This design ensures that the ChiMerge algorithm will produce distinct chi-square
+    statistics for correlated vs. independent features, making the test results
+    more meaningful and interpretable.
+
+    Args:
+        n_samples: Number of samples to generate
+        n_features: Number of features to generate
+        seed: Random seed for reproducibility
+
+    Returns:
+        X: Generated feature matrix of shape (n_samples, n_features)
+        y: Generated target vector of shape (n_samples,)
+    """
     key = jax.random.PRNGKey(seed)
-    X = jax.random.normal(key, (n_samples, n_features))
     key, subkey = jax.random.split(key)
     y = jax.random.bernoulli(subkey, p=0.5, shape=(n_samples,)).astype(jnp.int32)
+
+    # Generate features with strong correlation to y
+    key, subkey = jax.random.split(key)
+    # Half of the features are correlated with y
+    n_correlated = n_features // 2
+    # Generate different feature distributions for y=0 and y=1 samples
+    X_correlated_0 = (
+        jax.random.normal(subkey, (n_samples, n_correlated)) - 1.0
+    )  # mean = -1
+    key, subkey = jax.random.split(key)
+    X_correlated_1 = (
+        jax.random.normal(subkey, (n_samples, n_correlated)) + 1.0
+    )  # mean = +1
+
+    # Select appropriate feature values based on y values
+    X_correlated = jnp.where(y[:, None], X_correlated_1, X_correlated_0)
+
+    # The other half of features remain independent (noise features)
+    key, subkey = jax.random.split(key)
+    X_independent = jax.random.normal(subkey, (n_samples, n_features - n_correlated))
+
+    # Combine correlated and independent features
+    X = jnp.concatenate([X_correlated, X_independent], axis=1)
+
+    # Shuffle feature order to mix correlated and independent features
+    key, subkey = jax.random.split(key)
+    perm = jax.random.permutation(subkey, jnp.arange(n_features))
+    X = X[:, perm]
+
     return X, y
 
 
