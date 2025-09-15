@@ -347,7 +347,7 @@ class LogisticRegression:
             # For binary classification, pred[0] contains the decision values
             decision_values = pred[0]
             assert decision_values is not None, "Decision values should not be None"
-            label = jnp.where(decision_values > 0, 1.0, 0.0)
+            label = jnp.where(decision_values > 0, 1, 0)
         elif self.multi_class == MultiClass.Ovr:
             label = jnp.argmax(jnp.array(pred), axis=0)
         else:
