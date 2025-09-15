@@ -66,12 +66,8 @@ def sigmoid_t5(x, limit: bool = True):
 #        1            if       x > 4
 #        0            if  -4 > x
 def sigmoid_seg3(x):
-    # Handle each condition separately using boolean masks
-    cond1 = x < -4
-    cond2 = x > 4
-    cond3 = ~(cond1 | cond2)  # -4 <= x <= 4
-
-    return cond2 * 1.0 + cond3 * (0.5 + x * 0.125)
+    ret = 0.5 + 0.125 * x
+    return jnp.clip(ret, 0, 1)
 
 
 # https://dergipark.org.tr/en/download/article-file/54559
