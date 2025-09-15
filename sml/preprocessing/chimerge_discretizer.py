@@ -292,13 +292,18 @@ def chimerge(
             return sml_reveal(need_next)
 
         def _merge_body(state):
-            cur_bin_edges, cur_bin_counts, cur_n_bins, _, _ = state
+            cur_bin_edges, cur_bin_counts, cur_n_bins, cur_all_bins_valid, _ = state
             new_bin_edges, new_bin_counts, min_chi = _chimerge_step(
                 cur_bin_edges, cur_bin_counts, cur_n_bins
             )
             new_n_bins = cur_n_bins - 1
 
-            all_bins_valid = _is_all_bins_valid(cur_bin_counts, cur_n_bins, min_samples)
+            all_bins_valid = jax.lax.cond(
+                cur_all_bins_valid,
+                lambda _: True,
+                lambda _: _is_all_bins_valid(new_bin_counts, new_n_bins, min_samples),
+                operand=None,
+            )
             hit_threshold = min_chi >= threshold
 
             return (
