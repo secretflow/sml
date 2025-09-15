@@ -39,7 +39,7 @@ def sigmoid_t1(x, limit: bool = True):
     T1 = 1.0 / 4
     ret = T0 + x * T1
     if limit:
-        return jnp.select([ret < 0, ret > 1], [0, 1], ret)
+        return jnp.clip(ret, 0, 1)
     else:
         return ret
 
@@ -48,7 +48,7 @@ def sigmoid_t3(x, limit: bool = True):
     T3 = -1.0 / 48
     ret = sigmoid_t1(x) + jnp.power(x, 3) * T3
     if limit:
-        return jnp.select([x < -2, x > 2], [0, 1], ret)
+        return jnp.where(x < -2, 0, jnp.where(x > 2, 1, ret))
     else:
         return ret
 
@@ -57,7 +57,7 @@ def sigmoid_t5(x, limit: bool = True):
     T5 = 1.0 / 480
     ret = sigmoid_t3(x) + jnp.power(x, 5) * T5
     if limit:
-        return jnp.select([ret < 0, ret > 1], [0, 1], ret)
+        return jnp.clip(ret, 0, 1)
     else:
         return ret
 
@@ -66,7 +66,8 @@ def sigmoid_t5(x, limit: bool = True):
 #        1            if       x > 4
 #        0            if  -4 > x
 def sigmoid_seg3(x):
-    return jnp.select([x < -4, x > 4], [0, 1], 0.5 + x * 0.125)
+    ret = 0.5 + 0.125 * x
+    return jnp.clip(ret, 0, 1)
 
 
 # https://dergipark.org.tr/en/download/article-file/54559
@@ -106,7 +107,7 @@ def sigmoid_ls7(x):
 def sigmoid_mix(x):
     ls7 = sigmoid_ls7(x)
     sr = sigmoid_sr(x)
-    return jnp.select([x < -4, x > 4], [sr, sr], ls7)
+    return jnp.where(jnp.abs(x) >= 4, sr, ls7)
 
 
 # real computation of sigmoid

@@ -49,15 +49,17 @@ def _sf(x, df, max_iter=3):
     """
     if df <= 0:
         raise ValueError("Domain error, df must be positive")
-    condlist = [x < 0, x == 0, x < df]
-    choicelist = [
-        jnp.ones_like(x),
-        jnp.zeros_like(x),
-        1 - _igam(0.5 * df, 0.5 * x, max_iter),
-    ]
-    result = jnp.select(
-        condlist, choicelist, default=_igamc(df * 0.5, x * 0.5, max_iter)
-    )
+
+    cond1 = x < 0
+    cond2 = x == 0
+    cond3 = (x < df) & ~cond1 & ~cond2
+    cond4 = ~(cond1 | cond2 | cond3)  # default case
+
+    result = (cond1 * jnp.ones_like(x) +
+              cond2 * jnp.zeros_like(x) +
+              cond3 * (1 - _igam(0.5 * df, 0.5 * x, max_iter)) +
+              cond4 * _igamc(df * 0.5, x * 0.5, max_iter))
+
     return result
 
 
