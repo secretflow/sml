@@ -344,7 +344,10 @@ class LogisticRegression:
         pred = self.decision_function(x)
 
         if self.multi_class == MultiClass.Binary:
-            label = jnp.select([pred[0] > 0], [1], 0)
+            # For binary classification, pred[0] contains the decision values
+            decision_values = pred[0]
+            assert decision_values is not None, "Decision values should not be None"
+            label = jnp.where(decision_values > 0, 1.0, 0.0)
         elif self.multi_class == MultiClass.Ovr:
             label = jnp.argmax(jnp.array(pred), axis=0)
         else:
