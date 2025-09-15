@@ -496,6 +496,7 @@ def test_chimerge_discretizer(
     np.testing.assert_allclose(
         np.asarray(spu_bin_edges), py_bin_edges, rtol=1e-3, atol=1e-3
     )
+    # TODO: SPU atol=3 error is too large, need to further investigate the cause
     np.testing.assert_allclose(
         np.asarray(spu_bin_inverse), py_bin_inverse, rtol=0.1, atol=3
     )
