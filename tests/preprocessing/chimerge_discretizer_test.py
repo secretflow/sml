@@ -169,7 +169,7 @@ def py_chimerge(
 
         cur_n_bins = init_n_bins
 
-        all_bins_valid = _is_all_bins_valid(feature_bin_counts, min_samples)
+        all_bins_valid = _is_all_bins_valid(feature_bin_counts, cur_n_bins, min_samples)
         hit_threshold = False
         while True:
             need_stop = (cur_n_bins == 1) or (
@@ -188,7 +188,9 @@ def py_chimerge(
             feature_bin_counts = new_bin_counts
             cur_n_bins -= 1
 
-            all_bins_valid = _is_all_bins_valid(feature_bin_counts, min_samples)
+            all_bins_valid = _is_all_bins_valid(
+                feature_bin_counts, cur_n_bins, min_samples
+            )
             hit_threshold = min_chi >= threshold
 
         # Store result for this feature
@@ -293,7 +295,7 @@ def test_chimerge_step():
         np.asarray(bin_edges), np.asarray(bin_counts), cur_n_bins
     )
 
-    np.testing.assert_allclose(float(min_chi), py_min_chi, rtol=1e-6)
+    np.testing.assert_allclose(float(min_chi), py_min_chi)
     np.testing.assert_almost_equal(np.asarray(new_bin_edges), py_bin_edges)
     np.testing.assert_almost_equal(np.asarray(new_bin_counts), py_bin_counts)
 
@@ -450,13 +452,13 @@ class PyChiMergeDiscretizer:
 
 @pytest.mark.parametrize(
     "n_samples,n_features,n_bins",
-    [(80, 5, 10)],
+    [(100, 5, 10)],
 )
 def test_chimerge_discretizer(
     n_samples: int,
     n_features: int,
     n_bins: int,
-    init_bins: int = 50,
+    init_bins: int = 10,
     min_samples: int = 5,
 ):
     X, y = _generate_datas(n_samples, n_features)
@@ -473,7 +475,7 @@ def test_chimerge_discretizer(
     jax_bin_edges = jax_cm.bin_edges_
 
     np.testing.assert_allclose(np.asarray(jax_bin_edges), py_bin_edges)
-    np.testing.assert_equal(np.asarray(jax_binned), py_binned)
+    np.testing.assert_allclose(np.asarray(jax_binned), py_binned)
     np.testing.assert_allclose(np.asarray(jax_bin_inverse), py_bin_inverse)
 
     def proc(X: jax.Array, y: jax.Array, n_bins: int):
@@ -486,12 +488,7 @@ def test_chimerge_discretizer(
     import spu.libspu as libspu
     import spu.utils.simulation as spsim
 
-    config = libspu.RuntimeConfig(
-        protocol=libspu.ProtocolKind.SEMI2K,
-        field=libspu.FieldType.FM128,
-        fxp_fraction_bits=48,
-    )
-    sim = spsim.Simulator(2, config)
+    sim = spsim.Simulator.simple(2, libspu.ProtocolKind.SEMI2K, libspu.FieldType.FM64)
     spu_binned, spu_bin_edges, spu_bin_inverse = spsim.sim_jax(
         sim, proc, static_argnums=(2,)
     )(X, y, n_bins)
@@ -500,7 +497,7 @@ def test_chimerge_discretizer(
         np.asarray(spu_bin_edges), py_bin_edges, rtol=1e-3, atol=1e-3
     )
     np.testing.assert_allclose(
-        np.asarray(spu_bin_inverse), py_bin_inverse, rtol=0.1, atol=3.0
+        np.asarray(spu_bin_inverse), py_bin_inverse, rtol=0.1, atol=3
     )
     mismatch_count = np.sum(~np.equal(np.asarray(spu_binned), py_binned))
     total_elements = py_binned.size

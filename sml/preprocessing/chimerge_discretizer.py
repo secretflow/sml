@@ -203,10 +203,23 @@ def _chimerge_step(
     return new_bin_edges, new_bin_counts, min_chi
 
 
-def _is_all_bins_valid(cur_bin_counts: jax.Array, min_samples: int) -> bool:
+def _is_all_bins_valid(
+    cur_bin_counts: jax.Array, cur_n_bins: int, min_samples: int
+) -> bool:
     # Check if all bins meet min_samples requirement
+    # Only check the first cur_n_bins bins
+    # Create a mask for valid bins
+    n_bins = cur_bin_counts.shape[0]
+    mask = jnp.arange(n_bins) < cur_n_bins
+
+    # Calculate total samples per bin
     bin_totals = jnp.sum(cur_bin_counts, axis=1)
-    return jnp.all(bin_totals >= min_samples)
+
+    # Apply mask to only consider valid bins
+    valid_bin_totals = jnp.where(mask, bin_totals, min_samples)
+
+    # Check if all valid bins meet min_samples requirement
+    return jnp.all(valid_bin_totals >= min_samples)
 
 
 @partial(jax.jit, static_argnames=("max_n_bins", "threshold", "min_samples"))
@@ -280,14 +293,12 @@ def chimerge(
 
         def _merge_body(state):
             cur_bin_edges, cur_bin_counts, cur_n_bins, _, _ = state
-            # bin_counts is already in (max_bins, 2) format for _merge_step
             new_bin_edges, new_bin_counts, min_chi = _chimerge_step(
                 cur_bin_edges, cur_bin_counts, cur_n_bins
             )
-            # new_bin_counts is already in (max_bins, 2) format
             new_n_bins = cur_n_bins - 1
 
-            all_bins_valid = _is_all_bins_valid(cur_bin_counts, min_samples)
+            all_bins_valid = _is_all_bins_valid(cur_bin_counts, cur_n_bins, min_samples)
             hit_threshold = min_chi >= threshold
 
             return (
@@ -299,7 +310,9 @@ def chimerge(
             )
 
         init_n_bins = feat_bin_counts.shape[0]
-        init_all_bins_valid = _is_all_bins_valid(feat_bin_counts, min_samples)
+        init_all_bins_valid = _is_all_bins_valid(
+            feat_bin_counts, init_n_bins, min_samples
+        )
         # Initialize the state
         initial_state = (
             feat_bin_edges,
