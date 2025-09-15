@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from sml.preprocessing.chimerge_discretizer import ChiMergeDiscretizer
 from sml.preprocessing.preprocessing import (
     Binarizer,
     KBinsDiscretizer,
@@ -34,4 +35,5 @@ __all__ = [
     "OneHotEncoder",
     "RobustScaler",
     "QuantileTransformer",
+    "ChiMergeDiscretizer",
 ]
