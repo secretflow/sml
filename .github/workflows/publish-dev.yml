@@ -29,7 +29,7 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: uv sync --group dev
+        run: uv sync
 
       - name: Build package
         run: uv build
