@@ -12,12 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from sml.stats.pearsonr import pearsonr
-from sml.stats.psi import psi
-from sml.stats.vif import vif
+from sml.preprocessing.encoding.mean_encoder import MeanEncoder
+from sml.preprocessing.encoding.woe_encoder import WoEEncoder
 
 __all__ = [
-    "pearsonr",
-    "vif",
-    "psi",
+    "MeanEncoder",
+    "WoEEncoder",
 ]
