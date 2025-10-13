@@ -68,7 +68,7 @@ def _kmeans_plusplus_single(X, n_clusters, init_center_id, init_params):
     return centers
 
 
-def _euclidean_distances(X, Y, Y_norm_squared):
+def _euclidean_distances(X: jax.Array, Y: jax.Array, Y_norm_squared: jax.Array):
     """Computational part of euclidean_distances of X and Y"""
     XX = jnp.einsum("ij,ij->i", X, X)[:, jnp.newaxis]
     YY = Y_norm_squared.reshape(1, -1)
@@ -77,10 +77,10 @@ def _euclidean_distances(X, Y, Y_norm_squared):
 
 
 def _kmeans_single(
-    x,
-    centers,
-    n_clusters,
-    max_iter=300,
+    x: jax.Array,
+    centers: jax.Array,
+    n_clusters: int,
+    max_iter: int = 300,
 ):
     """A single run of k-means.
 
@@ -107,31 +107,55 @@ def _kmeans_single(
         Centers found at the last iteration of k-means.
 
     """
+    x = x.reshape((1, x.shape[0], x.shape[1]))
     for _ in range(max_iter):
-        C = x.reshape((1, x.shape[0], x.shape[1])) - centers.reshape(
-            (centers.shape[0], 1, centers.shape[1])
-        )
+        centers_reshaped = centers.reshape((centers.shape[0], 1, centers.shape[1]))
+        C = x - centers_reshaped
         C = jnp.argmin(jnp.sum(jnp.square(C), axis=2), axis=0)
         S = jnp.tile(C, (n_clusters, 1))
         ks = jnp.arange(n_clusters)
         aligned_array_raw = (S.T - ks).T
         aligned_array = jnp.equal(aligned_array_raw, 0)
 
-        centers_raw = x.reshape((1, x.shape[0], x.shape[1])) * aligned_array.reshape(
+        aligned_array = aligned_array.reshape(
             (aligned_array.shape[0], aligned_array.shape[1], 1)
         )
+        centers_raw = x * aligned_array
         equals_sum = jnp.sum(aligned_array, axis=1)
         centers_sum = jnp.sum(centers_raw, axis=1)
-        centers = jnp.divide(centers_sum.T, equals_sum).T
+        centers = jnp.divide(centers_sum, equals_sum.reshape(-1, 1))
     return centers
 
 
-def _inertia(x, centers):
-    C = x.reshape((1, x.shape[0], x.shape[1])) - centers.reshape(
-        (centers.shape[0], 1, centers.shape[1])
-    )
+def _inertia(x: jax.Array, centers: jax.Array) -> jax.Array:
+    x = x.reshape((1, x.shape[0], x.shape[1]))
+    centers = centers.reshape((centers.shape[0], 1, centers.shape[1]))
+    C = x - centers
     distance = jnp.sum(jnp.square(C), axis=2)
     return jnp.sum(jnp.min(distance, axis=0))
+
+
+def predict(x: jax.Array, centers: jax.Array) -> jax.Array:
+    """Predict the closest cluster each sample in X belongs to.
+
+    Parameters
+    ----------
+    x : jax.Array, shape (n_samples, n_features)
+        New data to predict.
+
+    centers : jax.Array, shape (n_clusters, n_features)
+        Cluster centers from the trained K-means model.
+
+    Returns
+    -------
+    y : jax.Array, shape (n_samples,)
+        Index of the cluster each sample belongs to.
+    """
+    x = x.reshape((1, x.shape[0], x.shape[1]))
+    centers = centers.reshape((centers.shape[0], 1, centers.shape[1]))
+    y = x - centers
+    y = jnp.argmin(jnp.sum(jnp.square(y), axis=2), axis=0)
+    return y
 
 
 class KMEANS:
@@ -182,11 +206,11 @@ class KMEANS:
         self.init_center_id = None
         self.init_params = None
         self.n_samples = n_samples
-        self._centers = None
+        self.centers_ = None
 
         if centers is not None:
             # model has been fitted
-            self._centers = centers
+            self.centers_ = centers
             return
 
         if init_params is not None:
@@ -203,7 +227,7 @@ class KMEANS:
             self.n_init,
             self.n_samples,
         ]
-        dynamic_data = [self._centers, self.init_center_id, self.init_params]
+        dynamic_data = [self.centers_, self.init_center_id, self.init_params]
         return dynamic_data, static_data
 
     @classmethod
@@ -285,7 +309,7 @@ class KMEANS:
         self : object
             Returns an instance of self.
         """
-        self._centers = jnp.zeros(())
+        self.centers_ = jnp.zeros(())
 
         init = self.init
         n_init = self.n_init
@@ -312,7 +336,7 @@ class KMEANS:
             inertia = jax.vmap(_inertia, in_axes=(None, 0))(x, centers)
             centers_best = centers[jnp.argmin(inertia)]
 
-        self._centers = centers_best
+        self.centers_ = centers_best
         return self
 
     def predict(self, x):
@@ -331,12 +355,7 @@ class KMEANS:
         ndarray of shape (n_samples)
             Returns the result of the sample for each class in the model.
         """
-        centers = self._centers
-        y = x.reshape((1, x.shape[0], x.shape[1])) - centers.reshape(
-            (centers.shape[0], 1, centers.shape[1])
-        )
-        y = jnp.argmin(jnp.sum(jnp.square(y), axis=2), axis=0)
-        return y
+        return predict(x, self.centers_)
 
 
 jax.tree_util.register_pytree_node_class(KMEANS)

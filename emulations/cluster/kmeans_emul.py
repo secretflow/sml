@@ -28,7 +28,7 @@ def emul_KMEANS(emulator: emulation.Emulator):
     def proc(x1, x2):
         x = jnp.concatenate((x1, x2), axis=1)
 
-        return model.fit(x).predict(x), model._centers
+        return model.fit(x).predict(x), model.centers_
 
     def load_data():
         X, _ = make_blobs(
@@ -95,7 +95,7 @@ def emul_kmeans_kmeans_plus_plus(emulator: emulation.Emulator):
 
     def proc(x):
         model.fit(x)
-        return model._centers.sort(axis=0)
+        return model.centers_.sort(axis=0)
 
     X = emulator.seal(X)
     result = emulator.run(proc)(X)
@@ -120,7 +120,7 @@ def emul_kmeans_init_array(emulator: emulation.Emulator):
             n_clusters=4, n_samples=x.shape[0], init=init, n_init=1, max_iter=10
         )
         model.fit(x)
-        return model._centers
+        return model.centers_
 
     X = jnp.array([[-4, -3, -2, -1]]).T
     uniform_edges = np.linspace(np.min(X), np.max(X), 5)
@@ -163,7 +163,7 @@ def emul_kmeans_random(emulator: emulation.Emulator):
 
     def proc(x):
         model.fit(x)
-        return model._centers.sort(axis=0)
+        return model.centers_.sort(axis=0)
 
     X = emulator.seal(X)
     result = emulator.run(proc)(X)

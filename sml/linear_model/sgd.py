@@ -42,6 +42,9 @@ def _compute_2norm(grad, eps=1e-4):
     return jax.lax.rsqrt(jnp.sum(jnp.square(grad)) + eps)
 
 
+ActivationFunc = Callable[[jax.Array], jax.Array]
+
+
 @partial(
     jax.jit,
     static_argnames=(
@@ -59,7 +62,7 @@ def _update_weights(
     y: jax.Array,
     w: jax.Array,
     *,
-    activation: Callable[[jax.Array], jax.Array],
+    activation: ActivationFunc,
     total_batch: int,
     batch_size: int,
     learning_rate: float,
@@ -106,7 +109,37 @@ def _update_weights(
     return w
 
 
-class BaseSGD:
+@partial(jax.jit, static_argnames=("activation"))
+def predict(
+    X: jax.Array,
+    weights: jax.Array,
+    activation: ActivationFunc | None = None,
+) -> jax.Array:
+    """Make predictions using the trained weights.
+
+    Args:
+        X: Input features for prediction.
+        weights: Trained weights from SGDClassifier/SGDRegressor.
+        activation: Activation function, e.g., sigmoid for SGDClassifier.
+
+    Returns:
+        Predicted values.
+    """
+    n_features = X.shape[1]
+    assert weights.shape[0] == n_features + 1, f"w shape is mismatch to x={X.shape}"
+    assert weights.ndim == 1 or weights.shape[1] == 1, (
+        "weights should be a 1D array or a 2D array with one column"
+    )
+    if weights.ndim == 1:
+        weights = weights.reshape(-1, 1)
+    bias = weights[-1, 0]
+    weights = weights[:-1]
+
+    pred = jnp.matmul(X, weights) + bias
+    return activation(pred) if activation else pred
+
+
+class SGDBase:
     def __init__(
         self,
         epochs: int,
@@ -201,21 +234,8 @@ class BaseSGD:
         self.n_features_ = n_features
         self.weights_ = weights
 
-    def _predict(self, X: jax.Array) -> jax.Array:
-        n_features = X.shape[1]
-        w: jax.Array = self.weights_
-        assert w.shape[0] == n_features + 1, f"w shape is mismatch to x={X.shape}"
-        assert len(w.shape) == 1 or w.shape[1] == 1, "w should be list or 1D array"
-        w.reshape((w.shape[0], 1))
 
-        bias = w[-1, 0]
-        w = jnp.resize(w, (n_features, 1))
-
-        pred = jnp.matmul(X, w) + bias
-        return pred
-
-
-class SGDClassifier(BaseSGD):
+class SGDClassifier(SGDBase):
     def __init__(
         self,
         epochs: int,
@@ -263,12 +283,39 @@ class SGDClassifier(BaseSGD):
         return self
 
     def predict(self, X: jax.Array) -> jax.Array:
-        pred = self._predict(X)
-        pred = sigmoid(pred, self._sig_type)
-        return pred
+        def _activation(pred: jax.Array) -> jax.Array:
+            return sigmoid(pred, self._sig_type)
+
+        return predict(X, self.weights_, _activation)
+
+    def tree_flatten(self):
+        children = (self.weights_,)
+        aux_data = {
+            "epochs": self._epochs,
+            "learning_rate": self._learning_rate,
+            "batch_size": self._batch_size,
+            "penalty": self._penalty,
+            "l2_norm": self._l2_norm,
+            "decay_epoch": self._decay_epoch,
+            "decay_rate": self._decay_rate,
+            "strategy": self._strategy,
+            "early_stopping_metric": self._early_stopping_metric,
+            "early_stopping_threshold": self._early_stopping_threshold,
+            "sig_type": self._sig_type,
+        }
+        return (children, aux_data)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        (weights,) = children
+        obj = cls.__new__(cls)
+        for k, v in aux_data.items():
+            setattr(obj, f"_{k}", v)
+        obj.weights_ = weights
+        return obj
 
 
-class SGDRegressor(BaseSGD):
+class SGDRegressor(SGDBase):
     def __init__(
         self,
         epochs: int,
@@ -299,4 +346,33 @@ class SGDRegressor(BaseSGD):
         return self
 
     def predict(self, X: jax.Array) -> jax.Array:
-        return self._predict(X)
+        return predict(X, self.weights_)
+
+    def tree_flatten(self):
+        children = (self.weights_,)
+        aux_data = {
+            "epochs": self._epochs,
+            "learning_rate": self._learning_rate,
+            "batch_size": self._batch_size,
+            "penalty": self._penalty,
+            "l2_norm": self._l2_norm,
+            "decay_epoch": self._decay_epoch,
+            "decay_rate": self._decay_rate,
+            "strategy": self._strategy,
+            "early_stopping_metric": self._early_stopping_metric,
+            "early_stopping_threshold": self._early_stopping_threshold,
+        }
+        return (children, aux_data)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        (weights,) = children
+        obj = cls.__new__(cls)
+        for k, v in aux_data.items():
+            setattr(obj, f"_{k}", v)
+        obj.weights_ = weights
+        return obj
+
+
+jax.tree_util.register_pytree_node_class(SGDClassifier)
+jax.tree_util.register_pytree_node_class(SGDRegressor)
