@@ -772,7 +772,7 @@ def _kmeans_bin_func(x, n_bins, minval, maxval, KMEANS):
     init = (uniform_edges[1:] + uniform_edges[:-1])[:, None] * 0.5
     km = KMEANS(n_clusters=n_bins, n_samples=x.shape[0], init=init, max_iter=10)
     km.fit(x)
-    centers = jnp.sort(km._centers[:, 0])
+    centers = jnp.sort(km.centers_[:, 0])
     return jnp.r_[minval, (centers[1:] + centers[:-1]) * 0.5, maxval]
 
 
@@ -1054,7 +1054,7 @@ class KBinsDiscretizer:
                 ### the problem here is the KMENAS will ruturn invalid center as 0
                 ### The idea now is to use predict to get the valid centers.
                 ### But it seems to be not an efficient solution
-                #     centers = jnp.sort(km._centers[:, 0])
+                #     centers = jnp.sort(km.centers_[:, 0])
                 #     return jnp.r_[minval, (centers[1:] + centers[:-1]) * 0.5, maxval]
                 # bin_edges = jax.vmap(bin_func, in_axes=(1, None, 0), out_axes=1)(X, KMEANS, diverse_n_bins)
 

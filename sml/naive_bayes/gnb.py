@@ -17,6 +17,73 @@ import jax.numpy as jnp
 from jax import vmap
 
 
+def _joint_log_likelihood(
+    X: jax.Array, class_prior: jax.Array, theta: jax.Array, variance: jax.Array
+):
+    """Compute the log likehood.
+
+    Parameters
+    ----------
+    X : array-like of shape (n_samples, n_features)
+        Testing vectors.
+
+    Returns
+    -------
+    jll: array-like of shape (n_samples, n_classes)
+        The joint log likelihood of testing samples w.r.t all classes.
+    """
+
+    def _joint_log_likelihood_single(prior, theta, var, X):
+        # This jnp.where() is necessary
+        # because log(prior) != -jnp.inf on SPU when prior == 0.
+        jointi = jnp.where(prior != 0, jnp.log(prior), -jnp.inf)
+        n_ij = -0.5 * jnp.sum(jnp.log(2.0 * jnp.pi * var))
+        n_ij -= 0.5 * jnp.sum(((X - theta) ** 2) / var, 1)
+        return jointi + n_ij
+
+    joint_log_likelihood = vmap(_joint_log_likelihood_single, in_axes=(0, 0, 0, None))(
+        class_prior, theta, variance, X
+    )
+
+    joint_log_likelihood = jnp.array(joint_log_likelihood).T
+    return joint_log_likelihood
+
+
+def predict(
+    X: jax.Array,
+    classes: jax.Array,
+    class_prior: jax.Array,
+    theta: jax.Array,
+    variance: jax.Array,
+) -> jax.Array:
+    """Predict class labels for samples in X.
+
+    Parameters
+    ----------
+    X : jax.Array of shape (n_samples, n_features)
+        The input samples for which to predict class labels.
+
+    classes : jax.Array of shape (n_classes,)
+        The class labels known to the classifier.
+
+    class_prior : jax.Array of shape (n_classes,)
+        The prior probabilities of each class.
+
+    theta : jax.Array of shape (n_classes, n_features)
+        The mean of each feature per class.
+
+    variance : jax.Array of shape (n_classes, n_features)
+        The variance of each feature per class.
+
+    Returns
+    -------
+    jax.Array of shape (n_samples,)
+        The predicted class labels for the input samples.
+    """
+    jll = _joint_log_likelihood(X, class_prior, theta, variance)
+    return classes[jnp.argmax(jll, axis=1)]
+
+
 class GaussianNB:
     def __init__(self, classes_, var_smoothing=1e-6):
         """Gaussian Naive Bayes (GaussianNB).
@@ -290,36 +357,7 @@ class GaussianNB:
         self.var_ = self.var_ - self.epsilon_
         return self._update_theta_var(X, y)
 
-    def _joint_log_likelihood(self, X):
-        """Compute the log likehood.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Testing vectors.
-
-        Returns
-        -------
-        jll: array-like of shape (n_samples, n_classes)
-            The joint log likelihood of testing samples w.r.t all classes.
-        """
-
-        def _joint_log_likelihood_single(prior, theta, var, X):
-            # This jnp.where() is necessary
-            # because log(prior) != -jnp.inf on SPU when prior == 0.
-            jointi = jnp.where(prior != 0, jnp.log(prior), -jnp.inf)
-            n_ij = -0.5 * jnp.sum(jnp.log(2.0 * jnp.pi * var))
-            n_ij -= 0.5 * jnp.sum(((X - theta) ** 2) / var, 1)
-            return jointi + n_ij
-
-        joint_log_likelihood = vmap(
-            _joint_log_likelihood_single, in_axes=(0, 0, 0, None)
-        )(self.class_prior_, self.theta_, self.var_, X)
-
-        joint_log_likelihood = jnp.array(joint_log_likelihood).T
-        return joint_log_likelihood
-
-    def predict(self, X):
+    def predict(self, X: jax.Array) -> jax.Array:
         """Predict attribute.
 
         Parameters
@@ -333,8 +371,7 @@ class GaussianNB:
             The predicted classes of testing samples.
         """
         assert not self.first_, f"Not fit on any data yet!"
-        jll = self._joint_log_likelihood(X)
-        return self.classes_[jnp.argmax(jll, axis=1)]
+        return predict(X, self.classes_, self.class_prior_, self.theta_, self.var_)
 
 
 jax.tree_util.register_pytree_node_class(GaussianNB)

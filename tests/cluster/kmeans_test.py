@@ -40,8 +40,8 @@ class UnitTests:
             x = jnp.concatenate((x1, x2), axis=1)
             return model.predict(x)
 
-        model = spsim.sim_jax(sim, fit)(x1, x2, model)
-        print("sml center\n", model._centers)
+        model: KMEANS = spsim.sim_jax(sim, fit)(x1, x2, model)
+        print("sml center\n", model.centers_)
         result = spsim.sim_jax(sim, predict)(x1, x2, model)
         print("sml result\n", result)
 
@@ -75,10 +75,10 @@ class UnitTests:
         X = jnp.concatenate((x1, x2), axis=1)
         model = KMEANS(n_clusters=2, n_samples=X.shape[0], init="random", max_iter=100)
 
-        def proc(x1, x2, model):
+        def proc(x1, x2, model: KMEANS):
             x = jnp.concatenate((x1, x2), axis=1)
             model.fit(x)
-            return model._centers, model.predict(x)
+            return model.centers_, model.predict(x)
 
         result = spsim.sim_jax(sim, proc)(x1, x2, model)
         print("sml centers\n", result[0])
@@ -134,7 +134,7 @@ class UnitTests:
 
         def proc(x):
             model.fit(x)
-            return model._centers.sort(axis=0)
+            return model.centers_.sort(axis=0)
 
         result = spsim.sim_jax(sim, proc)(X)
         # print("result\n", result)
@@ -158,7 +158,7 @@ class UnitTests:
                 n_clusters=4, n_samples=x.shape[0], init=init, n_init=1, max_iter=10
             )
             model.fit(x)
-            return model._centers
+            return model.centers_
 
         X = jnp.array([[-4, -3, -2, -1]]).T
         uniform_edges = np.linspace(np.min(X), np.max(X), 5)
@@ -198,7 +198,7 @@ class UnitTests:
 
         def proc(x):
             model.fit(x)
-            return model._centers.sort(axis=0)
+            return model.centers_.sort(axis=0)
 
         result = spsim.sim_jax(sim, proc)(X)
         # print("result\n", result)
