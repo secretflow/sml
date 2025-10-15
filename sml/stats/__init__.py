@@ -15,11 +15,9 @@
 from sml.stats.pearsonr import pearsonr
 from sml.stats.psi import psi
 from sml.stats.vif import vif
-from sml.stats.woe_iv import woe_iv
 
 __all__ = [
     "pearsonr",
     "vif",
     "psi",
-    "woe_iv",
 ]
