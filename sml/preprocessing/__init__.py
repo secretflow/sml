@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from sml.preprocessing.chimerge_discretizer import ChiMergeDiscretizer
+from sml.preprocessing.encoding import MeanEncoder, WoEEncoder
 from sml.preprocessing.preprocessing import (
     Binarizer,
     KBinsDiscretizer,
@@ -36,4 +37,6 @@ __all__ = [
     "RobustScaler",
     "QuantileTransformer",
     "ChiMergeDiscretizer",
+    "MeanEncoder",
+    "WoEEncoder",
 ]
