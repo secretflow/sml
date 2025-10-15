@@ -100,7 +100,7 @@ class EmulationRunner:
 
     def discover_emulation_files(self) -> list[str]:
         """
-        Discover all emulation files in the emulations directory.
+        Discover all emulation files in the emulations directory (including nested subdirectories).
 
         Returns:
             List of module paths for emulation files
@@ -108,11 +108,20 @@ class EmulationRunner:
         emulations_dir = Path(__file__).parent
         emulation_files = []
 
-        for module_dir in emulations_dir.iterdir():
-            if module_dir.is_dir() and module_dir.name not in ["__pycache__", ".git"]:
-                for emul_file in module_dir.glob("*_emul.py"):
-                    module_path = f"emulations.{module_dir.name}.{emul_file.stem}"
-                    emulation_files.append(module_path)
+        # Use rglob to recursively find all *_emul.py files
+        for emul_file in emulations_dir.rglob("*_emul.py"):
+            # Skip files in __pycache__ or .git directories
+            if "__pycache__" in emul_file.parts or ".git" in emul_file.parts:
+                continue
+
+            # Calculate relative path from emulations directory
+            relative_path = emul_file.relative_to(emulations_dir)
+
+            # Convert path to module format: preprocessing/encoding/woe_emul.py -> preprocessing.encoding.woe_emul
+            module_parts = list(relative_path.parts[:-1]) + [relative_path.stem]
+            module_path = f"emulations.{'.'.join(module_parts)}"
+
+            emulation_files.append(module_path)
 
         return sorted(emulation_files)
 
