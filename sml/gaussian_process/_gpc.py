@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import abc
+
 import jax
 import jax.numpy as jnp
-from jax.lax.linalg import cholesky
-from jax.scipy.linalg import cho_solve, solve
-from jax.scipy.special import erf, expit
+from jax.scipy.linalg import solve
+from jax.scipy.special import erf
 
-from sml.gaussian_process.kernels import RBF
-from sml.gaussian_process.ovo_ovr import OneVsRestClassifier
+from sml.gaussian_process.kernels import RBF, Kernel
+from sml.gaussian_process.laplace import _BinaryGaussianProcessClassifierLaplace
 
 LAMBDAS = jnp.array([0.41, 0.4, 0.37, 0.44, 0.39])[:, jnp.newaxis]
 COEFS = jnp.array(
@@ -27,143 +28,152 @@ COEFS = jnp.array(
 )[:, jnp.newaxis]
 
 
-class _BinaryGaussianProcessClassifierLaplace:
-    def __init__(
-        self,
-        kernel=None,
-        *,
-        poss="sigmoid",
-        max_iter_predict=100,
-        kernel_internal=None,
-    ):
-        self.kernel = kernel
-        self.kernel_ = kernel_internal
-        self._check_kernel()
+def _binary_predict(X: jax.Array, X_train: jax.Array, alpha: jax.Array, kernel: Kernel):
+    X = jnp.asarray(X)
+    K_star = kernel(X_train, X)
+    # f_star = K_star.T.dot(self.log_and_grad(self.f_, self.y_train))
+    f_star = K_star.T.dot(alpha)
 
-        self.max_iter_predict = max_iter_predict
-        self.poss = poss
+    return jnp.where(f_star > 0, 1, 0)
 
-        if self.poss == "sigmoid":
-            self.approx_func = expit
-        else:
-            raise ValueError(
-                f"Unsupported prior-likelihood function {self.poss}."
-                "Please try the default dunction sigmoid."
-            )
 
-    def tree_flatten(self):
-        static_data = (self.kernel, self.kernel_, self.max_iter_predict, self.poss)
-        dynamic_data = (self.X_train_, self.y_train, self.pi_, self.W_sr_, self.L_)
-        return (dynamic_data, static_data)
+def _binary_predict_proba(
+    X: jax.Array,
+    X_train: jax.Array,
+    alpha: jax.Array,
+    W_sr: jax.Array,
+    L: jax.Array,
+    kernel: Kernel,
+):
+    K_star = kernel(X_train, X)
+    # f_star = K_star.T.dot(self.log_and_grad(self.f_, self.y_train))
+    f_star = K_star.T.dot(alpha)
+    v = solve(L, W_sr[:, jnp.newaxis] * K_star)
+    # var_f_star = jnp.diag(self.kernel_(X)) - jnp.einsum("ij,ij->j", v, v)
+    var_f_star = kernel.diag(X) - jnp.einsum("ij,ij->j", v, v)
 
-    @classmethod
-    def tree_unflatten(cls, static_data, dynamic_data):
-        (
-            X_train_,
-            y_train,
-            pi_,
-            W_sr_,
-            L_,
-        ) = dynamic_data
+    alpha = 1 / (2 * var_f_star)
+    gamma = LAMBDAS * f_star
 
-        (kernel, kernel_, max_iter_predict, poss) = static_data
+    integrals = (
+        jnp.sqrt(jnp.pi / alpha)
+        * erf(gamma * jnp.sqrt(alpha / (alpha + LAMBDAS**2)))
+        / (2 * jnp.sqrt(var_f_star * 2 * jnp.pi))
+    )
+    pi_star = (COEFS * integrals).sum(axis=0) + 0.5 * COEFS.sum()
 
-        ins = cls(
-            kernel,
-            poss=poss,
-            max_iter_predict=max_iter_predict,
-            kernel_internal=kernel_,
-        )
-        ins.pi_ = pi_
-        ins.W_sr_ = W_sr_
-        ins.L_ = L_
-        ins.X_train_ = X_train_
-        ins.y_train = y_train
-        return ins
+    return jnp.vstack((1 - pi_star, pi_star)).T
+
+
+def _get_probabilities(
+    X: jax.Array,
+    X_train: jax.Array,
+    alpha: jax.Array,
+    W_sr: jax.Array,
+    L: jax.Array,
+    n_classes: int,
+    kernel: Kernel,
+) -> jax.Array:
+    def single_class_pred(i):
+        return _binary_predict_proba(X, X_train, alpha[i], W_sr[i], L[i], kernel)[:, 1]
+
+    return jax.vmap(single_class_pred)(jnp.arange(n_classes))
+
+
+def predict(
+    X: jax.Array,  # (n_test, n_features)
+    X_train: jax.Array,  # (n_train, n_features)
+    alpha: jax.Array,  # (n_classes, n_train)
+    W_sr: jax.Array,  # (n_classes, n_train)
+    L: jax.Array,  # (n_classes, n_train, n_train)
+    n_classes: int,
+    multi_class: str,
+    kernel: Kernel | None,
+) -> jax.Array:
+    if kernel is None:
+        kernel = RBF()
+    if n_classes <= 2:
+        return _binary_predict(X, X_train, alpha[0])
+    elif multi_class == "one_vs_rest":
+        pos_probs = _get_probabilities(X, X_train, alpha, W_sr, L, n_classes, kernel)
+        return pos_probs.argmax(axis=0)
+    elif multi_class == "one_vs_one":
+        raise ValueError("one_vs_one classifier is not supported")
+    else:
+        raise ValueError("Unknown multi-class mode %s" % multi_class)
+
+
+def predict_proba(
+    X: jax.Array,  # (n_test, n_features)
+    X_train: jax.Array,  # (n_train, n_features)
+    alpha: jax.Array,  # (n_classes, n_train)
+    W_sr: jax.Array,  # (n_classes, n_train)
+    L: jax.Array,  # (n_classes, n_train, n_train)
+    n_classes: int,
+    multi_class: str,
+    kernel: Kernel | None,
+) -> jax.Array:
+    if kernel is None:
+        kernel = RBF()
+    if n_classes <= 2:
+        return _binary_predict_proba(X, X_train, alpha[0])
+    elif multi_class == "one_vs_rest":
+        pos_probs = _get_probabilities(X, X_train, alpha, W_sr, L, n_classes, kernel)
+        return pos_probs.T
+    elif multi_class == "one_vs_one":
+        raise ValueError("one_vs_one classifier is not supported")
+    else:
+        raise ValueError("Unknown multi-class mode %s" % multi_class)
+
+
+class Estimator(abc.ABC):
+    @property
+    @abc.abstractmethod
+    def state(self) -> tuple[jax.Array, jax.Array, jax.Array]:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def fit(self, X, y):
+        raise NotImplementedError()
+
+
+class BinaryEstimator(Estimator):
+    def __init__(self, **kwargs):
+        self.estimator = _BinaryGaussianProcessClassifierLaplace(**kwargs)
+
+    @property
+    def state(self) -> tuple[jax.Array, jax.Array, jax.Array]:
+        e = self.estimator
+        return e.alpha[None, :], e.W_sr_[None, :], e.L_[None, :]
 
     def fit(self, X, y):
-        self.X_train_ = jnp.asarray(X)
-
-        self.y_train = y
-
-        K = self.kernel_(self.X_train_)
-
-        (
-            self.pi_,
-            self.W_sr_,
-            self.L_,
-        ) = self._posterior_mode(K)
+        self.estimator.fit(X, y)
         return self
 
-    def predict(self, Xll):
-        X = jnp.asarray(Xll)
-        K_star = self.kernel_(self.X_train_, X)
-        # f_star = K_star.T.dot(self.log_and_grad(self.f_, self.y_train))
-        f_star = K_star.T.dot(self.y_train - self.pi_)
 
-        return jnp.where(f_star > 0, 1, 0)
+class OneVsRestEstimator(Estimator):
+    def __init__(self, n_classes: int, **kwargs):
+        self.classes_ = n_classes
+        self.estimators_ = [
+            _BinaryGaussianProcessClassifierLaplace(**kwargs) for _ in range(n_classes)
+        ]
 
-    def predict_proba(self, Xll):
-        X = jnp.asarray(Xll)
+    @property
+    def state(self) -> tuple[jax.Array, jax.Array, jax.Array]:
+        alpha = []
+        W_sr = []
+        L = []
+        for e in self.estimators_:
+            alpha.append(e.alpha)
+            W_sr.append(e.W_sr_)
+            L.append(e.L_)
 
-        K_star = self.kernel_(self.X_train_, X)
-        # f_star = K_star.T.dot(self.log_and_grad(self.f_, self.y_train))
-        f_star = K_star.T.dot(self.y_train - self.pi_)
-        v = solve(self.L_, self.W_sr_[:, jnp.newaxis] * K_star)
-        # var_f_star = jnp.diag(self.kernel_(X)) - jnp.einsum("ij,ij->j", v, v)
-        var_f_star = self.kernel_.diag(X) - jnp.einsum("ij,ij->j", v, v)
+        return jnp.stack(alpha), jnp.stack(W_sr), jnp.stack(L)
 
-        alpha = 1 / (2 * var_f_star)
-        gamma = LAMBDAS * f_star
-
-        integrals = (
-            jnp.sqrt(jnp.pi / alpha)
-            * erf(gamma * jnp.sqrt(alpha / (alpha + LAMBDAS**2)))
-            / (2 * jnp.sqrt(var_f_star * 2 * jnp.pi))
-        )
-        pi_star = (COEFS * integrals).sum(axis=0) + 0.5 * COEFS.sum()
-
-        return jnp.vstack((1 - pi_star, pi_star)).T
-
-    def _posterior_mode(self, K):
-        # Based on Algorithm 3.1 of GPML
-        f = jnp.zeros_like(
-            self.y_train, dtype=jnp.float32
-        )  # a warning is triggered if float64 is used
-
-        for _ in range(self.max_iter_predict):
-            # W = self.log_and_2grads_and_negtive(f, self.y_train)
-            pi = self.approx_func(f)
-            W = pi * (1 - pi)
-            W_sqr = jnp.sqrt(W)
-            W_sqr_K = W_sqr[:, jnp.newaxis] * K
-
-            B = jnp.eye(W.shape[0]) + W_sqr_K * W_sqr
-            L = cholesky(B, symmetrize_input=False)
-            # b = W * f + self.log_and_grad(f, self.y_train)
-            b = W * f + (self.y_train - pi)
-            a = b - jnp.dot(
-                W_sqr[:, jnp.newaxis] * cho_solve((L, True), jnp.eye(W.shape[0])),
-                W_sqr_K.dot(b),
-            )
-            f = K.dot(a)
-
-            # no early stop here...
-
-        # for warm-start
-        # self.f_cached = f
-        return pi, W_sqr, L
-
-    def _check_kernel(self):
-        if self.kernel_ is not None:
-            return
-        if self.kernel is None:  # Use an RBF kernel as default
-            self.kernel_ = RBF()
-        else:
-            raise NotImplementedError("Only RBF kernel is supported now.")
-
-
-jax.tree_util.register_pytree_node_class(_BinaryGaussianProcessClassifierLaplace)
+    def fit(self, X, y):
+        for i in range(self.classes_):
+            self.estimators_[i].fit(X, jnp.where(y == i, 1, 0))
+        return self
 
 
 class GaussianProcessClassifier:
@@ -224,7 +234,6 @@ class GaussianProcessClassifier:
         max_iter_predict=20,
         multi_class="one_vs_rest",
         n_classes=2,
-        base_estimator=None,
     ):
         self.kernel = kernel
         self.max_iter_predict = max_iter_predict
@@ -232,7 +241,6 @@ class GaussianProcessClassifier:
         self.poss = poss
 
         self.n_classes = n_classes
-        self.base_estimator_ = base_estimator
 
         assert self.n_classes > 1, (
             "GaussianProcessClassifier requires 2 or more distinct classes"
@@ -246,21 +254,26 @@ class GaussianProcessClassifier:
             self.multi_class,
             self.n_classes,
         )
-        dynamic_data = (self.base_estimator_,)
+        dynamic_data = (self.alpha_, self.W_sr_, self.L_, self.X_train_, self.y_train_)
         return (dynamic_data, static_data)
 
     @classmethod
     def tree_unflatten(cls, static_data, dynamic_data):
-        base_estimator_ = dynamic_data[0]
+        alpha, W_sr, L, X_train, y_train = dynamic_data
         (kernel, max_iter_predict, poss, multi_class, n_classes) = static_data
-        return cls(
+        ins = cls(
             kernel=kernel,
             max_iter_predict=max_iter_predict,
             poss=poss,
             n_classes=n_classes,
             multi_class=multi_class,
-            base_estimator=base_estimator_,
         )
+        ins.alpha_ = alpha
+        ins.W_sr_ = W_sr
+        ins.L_ = L
+        ins.X_train_ = X_train
+        ins.y_train_ = y_train
+        return ins
 
     def fit(self, X, y):
         """Fit Gaussian process classification model.
@@ -278,30 +291,35 @@ class GaussianProcessClassifier:
         self : object
             Returns an instance of self.
         """
-        self.y_train = jnp.array(y)
+        if self.n_classes <= 2:
+            estimator = BinaryEstimator(
+                kernel=self.kernel,
+                max_iter_predict=self.max_iter_predict,
+                poss=self.poss,
+            )
+        elif self.multi_class == "one_vs_rest":
+            estimator = OneVsRestEstimator(
+                n_classes=self.n_classes,
+                kernel=self.kernel,
+                max_iter_predict=self.max_iter_predict,
+                poss=self.poss,
+            )
+        elif self.multi_class == "one_vs_one":
+            raise ValueError("one_vs_one classifier is not supported")
+        else:
+            raise ValueError("Unknown multi-class mode %s" % self.multi_class)
 
-        self.base_estimator_ = _BinaryGaussianProcessClassifierLaplace(
-            kernel=self.kernel,
-            max_iter_predict=self.max_iter_predict,
-            poss=self.poss,
-        )
+        X = jnp.array(X)
+        y = jnp.array(y)
+        estimator.fit(X, y)
 
-        if self.n_classes > 2:
-            if self.multi_class == "one_vs_rest":
-                self.base_estimator_ = OneVsRestClassifier(
-                    base_estimate_cls=_BinaryGaussianProcessClassifierLaplace,
-                    n_classes=self.n_classes,
-                    kernel=self.kernel,
-                    max_iter_predict=self.max_iter_predict,
-                    poss=self.poss,
-                )
-            elif self.multi_class == "one_vs_one":
-                raise ValueError("one_vs_one classifier is not supported")
-            else:
-                raise ValueError("Unknown multi-class mode %s" % self.multi_class)
+        state = estimator.state
+        self.alpha_ = state[0]
+        self.W_sr_ = state[1]
+        self.L_ = state[2]
 
-        self.X = jnp.array(X)
-        self.base_estimator_.fit(self.X, self.y_train)
+        self.X_train_ = X
+        self.y_train_ = y
 
         return self
 
@@ -319,7 +337,17 @@ class GaussianProcessClassifier:
             Predicted target values for X.
         """
         self.check_is_fitted()
-        return self.base_estimator_.predict(X)
+        X = jnp.asarray(X)
+        return predict(
+            X,
+            self.X_train_,
+            self.alpha_,
+            self.W_sr_,
+            self.L_,
+            self.n_classes,
+            self.multi_class,
+            self.kernel,
+        )
 
     def predict_proba(self, X):
         """Return probability estimates for the test vector X.
@@ -337,11 +365,21 @@ class GaussianProcessClassifier:
             order.
         """
         self.check_is_fitted()
-        return self.base_estimator_.predict_proba(X)
+        X = jnp.asarray(X)
+        return predict_proba(
+            X,
+            self.X_train_,
+            self.alpha_,
+            self.W_sr_,
+            self.L_,
+            self.n_classes,
+            self.multi_class,
+            self.kernel,
+        )
 
     def check_is_fitted(self):
         """Perform is_fitted validation for estimator."""
-        assert self.base_estimator_ is not None, "Model should be fitted first."
+        assert self.alpha_ is not None, "Model should be fitted first."
 
 
 jax.tree_util.register_pytree_node_class(GaussianProcessClassifier)

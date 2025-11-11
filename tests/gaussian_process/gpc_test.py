@@ -64,7 +64,7 @@ def test_gpc_sep():
         return model
 
     @jax.jit
-    def predict(model, x_pred):
+    def predict(model: GaussianProcessClassifier, x_pred: jnp.ndarray):
         pred = model.predict(x_pred)
         return pred
         # return model
