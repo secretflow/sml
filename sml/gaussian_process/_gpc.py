@@ -87,8 +87,8 @@ def predict(
     W_sr: jax.Array,  # (n_classes, n_train)
     L: jax.Array,  # (n_classes, n_train, n_train)
     n_classes: int,
-    multi_class: str,
-    kernel: Kernel | None,
+    multi_class: str = "one_vs_rest",
+    kernel: Kernel | None = None,
 ) -> jax.Array:
     if kernel is None:
         kernel = RBF()
@@ -110,8 +110,8 @@ def predict_proba(
     W_sr: jax.Array,  # (n_classes, n_train)
     L: jax.Array,  # (n_classes, n_train, n_train)
     n_classes: int,
-    multi_class: str,
-    kernel: Kernel | None,
+    multi_class: str = "one_vs_rest",
+    kernel: Kernel | None = None,
 ) -> jax.Array:
     if kernel is None:
         kernel = RBF()
