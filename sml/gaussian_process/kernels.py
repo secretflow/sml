@@ -29,7 +29,15 @@ def cdist(XA, XB, metric="sqeuclidean"):
     return jax.vmap(lambda xa: jax.vmap(lambda xb: sqeuclidean(xa, xb))(XB))(XA)
 
 
-class RBF:
+class Kernel:
+    def __call__(self, X: jax.Array, Y: jax.Array | None = None) -> jax.Array:
+        raise NotImplementedError()
+
+    def diag(self, X: jax.Array) -> jax.Array:
+        raise NotImplementedError()
+
+
+class RBF(Kernel):
     """Radial basis function kernel (aka squared-exponential kernel).
 
     The RBF kernel is a stationary kernel. It is also known as the

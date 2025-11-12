@@ -45,66 +45,123 @@ def _compute_2norm(grad, eps=1e-4):
 ActivationFunc = Callable[[jax.Array], jax.Array]
 
 
-@partial(
-    jax.jit,
-    static_argnames=(
-        "activation",
-        "total_batch",
-        "batch_size",
-        "learning_rate",
-        "penalty",
-        "l2_norm",
-        "strategy",
-    ),
-)
-def _update_weights(
-    x: jax.Array,
-    y: jax.Array,
+def _update_w(
     w: jax.Array,
+    y: jax.Array,
+    x: jax.Array,
     *,
     activation: ActivationFunc,
-    total_batch: int,
     batch_size: int,
     learning_rate: float,
     penalty: Penalty,
     l2_norm: float,
     strategy: Strategy,
 ) -> jax.Array:
-    num_feat = x.shape[1]
-    assert w.shape[0] == num_feat + 1, "w shape is mismatch to x"
-    assert len(w.shape) == 1 or w.shape[1] == 1, "w should be list or 1D array"
-    w = w.reshape((w.shape[0], 1))
+    """Mini-batch gradient update step."""
+    n_samples, n_features = x.shape
 
-    for idx in range(total_batch):
-        begin = idx * batch_size
-        end = (idx + 1) * batch_size
-        if end > x.shape[0]:
-            end = x.shape[0]
-        this_batch_size = end - begin
-        # padding one col for bias in w
-        x_slice = jnp.concatenate(
-            (x[begin:end, :], jnp.ones((this_batch_size, 1))), axis=1
+    # Ensure w is properly shaped
+    if len(w.shape) == 1 or w.shape[1] == 1:
+        w = w.reshape((w.shape[0], 1))
+
+    # Add bias term to x
+    x_with_bias = jnp.concatenate((x, jnp.ones((n_samples, 1))), axis=1)
+
+    # Forward pass
+    pred = jnp.matmul(x_with_bias, w)
+    pred = activation(pred)
+
+    # Compute error and gradient
+    err = pred - y
+    grad = jnp.matmul(jnp.transpose(x_with_bias), err)
+
+    # Apply strategy scaling
+    if strategy == Strategy.POLICY_SGD:
+        scale_factor = _compute_2norm(grad)
+    else:
+        scale_factor = 1
+
+    # Apply L2 penalty (skip bias term)
+    if penalty == Penalty.L2:
+        reg = l2_norm * jnp.concatenate([w[:-1], jnp.zeros((1, 1))], axis=0)
+        grad = grad + reg
+
+    # Update weights
+    step = (learning_rate * scale_factor * grad) / batch_size
+    w = w - step
+
+    return w
+
+
+def _sgd_step(
+    x: jax.Array,
+    y: jax.Array,
+    w: jax.Array,
+    *,
+    activation: ActivationFunc,
+    batch_size: int,
+    learning_rate: float,
+    penalty: Penalty,
+    l2_norm: float,
+    strategy: Strategy,
+) -> jax.Array:
+    """Process all batches using while_loop for better performance."""
+    n_samples, n_features = x.shape
+    batch_size = min(batch_size, n_samples)
+    total_batch = n_samples // batch_size
+    remainder = n_samples % batch_size
+
+    def _slice_batch(v: jax.Array, start: int, size: int) -> jax.Array:
+        return jax.lax.dynamic_slice(v, (start, 0), (size, v.shape[1]))
+
+    def _slice_1d(v: jax.Array, start: int, size: int) -> jax.Array:
+        return jax.lax.dynamic_slice(v, (start, 0), (size, 1))
+
+    def _cond_fn(carry):
+        _, idx = carry
+        return idx < total_batch
+
+    def _body_fn(carry):
+        w, idx = carry
+        start = idx * batch_size
+
+        x_b = _slice_batch(x, start, batch_size)
+        y_b = _slice_1d(y, start, batch_size)
+
+        w = _update_w(
+            w,
+            y_b,
+            x_b,
+            activation=activation,
+            batch_size=batch_size,
+            learning_rate=learning_rate,
+            penalty=penalty,
+            l2_norm=l2_norm,
+            strategy=strategy,
         )
-        y_slice = y[begin:end, :]
+        return w, idx + 1
 
-        pred = jnp.matmul(x_slice, w)
-        pred = activation(pred)
+    # Process main batches
+    if total_batch > 0:
+        w, _ = jax.lax.while_loop(_cond_fn, _body_fn, (w, 0))
 
-        err = pred - y_slice
-        grad = jnp.matmul(jnp.transpose(x_slice), err)
+    # Handle remainder
+    if remainder > 0:
+        start = total_batch * batch_size
+        x_b = x[start:, :]
+        y_b = y[start:, :]
 
-        if strategy == Strategy.POLICY_SGD:
-            scale_factor = _compute_2norm(grad)
-        else:
-            scale_factor = 1
-
-        if penalty == Penalty.L2:
-            reg = l2_norm * jnp.concatenate([w[:-1], jnp.zeros((1, 1))], axis=0)
-            grad = grad + reg
-
-        step = (learning_rate * scale_factor * grad) / batch_size
-
-        w = w - step
+        w = _update_w(
+            w,
+            y_b,
+            x_b,
+            activation=activation,
+            batch_size=remainder,  # Use actual remainder size
+            learning_rate=learning_rate,
+            penalty=penalty,
+            l2_norm=l2_norm,
+            strategy=strategy,
+        )
 
     return w
 
@@ -186,7 +243,6 @@ class SGDBase:
     def _fit(self, X: jax.Array, y: jax.Array, activation: Callable):
         n_samples, n_features = X.shape
         batch_size = min(self._batch_size, n_samples)
-        total_batch = int((n_samples + batch_size - 1) / batch_size)
 
         weights = jnp.zeros((n_features + 1, 1))
         weights_last = weights
@@ -201,12 +257,11 @@ class SGDBase:
             weights, weights_last, epoch, need_stop = carry
             weights_last = weights
             learning_rate = self._get_learning_rate(epoch)
-            weights = weights = _update_weights(
+            weights = _sgd_step(
                 X,
                 y,
                 weights,
                 activation=activation,
-                total_batch=total_batch,
                 batch_size=batch_size,
                 learning_rate=learning_rate,
                 penalty=self._penalty,
@@ -262,6 +317,10 @@ class SGDClassifier(SGDBase):
             decay_rate = 0.5
             decay_epoch = 5
 
+        def _activation(pred: jax.Array) -> jax.Array:
+            return sigmoid(pred, sig_type)
+
+        self._activation = _activation
         self._sig_type = sig_type
 
         super().__init__(
@@ -278,15 +337,11 @@ class SGDClassifier(SGDBase):
         )
 
     def fit(self, X: jax.Array, y: jax.Array) -> "SGDClassifier":
-        activation = lambda pred: sigmoid(pred, self._sig_type)
-        self._fit(X, y, activation)
+        self._fit(X, y, self._activation)
         return self
 
     def predict(self, X: jax.Array) -> jax.Array:
-        def _activation(pred: jax.Array) -> jax.Array:
-            return sigmoid(pred, self._sig_type)
-
-        return predict(X, self.weights_, _activation)
+        return predict(X, self.weights_, self._activation)
 
     def tree_flatten(self):
         children = (self.weights_,)
@@ -315,6 +370,10 @@ class SGDClassifier(SGDBase):
         return obj
 
 
+def _identity(pred: jax.Array) -> jax.Array:
+    return pred
+
+
 class SGDRegressor(SGDBase):
     def __init__(
         self,
@@ -341,8 +400,7 @@ class SGDRegressor(SGDBase):
         )
 
     def fit(self, X: jax.Array, y: jax.Array) -> "SGDRegressor":
-        activation = lambda pred: pred
-        self._fit(X, y, activation)
+        self._fit(X, y, _identity)
         return self
 
     def predict(self, X: jax.Array) -> jax.Array:

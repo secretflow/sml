@@ -14,6 +14,5 @@
 
 from sml.gaussian_process._gpc import GaussianProcessClassifier
 from sml.gaussian_process.kernels import RBF
-from sml.gaussian_process.ovo_ovr import OneVsRestClassifier
 
-__all__ = ["GaussianProcessClassifier", "RBF", "OneVsRestClassifier"]
+__all__ = ["GaussianProcessClassifier", "RBF"]
