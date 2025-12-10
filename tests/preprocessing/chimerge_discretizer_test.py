@@ -505,7 +505,7 @@ class PyChiMergeDiscretizer:
 
 @pytest.mark.parametrize(
     "n_samples,n_features,n_bins",
-    [(100, 5, 10)],
+    [(1000, 5, 10)],
 )
 def test_chimerge_discretizer(
     n_samples: int,
@@ -558,6 +558,6 @@ def test_chimerge_discretizer(
     mismatch_ratio = mismatch_count / total_elements
     max_mismatch_ratio = 0.02
 
-    assert mismatch_ratio <= max_mismatch_ratio, (
-        f"Too many mismatches: {mismatch_ratio:.2%} > {max_mismatch_ratio:.2%} ({mismatch_count}/{total_elements})"
-    )
+    assert (
+        mismatch_ratio <= max_mismatch_ratio
+    ), f"Too many mismatches: {mismatch_ratio:.2%} > {max_mismatch_ratio:.2%} ({mismatch_count}/{total_elements})"
