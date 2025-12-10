@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from sml.gaussian_process._gpc import GaussianProcessClassifier
-from sml.gaussian_process.kernels import RBF
+from sml.gaussian_process._gpc import GaussianProcessClassifier, predict, predict_proba
+from sml.gaussian_process.kernels import RBF, Kernel
 
-__all__ = ["GaussianProcessClassifier", "RBF"]
+__all__ = ["GaussianProcessClassifier", "RBF", "Kernel", "predict", "predict_proba"]

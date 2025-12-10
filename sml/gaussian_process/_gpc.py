@@ -93,7 +93,7 @@ def predict(
     if kernel is None:
         kernel = RBF()
     if n_classes <= 2:
-        return _binary_predict(X, X_train, alpha[0])
+        return _binary_predict(X, X_train, alpha[0], kernel)
     elif multi_class == "one_vs_rest":
         pos_probs = _get_probabilities(X, X_train, alpha, W_sr, L, n_classes, kernel)
         return pos_probs.argmax(axis=0)
@@ -116,7 +116,7 @@ def predict_proba(
     if kernel is None:
         kernel = RBF()
     if n_classes <= 2:
-        return _binary_predict_proba(X, X_train, alpha[0])
+        return _binary_predict_proba(X, X_train, alpha[0], W_sr[0], L[0], kernel)
     elif multi_class == "one_vs_rest":
         pos_probs = _get_probabilities(X, X_train, alpha, W_sr, L, n_classes, kernel)
         return pos_probs.T
