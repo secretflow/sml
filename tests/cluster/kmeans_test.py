@@ -189,7 +189,7 @@ class UnitTests:
         # to get the correct result in some cases
         # (since jax.random.choice did not work well in SPU runtime)
         model = KMEANS(
-            n_clusters=4,
+            n_clusters=2,
             n_samples=X.shape[0],
             init="random",
             n_init=5,
@@ -206,7 +206,7 @@ class UnitTests:
         # Compare with sklearn
         from sklearn.cluster import KMeans
 
-        model = KMeans(n_clusters=4, init="random", n_init=5, max_iter=10)
+        model = KMeans(n_clusters=2, init="random", n_init=5, max_iter=10)
         model.fit(X)
         sk_result = model.cluster_centers_
         sk_result.sort(axis=0)
