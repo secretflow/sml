@@ -206,7 +206,7 @@ class SGDBase:
         l2_norm: float = 0.5,
         decay_epoch: int | None = None,
         decay_rate: float | None = None,
-        early_stopping_threshold: bool = 0.0,
+        early_stopping_threshold: float = 0.0,
         early_stopping_metric: EarlyStoppingMetric = EarlyStoppingMetric.WEIGHT,
         strategy: Strategy = Strategy.NAIVE_SGD,
     ):
@@ -219,7 +219,9 @@ class SGDBase:
             assert l2_norm > 0, f"l2_norm<{l2_norm}> should >0 if use L2 penalty"
         if decay_epoch is not None:
             assert decay_epoch > 0, f"decay_epoch<{decay_epoch}> should >0"
-            assert decay_rate > 0, f"decay_rate<{decay_rate}> should >0"
+            assert decay_rate is not None and decay_rate > 0, (
+                f"decay_rate<{decay_rate}> should >0"
+            )
 
         self._epochs = epochs
         self._learning_rate = learning_rate
@@ -235,8 +237,9 @@ class SGDBase:
 
     def _get_learning_rate(self, epoch_idx: int) -> float:
         if self._decay_rate is not None:
+            assert self._decay_epoch is not None
             rate = self._decay_rate ** jnp.floor(epoch_idx / self._decay_epoch)
-            return self._learning_rate * rate
+            return self._learning_rate * rate  # type: ignore
         else:
             return self._learning_rate
 
@@ -277,7 +280,7 @@ class SGDBase:
                         f"early_stopping_metric={self._early_stopping_metric} is not supported"
                     )
                 # WARNING: Reveal the need_stop to plaintext here
-                need_stop = sml_reveal(stop)
+                need_stop = sml_reveal(stop)  # type: ignore
             else:
                 need_stop = False
             return (weights, weights_last, epoch + 1, need_stop)
@@ -300,7 +303,7 @@ class SGDClassifier(SGDBase):
         l2_norm: float = 0.5,
         decay_epoch: int | None = None,
         decay_rate: float | None = None,
-        early_stopping_threshold: bool = 0.0,
+        early_stopping_threshold: float = 0.0,
         early_stopping_metric: EarlyStoppingMetric = EarlyStoppingMetric.WEIGHT,
         sig_type: SigType = SigType.T1,
         strategy: str | Strategy = Strategy.NAIVE_SGD,
@@ -384,7 +387,7 @@ class SGDRegressor(SGDBase):
         l2_norm: float = 0.5,
         decay_epoch: int | None = None,
         decay_rate: float | None = None,
-        early_stopping_threshold: bool = 0.0,
+        early_stopping_threshold: float = 0.0,
         early_stopping_metric: EarlyStoppingMetric = EarlyStoppingMetric.WEIGHT,
     ):
         super().__init__(
