@@ -15,8 +15,6 @@
 
 import numpy as np
 import pandas as pd
-from sklearn import datasets as sk_datasets
-from sklearn.model_selection import train_test_split
 
 from sml.utils.utils import get_logger
 
@@ -603,6 +601,9 @@ def load_open_source_datasets(
 def fetch_and_preprocess_diabetes(
     test_size=0.2, random_state=107, need_split_train_test=True
 ):
+    from sklearn import datasets as sk_datasets
+    from sklearn.model_selection import train_test_split
+
     ds = sk_datasets.load_diabetes()
     x, y = ds["data"], ds["target"]
     x = (x - np.min(x)) / (np.max(x) - np.min(x))
@@ -620,6 +621,9 @@ def fetch_and_preprocess_diabetes(
 def fetch_and_preprocess_irls(
     test_size=0.2, random_state=107, need_split_train_test=True
 ):
+    from sklearn import datasets as sk_datasets
+    from sklearn.model_selection import train_test_split
+
     ds = sk_datasets.load_iris()
     x, y = ds["data"], ds["target"]
     x = (x - np.min(x)) / (np.max(x) - np.min(x))
@@ -637,6 +641,9 @@ def fetch_and_preprocess_irls(
 def fetch_and_preprocess_breast_cancer(
     test_size=0.2, random_state=107, need_split_train_test=True
 ):
+    from sklearn import datasets as sk_datasets
+    from sklearn.model_selection import train_test_split
+
     ds = sk_datasets.load_breast_cancer()
     x, y = ds["data"], ds["target"]
     x = (x - np.min(x)) / (np.max(x) - np.min(x))
@@ -665,6 +672,8 @@ def _load_mtpl2(n_samples=None):
       number of samples to select (for faster run time). Full dataset has
       678013 samples.
     """
+    from sklearn import datasets as sk_datasets
+
     # freMTPL2freq dataset from https://www.openml.org/d/41214
     df_freq = sk_datasets.fetch_openml(data_id=41214, as_frame=True).data
     df_freq["IDpol"] = df_freq["IDpol"].astype(int)
@@ -745,6 +754,8 @@ def _preprocess_mtpl2(df: pd.DataFrame):
 def _fetch_and_preprocess_mtpl2(
     test_size=0.2, random_state=107, distribution="Tweedie", need_split_train_test=True
 ):
+    from sklearn.model_selection import train_test_split
+
     # freMTPL2freq dataset from https://www.openml.org/d/41214
     df = _load_mtpl2()
 
@@ -1072,6 +1083,7 @@ def mock_bi_classification(
     n_samples, n_features, random_seed=107, test_size=0.2, need_split_train_test=True
 ):
     from sklearn.datasets import make_classification
+    from sklearn.model_selection import train_test_split
 
     X, y = make_classification(
         n_samples,
@@ -1096,6 +1108,7 @@ def mock_multi_classification(
     need_split_train_test=True,
 ):
     from sklearn.datasets import make_classification
+    from sklearn.model_selection import train_test_split
 
     X, y = make_classification(
         n_samples,
@@ -1115,6 +1128,7 @@ def mock_regression(
     n_samples, n_features, random_seed=107, test_size=0.2, need_split_train_test=True
 ):
     from sklearn.datasets import make_regression
+    from sklearn.model_selection import train_test_split
 
     # we leave the coef for future use
     X, y, _ = make_regression(
