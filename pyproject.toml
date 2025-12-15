@@ -43,6 +43,8 @@ dev = [
     "pandas>=1.5.3",
     "scikit-learn>=1.5.2,<1.7.0",
     "statsmodels>=0.11.1",
+    "protobuf",
+    "grpcio>=1.60.0",
 ]
 
 [project.urls]

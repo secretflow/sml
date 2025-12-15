@@ -52,7 +52,7 @@ def binary_clf_curve(
     tps = jnp.cumsum(sorted_pairs[:, 0])
     fps = jnp.arange(1, sorted_pairs.shape[0] + 1) - tps
     thresholds = sorted_pairs[:, 1]
-    _, _, _, seg_end_marks = groupby_sorted([-thresholds], [-thresholds])
+    _, _, _, seg_end_marks = groupby_sorted([-thresholds], [-thresholds])  # type: ignore
     tps = seg_end_marks * tps
     fps = seg_end_marks * fps
     thresholds = seg_end_marks * thresholds
@@ -61,7 +61,9 @@ def binary_clf_curve(
     return fps, tps, -thresholds
 
 
-def roc_curve(sorted_pairs: jnp.array) -> tuple[jnp.array, jnp.array, jnp.array]:
+def roc_curve(
+    sorted_pairs: jnp.ndarray,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Compute Receiver operating characteristic (ROC).
 
     Compared to sklearn implementation, this implementation eliminates most conditionals and ill-conditionals checking.
@@ -93,7 +95,7 @@ def roc_curve(sorted_pairs: jnp.array) -> tuple[jnp.array, jnp.array, jnp.array]
     return fpr, tpr, thresholds
 
 
-def auc(x, y):
+def auc(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
     """Compute Area Under the Curve (AUC) using the trapezoidal rule.
     X must be monotonic, no checking inside function.
 
@@ -111,7 +113,7 @@ def auc(x, y):
     return area
 
 
-def binary_roc_auc(sorted_pairs: jnp.array) -> float:
+def binary_roc_auc(sorted_pairs: jnp.ndarray) -> float:
     """
     Compute Area Under the Curve (AUC) for ROC from labels and prediction scores in sorted_pairs.
 

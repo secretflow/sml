@@ -25,11 +25,11 @@ from collections.abc import Callable
 from contextlib import contextmanager
 from enum import Enum
 
-import spu.utils.distributed as ppd
 import yaml
 from spu import libspu
 from spu.utils.polyfill import Process
 
+import emulations.utils.distributed as ppd
 from sml.utils.utils import get_logger
 
 CLUSTER_ABY3_3PC = "sml/utils/conf/3pc.json"

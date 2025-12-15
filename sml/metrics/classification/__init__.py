@@ -12,6 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from sml.metrics.classification import classification
+from sml.metrics.classification.classification import (
+    accuracy_score,
+    average_precision_score,
+    f1_score,
+    fun_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 
-__all__ = ["classification"]
+__all__ = [
+    "accuracy_score",
+    "average_precision_score",
+    "f1_score",
+    "fun_score",
+    "precision_score",
+    "recall_score",
+    "roc_auc_score",
+]
