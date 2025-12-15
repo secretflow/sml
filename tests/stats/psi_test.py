@@ -22,8 +22,13 @@ from sml.preprocessing.preprocessing import KBinsDiscretizer
 from sml.stats.psi import psi
 
 
-def _numpy_psi(actual: np.ndarray, expect: np.ndarray, bins: np.ndarray) -> np.ndarray:
+def _numpy_psi(
+    actual: np.ndarray, expect: np.ndarray, bins: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     """Simple numpy implementation of PSI for validation, supporting multiple features"""
+    actual = np.asarray(actual)
+    expect = np.asarray(expect)
+    bins = np.asarray(bins)
 
     def _compute_feature_distribution(
         data: np.ndarray, feature_bins: np.ndarray, n_bins: int
@@ -45,6 +50,7 @@ def _numpy_psi(actual: np.ndarray, expect: np.ndarray, bins: np.ndarray) -> np.n
     n_features = actual.shape[1]
     n_bins = bins.shape[0] - 1
     psi_values = []
+    bin_details_list = []
 
     for i in range(n_features):
         # Compute distributions for actual and expect data
@@ -56,11 +62,23 @@ def _numpy_psi(actual: np.ndarray, expect: np.ndarray, bins: np.ndarray) -> np.n
         actual_pct = np.where(actual_pct == 0, eps, actual_pct)
         expect_pct = np.where(expect_pct == 0, eps, expect_pct)
 
-        # Calculate PSI for this feature
-        psi_value = np.sum((actual_pct - expect_pct) * np.log(actual_pct / expect_pct))
+        # Calculate PSI contributions for each bin
+        psi_contributions = (actual_pct - expect_pct) * np.log(actual_pct / expect_pct)
+
+        # Total PSI for this feature
+        psi_value = np.sum(psi_contributions)
         psi_values.append(psi_value)
 
-    return np.array(psi_values)
+        # Stack bin details: [psi_contribution, actual_dist, expect_dist]
+        feature_bin_details = np.stack(
+            [psi_contributions, actual_pct, expect_pct], axis=1
+        )
+        bin_details_list.append(feature_bin_details)
+
+    # Combine all features into final shape (n_features, n_bins, 3)
+    bin_details = np.array(bin_details_list)
+
+    return np.array(psi_values), bin_details
 
 
 @pytest.mark.parametrize(
@@ -90,9 +108,12 @@ def test_psi(n_samples: int, n_features: int, n_bins: int, offset: int, method: 
 
     bin_edges = discretizer.bin_edges_
 
-    res_jax = psi(actual, expect, bin_edges)
-    res_np = _numpy_psi(np.asarray(actual), np.asarray(expect), np.asarray(bin_edges))
+    res_jax, bin_details_jax = psi(actual, expect, bin_edges)
+    res_np, bin_details_np = _numpy_psi(
+        np.asarray(actual), np.asarray(expect), np.asarray(bin_edges)
+    )
     np.testing.assert_allclose(res_jax, res_np, rtol=1e-3)
+    np.testing.assert_allclose(bin_details_jax, bin_details_np, rtol=1e-3)
 
     # test in spu
     import spu.libspu as libspu
@@ -104,6 +125,7 @@ def test_psi(n_samples: int, n_features: int, n_bins: int, offset: int, method: 
         fxp_fraction_bits=48,
     )
     sim = spsim.Simulator(2, config)
-    res_spu = spsim.sim_jax(sim, psi)(actual, expect, bin_edges)
+    res_spu, bin_details_spu = spsim.sim_jax(sim, psi)(actual, expect, bin_edges)
 
     np.testing.assert_allclose(res_np, res_spu, atol=1e-3)
+    np.testing.assert_allclose(bin_details_np, bin_details_spu, atol=1e-3)
