@@ -140,7 +140,8 @@ def emul_onehotEncoder(emulator: emulation.Emulator):
     sk_onehotEncoder.fit(sk_X)
     sk_transformed = sk_onehotEncoder.transform(sk_Y)
     sk_inv_transformed = sk_onehotEncoder.inverse_transform(sk_transformed)
-    sk_inv_transformed = np.where(sk_inv_transformed is None, 0.0, sk_inv_transformed)
+    sk_inv_transformed = sk_inv_transformed.astype(np.float64)
+    sk_inv_transformed = np.where(np.isnan(sk_inv_transformed), 0.0, sk_inv_transformed)
 
     X, Y = emulator.seal(X, Y)
     spu_transformed, spu_inv_transformed = emulator.run(onehotEncode)(X, Y)

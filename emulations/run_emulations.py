@@ -98,6 +98,24 @@ class EmulationRunner:
         self.timeout = timeout
         self.results: list[TestResult] = []
 
+    @staticmethod
+    def _format_exception(exc: Exception) -> dict[str, str]:
+        """Format exception details with line info."""
+
+        tb_exc = traceback.TracebackException.from_exception(exc)
+        if tb_exc.stack:
+            last_frame = tb_exc.stack[-1]
+            location = f"{last_frame.filename}:{last_frame.lineno}"
+        else:
+            location = "<unknown>"
+
+        return {
+            "message": f"{exc} @ {location}",
+            "traceback": "".join(tb_exc.format()),
+            "location": location,
+            "type": type(exc).__name__,
+        }
+
     def discover_emulation_files(self) -> list[str]:
         """
         Discover all emulation files in the emulations directory (including nested subdirectories).
@@ -193,14 +211,14 @@ class EmulationRunner:
             result_queue.put({"success": True})
 
         except Exception as e:
-            error_type = type(e).__name__
-            error_message = str(e)
+            formatted = self._format_exception(e)
             result_queue.put(
                 {
                     "success": False,
-                    "error_message": error_message,
-                    "error_type": error_type,
-                    "traceback": traceback.format_exc(),
+                    "error_message": formatted["message"],
+                    "error_type": formatted["type"],
+                    "traceback": formatted["traceback"],
+                    "location": formatted["location"],
                 }
             )
 
@@ -312,11 +330,12 @@ class EmulationRunner:
 
         except Exception as e:
             duration = time.time() - start_time
-            error_type = type(e).__name__
-            error_message = str(e)
+            formatted = self._format_exception(e)
 
             if self.verbose:
-                print(f"  ERROR in process management: {error_type}: {error_message}")
+                print(
+                    f"  ERROR in process management: {formatted['type']}: {formatted['message']}"
+                )
                 traceback.print_exc()
 
             # Clean up process if still running
@@ -331,8 +350,8 @@ class EmulationRunner:
                 function_name="main",
                 success=False,
                 duration=duration,
-                error_message=error_message,
-                error_type=error_type,
+                error_message=formatted["message"],
+                error_type=formatted["type"],
             )
 
     def run_all_emulations(self) -> None:
@@ -401,14 +420,15 @@ class EmulationRunner:
                 print(f"  {status} main ({result.duration:.2f}s)")
 
             except ImportError as e:
-                print(f"  ❌ Failed to import {module_path}: {e}")
+                formatted = self._format_exception(e)
+                print(f"  ❌ Failed to import {module_path}: {formatted['message']}")
                 self.results.append(
                     TestResult(
                         module_path=module_path,
                         function_name="main",
                         success=False,
                         duration=0.0,
-                        error_message=str(e),
+                        error_message=formatted["message"],
                         error_type="ImportError",
                     )
                 )
