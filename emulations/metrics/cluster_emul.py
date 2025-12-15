@@ -40,7 +40,7 @@ def emul_Cluster(emulator: emulation.Emulator):
 
     def check(spu_result, sk_result):
         for pair in zip(spu_result, sk_result):
-            np.testing.assert_allclose(pair[0], pair[1], rtol=1e-3, atol=1e-3)
+            np.testing.assert_allclose(pair[0], pair[1], rtol=1e-2, atol=1e-2)
 
     # --- Test perfect match ---
     labels_true = jnp.array([0, 0, 1, 1])

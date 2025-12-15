@@ -71,8 +71,8 @@ def emul_mean_squared_error(emulator: emulation.Emulator):
     y_true = jnp.array([3, -0.5, 2, 7])
     y_pred = jnp.array([2.5, 0.0, 2, 8])
     for weight in weight_list:
-        sk_result = metrics.mean_squared_error(
-            y_true, y_pred, sample_weight=weight, squared=False
+        sk_result = metrics.root_mean_squared_error(
+            y_true, y_pred, sample_weight=weight
         )
         spu_result = emulator.run(mean_squared_error, static_argnums=(3, 4))(
             y_true, y_pred, weight, "uniform_average", False

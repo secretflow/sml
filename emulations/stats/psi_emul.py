@@ -21,16 +21,26 @@ from sml.stats.psi import psi
 
 
 # Calculate reference using numpy
-def _numpy_psi(actual: np.ndarray, expect: np.ndarray, bins: np.ndarray) -> np.ndarray:
+def _numpy_psi(
+    actual: np.ndarray, expect: np.ndarray, bins: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     """Simple numpy implementation of PSI for validation, supporting multiple features"""
+    actual = np.asarray(actual)
+    expect = np.asarray(expect)
+    bins = np.asarray(bins)
 
     def _compute_feature_distribution(
         data: np.ndarray, feature_bins: np.ndarray, n_bins: int
     ) -> np.ndarray:
-        """Compute the distribution for a single feature"""
-        indices = np.digitize(data, feature_bins, right=True) - 1
-        indices = np.clip(indices, 0, n_bins - 1)
-        hist = np.bincount(indices, minlength=n_bins)
+        """Compute the distribution for a single feature using JAX-compatible logic"""
+        # Use broadcasting to compare each data point with all bin edges
+        data_expanded = data[:, None]  # (n_samples, 1)
+        bin_edges_expanded = feature_bins[None, :]  # (1, n_bins+1)
+
+        # Compute bin indices using the same logic as JAX
+        bin_indices = (data_expanded >= bin_edges_expanded).sum(axis=-1) - 1
+        bin_indices = np.clip(bin_indices, 0, n_bins - 1)
+        hist = np.bincount(bin_indices.flatten(), minlength=n_bins)
 
         # Calculate percentages without adding epsilon here
         pct = hist / np.sum(hist)
@@ -39,6 +49,7 @@ def _numpy_psi(actual: np.ndarray, expect: np.ndarray, bins: np.ndarray) -> np.n
     n_features = actual.shape[1]
     n_bins = bins.shape[0] - 1
     psi_values = []
+    bin_details_list = []
 
     for i in range(n_features):
         # Compute distributions for actual and expect data
@@ -50,11 +61,23 @@ def _numpy_psi(actual: np.ndarray, expect: np.ndarray, bins: np.ndarray) -> np.n
         actual_pct = np.where(actual_pct == 0, eps, actual_pct)
         expect_pct = np.where(expect_pct == 0, eps, expect_pct)
 
-        # Calculate PSI for this feature
-        psi_value = np.sum((actual_pct - expect_pct) * np.log(actual_pct / expect_pct))
+        # Calculate PSI contributions for each bin
+        psi_contributions = (actual_pct - expect_pct) * np.log(actual_pct / expect_pct)
+
+        # Total PSI for this feature
+        psi_value = np.sum(psi_contributions)
         psi_values.append(psi_value)
 
-    return np.array(psi_values)
+        # Stack bin details: [psi_contribution, actual_dist, expect_dist]
+        feature_bin_details = np.stack(
+            [psi_contributions, actual_pct, expect_pct], axis=1
+        )
+        bin_details_list.append(feature_bin_details)
+
+    # Combine all features into final shape (n_features, n_bins, 3)
+    bin_details = np.array(bin_details_list)
+
+    return np.array(psi_values), bin_details
 
 
 def emul_psi(emulator: emulation.Emulator):
@@ -73,13 +96,16 @@ def emul_psi(emulator: emulation.Emulator):
     discretizer.fit(expect)
     bins = discretizer.bin_edges_
 
-    ref_result = _numpy_psi(np.array(actual), np.array(expect), np.array(bins))
+    np_psi_res, np_bin_details = _numpy_psi(
+        np.array(actual), np.array(expect), np.array(bins)
+    )
 
     # Run SPU computation
-    spu_result = emulator.run(psi)(
+    spu_psi_res, spu_bin_details = emulator.run(psi)(
         emulator.seal(actual), emulator.seal(expect), emulator.seal(bins)
     )
-    np.testing.assert_allclose(spu_result, ref_result, rtol=1e-3, atol=1e-3)
+    np.testing.assert_allclose(spu_psi_res, np_psi_res, rtol=1e-3, atol=1e-3)
+    np.testing.assert_allclose(spu_bin_details, np_bin_details, rtol=1e-3, atol=1e-3)
 
 
 def main(

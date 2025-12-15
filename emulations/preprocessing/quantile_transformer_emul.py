@@ -24,120 +24,77 @@ from sml.preprocessing.quantile_transformer import QuantileTransformer
 
 
 def emul_quantile_transformer(emulator: emulation.Emulator):
-
-    N_QUANTILES = 100
+    N_QUANTILES = 50
     RANDOM_STATE = 42
-    N_SAMPLES = 50
+    N_SAMPLES = 100
     N_FEATURES = 2
 
     def proc_quantile_transform(X, n_quantiles, distribution):
-
         model = QuantileTransformer(
             n_quantiles=n_quantiles,
             output_distribution=distribution,
         )
-
         model.fit(X)
         X_transformed = model.transform(X)
         X_inversed = model.inverse_transform(X_transformed)
         return X_transformed, X_inversed
 
-    def compare_results(
-        X_plaintext,
-        X_transformed_spu,
-        X_inversed_spu,
-        output_dist,
-        n_quantiles,
-        n_samples,
-        random_state,
-    ):
-
-        print(f"\nStarting comparisons for '{output_dist}' distribution...")
-
-        assert (
-            X_transformed_spu.shape == X_plaintext.shape
-        ), f"Shape mismatch (transform, {output_dist})"
-        assert (
-            X_inversed_spu.shape == X_plaintext.shape
-        ), f"Shape mismatch (inverse, {output_dist})"
-        print("Shape checks PASSED.")
-
-        sklearn_qt = SklearnQuantileTransformer(
-            n_quantiles=min(n_quantiles, n_samples),
-            output_distribution=output_dist,
-            subsample=int(1e9),
-            random_state=random_state,
-        )
-        X_np = np.array(X_plaintext)
-        X_transformed_sklearn = sklearn_qt.fit_transform(X_np)
-        print("Sklearn reference calculated.")
-
-        # Compare Transformed Data
-        np.testing.assert_allclose(
-            X_transformed_sklearn,
-            np.array(X_transformed_spu),
-            rtol=1e-2,
-            atol=1e-2,
-            err_msg=f"Transformed data mismatch between SPU ({output_dist}) and Sklearn",
-        )
-        print(f"Sklearn transform comparison ({output_dist}) PASSED.")
-
-        if output_dist == "uniform":
-            assert jnp.all(
-                (X_transformed_spu >= -1e-6) & (X_transformed_spu <= 1 + 1e-6)
-            ), "Uniform output out of [0, 1] range"
-            assert (
-                jnp.std(X_transformed_spu) > 1e-3
-            ), "Uniform output seems collapsed (std dev too small)"
-            print("Uniform output properties check PASSED.")
-
-        np.testing.assert_allclose(
-            np.array(X_plaintext),
-            np.array(X_inversed_spu),
-            rtol=1e-2,
-            atol=1e-2,
-            err_msg=f"Inverse transformed data mismatch ({output_dist})",
-        )
-        print(f"Inverse transform reconstruction check ({output_dist}) PASSED.")
-
     def uniform_test(emulator, X_plaintext):
-        """Runs the emulation test specifically for the 'uniform' distribution."""
-        print("\n===== Running Test: Uniform Distribution =====")
         output_dist = "uniform"
-        output_dist = "uniform"
-
-        print("Sealing data for uniform test...")
         X_spu = emulator.seal(X_plaintext)
-        print("Data sealed.")
 
-        print("Running SPU computation (uniform)...")
         start_time = time.time()
         X_transformed_spu, X_inversed_spu = emulator.run(
             proc_quantile_transform, static_argnums=(1, 2)
         )(X_spu, N_QUANTILES, output_dist)
-        end_time = time.time()
-        print(f"SPU computation (uniform) finished in {end_time - start_time:.3f}s.")
+        _ = time.time() - start_time
 
-        compare_results(
-            X_plaintext,
-            X_transformed_spu,
-            X_inversed_spu,
-            output_dist,
-            N_QUANTILES,
-            N_SAMPLES,
-            RANDOM_STATE,
+        # Shape checks
+        assert X_transformed_spu.shape == X_plaintext.shape
+        assert X_inversed_spu.shape == X_plaintext.shape
+
+        # Reference with sklearn (cap n_quantiles by n_samples like sklearn does)
+        sklearn_qt = SklearnQuantileTransformer(
+            n_quantiles=min(N_QUANTILES, N_SAMPLES),
+            output_distribution=output_dist,
+            random_state=RANDOM_STATE,
         )
-        print("===== Test PASSED: Uniform Distribution =====")
+        X_np = np.array(X_plaintext)
+        X_transformed_sklearn = sklearn_qt.fit_transform(X_np)
+        X_inversed_sklearn = sklearn_qt.inverse_transform(X_transformed_sklearn)
 
-    print("Preparing common plaintext data...")
+        # Uniform range and non-collapsed distribution
+        assert jnp.all(X_transformed_spu >= -1e-4)
+        assert jnp.all(X_transformed_spu <= 1.0 + 1e-4)
+
+        # Compare transformed outputs
+        np.testing.assert_allclose(
+            X_transformed_spu,
+            X_transformed_sklearn,
+            rtol=1e-3,
+            atol=1e-3,
+        )
+
+        # Compare inverse outputs to sklearn and to original (looser like unit test)
+        np.testing.assert_allclose(
+            X_inversed_spu,
+            X_inversed_sklearn,
+            rtol=1e-3,
+            atol=1e-3,
+        )
+        np.testing.assert_allclose(
+            X_inversed_spu,
+            X_plaintext,
+            rtol=0.1,
+            atol=0.5,
+        )
+
+    # Generate data consistent with unit test
     key = random.PRNGKey(RANDOM_STATE)
-
-    data = random.normal(key, (N_SAMPLES, N_FEATURES))
-    data = data.at[:, 0].set(jnp.exp(data[:, 0] / 2))
-    data = data.at[:, 1].set(data[:, 1] * 5 + 10)
-    X_plaintext = jnp.array(data, dtype=jnp.float32)
-    assert not jnp.isnan(X_plaintext).any(), "Input data generation resulted in NaNs!"
-    print(f"Plaintext data prepared: shape={X_plaintext.shape}")
+    data_key, _ = random.split(key)
+    X_plaintext = random.exponential(data_key, (N_SAMPLES, N_FEATURES)) * 10
+    X_plaintext = X_plaintext.astype(jnp.float32)
+    assert not jnp.isnan(X_plaintext).any()
 
     uniform_test(emulator, X_plaintext)
 

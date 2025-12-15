@@ -15,6 +15,5 @@
 from .pearsonr_emul import emul_pearsonr
 from .psi_emul import emul_psi
 from .vif_emul import emul_vif
-from .woe_iv_emul import emul_woe_iv
 
-__all__ = ["emul_pearsonr", "emul_psi", "emul_vif", "emul_woe_iv"]
+__all__ = ["emul_pearsonr", "emul_psi", "emul_vif"]

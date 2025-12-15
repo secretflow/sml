@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import jax
 import jax.numpy as jnp
 
@@ -50,7 +51,7 @@ def psi(
     expect_data: jax.Array,
     bins: jax.Array,
     eps: float = 1e-8,
-) -> jax.Array:
+) -> tuple[jax.Array, jax.Array]:
     """
     Compute Population Stability Index (PSI) between actual and expected data.
 
@@ -62,9 +63,9 @@ def psi(
     Parameters
     ----------
     actual_data : ArrayLike
-        Actual data samples with shape (n_samples, n_features)
+        Actual data (like test data) samples with shape (n_samples, n_features)
     expect_data : ArrayLike
-        Expected data samples with shape (n_samples, n_features)
+        Expected data (like base data) samples with shape (n_samples, n_features)
     bins : ArrayLike
         Bin edges with shape (n_bins+1, n_features)
     eps : float, default=1e-8
@@ -72,8 +73,16 @@ def psi(
 
     Returns
     -------
-    psi_values : ArrayLike
-        PSI values for each feature with shape (n_features,)
+    tuple[jax.Array, jax.Array]
+        A tuple containing:
+        - psi_values : ArrayLike
+            Total PSI values for each feature with shape (n_features,)
+        - bin_details : ArrayLike
+            Detailed bin-level information with shape (n_features, n_bins, 3)
+            The last dimension contains [psi_contribution, actual_dist, expect_dist] for each bin:
+            - psi_contribution: PSI contribution from this bin
+            - actual_dist: Actual distribution proportion for this bin
+            - expect_dist: Expected distribution proportion for this bin
 
         Interpretation:
         - PSI < 0.1: No significant change
@@ -98,13 +107,16 @@ def psi(
     >>> actual_data = jnp.array([[1.0, 2.0], [2.0, 3.0], [3.0, 4.0]])
     >>> expect_data = jnp.array([[1.5, 2.5], [2.5, 3.5]])
     >>> bins = jnp.array([[0.0, 1.0], [2.0, 3.0], [4.0, 5.0]])
-    >>> psi_values = psi(actual_data, expect_data, bins)
-    >>> print(psi_values)
+    >>> psi_values, bin_details = psi(actual_data, expect_data, bins)
+    >>> print("Total PSI values:", psi_values)
+    >>> print("Bin details shape:", bin_details.shape)  # (n_features, n_bins, 3)
+    >>> print("First feature bin details:", bin_details[0])
     """
     # Ensure 2D arrays
     actual_data = jnp.atleast_2d(actual_data)
     expect_data = jnp.atleast_2d(expect_data)
     bins = jnp.atleast_2d(bins)
+    n_bins = bins.shape[0] - 1
 
     # Validate input dimension consistency
     if (
@@ -116,8 +128,6 @@ def psi(
             f"got {actual_data.shape} and {expect_data.shape} and {bins.shape}"
         )
 
-    n_bins = bins.shape[0] - 1
-
     # Compute bin distributions for actual and expected data
     actual_dist = _compute_distribution(actual_data, bins, n_bins)
     expect_dist = _compute_distribution(expect_data, bins, n_bins)
@@ -126,10 +136,16 @@ def psi(
     actual_dist = jnp.where(actual_dist == 0, eps, actual_dist)
     expect_dist = jnp.where(expect_dist == 0, eps, expect_dist)
 
-    # Compute PSI values
-    # PSI = Σ (actual_proportion - expected_proportion) * jnp.log(actual_dist / expect_dist)
-    psi_values = jnp.sum(
-        (actual_dist - expect_dist) * jnp.log(actual_dist / expect_dist), axis=0
-    )
+    # Compute PSI values for each bin
+    # PSI_contribution = (actual_proportion - expected_proportion) * ln(actual_proportion / expected_proportion)
+    psi_contributions = (actual_dist - expect_dist) * jnp.log(actual_dist / expect_dist)
 
-    return psi_values
+    # Total PSI values for each feature
+    psi_values = jnp.sum(psi_contributions, axis=0)
+
+    # Stack bin-level details: [psi_contribution, actual_dist, expect_dist]
+    # Transpose to get shape (n_features, n_bins, 3)
+    bin_details = jnp.stack([psi_contributions, actual_dist, expect_dist], axis=0)
+    bin_details = jnp.transpose(bin_details, (2, 1, 0))
+
+    return psi_values, bin_details
