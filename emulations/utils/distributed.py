@@ -30,6 +30,21 @@ from .distributed_impl import (  # type: ignore
     shape_spu_to_np,
 )
 
+__all__ = [
+    "PYU",
+    "SPU",
+    "Framework",
+    "current",
+    "device",
+    "dtype_spu_to_np",
+    "get",
+    "init",
+    "load",
+    "save",
+    "set_framework",
+    "shape_spu_to_np",
+]
+
 
 def main():
     import argparse
@@ -42,18 +57,18 @@ def main():
     subparsers = parser.add_subparsers(dest="command")
     parser_start = subparsers.add_parser("start", help="to start a single node")
     parser_start.add_argument("-n", "--node_id", default="node:0", help="the node id")
-    parser_up = subparsers.add_parser("up", help="to bring up all nodes")
+    _parser_up = subparsers.add_parser("up", help="to bring up all nodes")
 
     args = parser.parse_args()
 
     if args.config:
-        with open(args.config, "r") as file:
+        with open(args.config) as file:
             conf = json.load(file)
         nodes_def = conf["nodes"]
         devices_def = conf["devices"]
     else:
         nodes_def = SAMPLE_NODES_DEF
-        devices_def = SAMPLE_DEVICES_DEF
+        devices_def = SAMPLE_DEVICES_DEF  # noqa: F841
 
     if args.command == "start":
         RPC.serve(args.node_id, nodes_def)

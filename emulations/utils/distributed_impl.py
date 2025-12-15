@@ -27,7 +27,7 @@ from collections import Counter
 from collections.abc import Callable, Generator, Iterable, Sequence
 from enum import Enum
 from functools import partial, wraps
-from typing import Any, Dict, List, Tuple, Union  # noqa: UP035
+from typing import Any
 
 import cloudpickle
 import grpc
@@ -107,17 +107,16 @@ def patch_pickle_for_security():
     if whitelist_path is None:
         return
 
-    _pickle_whitelist = json.load(open(whitelist_path, "rt")).get(
-        "pickle_whitelist", None
-    )
+    with open(whitelist_path) as f:
+        _pickle_whitelist = json.load(f).get("pickle_whitelist", None)
     if _pickle_whitelist is None:
         return
 
     if "*" in _pickle_whitelist:
         _pickle_whitelist = None
-    for module, attr_list in _pickle_whitelist.items():
+    for module, attr_list in _pickle_whitelist.items():  # type: ignore
         if "*" in attr_list:
-            _pickle_whitelist[module] = None
+            _pickle_whitelist[module] = None  # type: ignore
     pickle.loads = restricted_loads
 
 
@@ -174,7 +173,7 @@ class RPC:
             )
 
     @classmethod
-    def serve(cls, node_id: str, nodes_def: Dict[str, str]):
+    def serve(cls, node_id: str, nodes_def: dict[str, str]):
         server = grpc.server(
             concurrent.futures.ThreadPoolExecutor(max_workers=10), options=RPC.OPTIONS
         )
@@ -182,7 +181,7 @@ class RPC:
             NodeServicer(node_id, nodes_def), server
         )
         global logger
-        processNameFix = {"processNameCorrected": multiprocess.current_process().name}
+        processNameFix = {"processNameCorrected": multiprocess.current_process().name}  # type: ignore
         logger = logging.LoggerAdapter(logger, processNameFix)
         if PPU_SPU_ENABLE_ATLS:
             server_creds = grpc.alts_server_credentials()
@@ -200,7 +199,7 @@ def split_message(msg: bytes) -> Iterable[bytes]:
 
 
 def rebuild_messages(msgs: Generator[bytes, None, None]) -> bytes:
-    return b"".join([msg for msg in msgs])
+    return b"".join(list(msgs))
 
 
 class NodeClient:
@@ -220,7 +219,8 @@ class NodeClient:
     def _call(self, stub_method, fn, *args, **kwargs):
         payload = cloudpickle.dumps((fn, args, kwargs))
         rsp_gen = stub_method(
-            distributed_pb2.RunRequest(data=split) for split in split_message(payload)
+            distributed_pb2.RunRequest(data=split)  # type: ignore
+            for split in split_message(payload)
         )
         rsp_data = rebuild_messages(rsp_itr.data for rsp_itr in rsp_gen)
         # Warning: this is only a demo, do not use in production
@@ -247,8 +247,8 @@ class NodeClient:
         # use uuid directly to prevent server fetch object ref.
         return self._call(self._stub.RunReturn, builtin_fetch_object, ref.uuid)
 
-    def save(self, refs: List[ObjectRef], filename: str):
-        def builtin_save_object(server, ref_ids: List[str], filename: str):
+    def save(self, refs: list[ObjectRef], filename: str):
+        def builtin_save_object(server, ref_ids: list[str], filename: str):
             pathlib.Path(filename).parent.absolute().mkdir(parents=True, exist_ok=True)
             with open(filename, "wb") as f:
                 data = []
@@ -272,20 +272,20 @@ class NodeClient:
 
 # Warning: this is only a demo on how to use SPU utilities.
 class NodeServicer(distributed_pb2_grpc.NodeServiceServicer):
-    def __init__(self, node_id: str, nodes_def: Dict[str, str]):
+    def __init__(self, node_id: str, nodes_def: dict[str, str]):
         self.node_id = node_id
         self.nodes_def = nodes_def
 
         # _locals saves objects visible only for this node.
-        self._locals: Dict[str, object] = {}
+        self._locals: dict[str, object] = {}
         # _globals saves objects visible for the entire cluster.
-        self._globals: Dict[ObjectRef, object] = {}
+        self._globals: dict[ObjectRef, object] = {}
         # _node_clients used to communicate with other nodes in the cluster.
         self._node_clients = {
             node_id: NodeClient(node_id, addr) for node_id, addr in nodes_def.items()
         }
 
-    def RunReturn(self, req_itr, ctx):
+    def RunReturn(self, req_itr, ctx):  # type: ignore
         payload = rebuild_messages(itr.data for itr in req_itr)
         # Warning: this is only a demo, do not use in production.
         (fn, args, kwargs) = pickle.loads(payload)
@@ -293,17 +293,17 @@ class NodeServicer(distributed_pb2_grpc.NodeServiceServicer):
         try:
             from jax.tree_util import tree_map
 
-            args, kwargs = tree_map(lambda obj: self._get_object(obj), (args, kwargs))
+            args, kwargs = tree_map(self._get_object, (args, kwargs))
             result = fn(self, *args, **kwargs)
             response = cloudpickle.dumps(result)
-        except Exception as e:
+        except Exception:
             stack_info = traceback.format_exc()
             logger.info(stack_info)
             response = cloudpickle.dumps(Exception(stack_info))
         for split in split_message(response):
-            yield distributed_pb2.RunResponse(data=split)
+            yield distributed_pb2.RunResponse(data=split)  # type: ignore
 
-    def Run(self, req_itr, ctx):
+    def Run(self, req_itr, ctx):  # type: ignore
         payload = rebuild_messages(itr.data for itr in req_itr)
         # Warning: this is only a demo, do not use in production.
         (fn, args, kwargs) = pickle.loads(payload)
@@ -311,18 +311,18 @@ class NodeServicer(distributed_pb2_grpc.NodeServiceServicer):
         try:
             from jax.tree_util import tree_map
 
-            args, kwargs = tree_map(lambda obj: self._get_object(obj), (args, kwargs))
+            args, kwargs = tree_map(self._get_object, (args, kwargs))
             ret_objs = fn(self, *args, **kwargs)
-            ret_refs = tree_map(lambda obj: self._add_object(obj), ret_objs)
+            ret_refs = tree_map(self._add_object, ret_objs)
             response = cloudpickle.dumps(ret_refs)
         except Exception:
             stack_info = traceback.format_exc()
             logger.info(stack_info)
             response = cloudpickle.dumps(Exception(stack_info))
         for split in split_message(response):
-            yield distributed_pb2.RunResponse(data=split)
+            yield distributed_pb2.RunResponse(data=split)  # type: ignore
 
-    def _get_object(self, ref: Union[ObjectRef, Any]):
+    def _get_object(self, ref: ObjectRef | Any):
         """Get an object from the distributed context."""
         if not isObjectRef(ref):
             return ref
@@ -356,7 +356,7 @@ class NodeServicer(distributed_pb2_grpc.NodeServiceServicer):
 
 
 def shape_spu_to_np(spu_shape):
-    return tuple(list(spu_shape.dims))
+    return tuple(spu_shape.dims)
 
 
 def dtype_spu_to_np(spu_dtype):
@@ -429,7 +429,7 @@ class Device:
     def get(self, obj: Device.Object):
         """Get this device object to the host"""
 
-    def compile(self, fn: Callable, *comp_args, **comp_kwargs) -> Callable:
+    def compile(self, fn: Callable, *comp_args, **comp_kwargs) -> Callable:  # type: ignore
         """Compile a python callable to device callable"""
 
     @classmethod
@@ -503,7 +503,7 @@ class PYU(Device):
     def compile(self, fn: Callable):
         return PYU.Function(self, fn)
 
-    def get(self, obj: PYU.Object):
+    def get(self, obj: PYU.Object):  # type: ignore
         return self.node_client.get(obj.ref)
 
 
@@ -523,16 +523,16 @@ class ValueWrapper:
 
 
 def builtin_spu_init(
-    server, name: str, my_rank: int, addrs: List[str], spu_config_str: str
+    server, name: str, my_rank: int, addrs: list[str], spu_config_str: str
 ):
     global logger
-    processNameFix = {"processNameCorrected": multiprocess.current_process().name}
+    processNameFix = {"processNameCorrected": multiprocess.current_process().name}  # type: ignore
     logger = logging.LoggerAdapter(logger, processNameFix)
 
     if f"{name}-rt" in server._locals:
         logger.info(f"spu-runtime ({name}) already exist, reuse it")
         return
-    desc = libspu.link.Desc()
+    desc = libspu.link.Desc()  # type: ignore
     desc.recv_timeout_ms = 100 * 1000  # 100 seconds
     desc.http_max_payload_size = 32 * 1024 * 1024  # Default set link payload to 32M
     for rank, addr in enumerate(addrs):
@@ -543,26 +543,27 @@ def builtin_spu_init(
     link_method = os.environ.get("SPU_LINK_METHOD", "brpc").lower()
 
     if link_method == "brpc":
-        logger.info(f"Creating link context using create_brpc method")
+        logger.info("Creating link context using create_brpc method")
         # Use the original brpc method
         link = libspu.link.create_brpc(desc, my_rank)
     else:
-        logger.info(f"Creating link context using HttpChannel method")
+        raise ValueError(f"unsupported link_method{link_method}")
+        # logger.info("Creating link context using HttpChannel method")
         # Use HttpChannel method (current default)
-        from examples.python.advanced.http_channel import HttpChannel
+        # from examples.python.advanced.http_channel import HttpChannel
 
-        channels = []
-        for rank in range(len(addrs)):
-            if rank == my_rank:
-                channels.append(None)
-            else:
-                channel = HttpChannel(my_rank, rank, 11450)
-                channels.append(channel)
+        # channels = []
+        # for rank in range(len(addrs)):
+        #     if rank == my_rank:
+        #         channels.append(None)
+        #     else:
+        #         channel = HttpChannel(my_rank, rank, 11450)
+        #         channels.append(channel)
 
-        link = libspu.link.create_with_channels(desc, my_rank, channels)
+        # link = libspu.link.create_with_channels(desc, my_rank, channels)
 
     spu_config = libspu.RuntimeConfig()
-    spu_config.ParseFromString(spu_config_str)
+    spu_config.ParseFromString(spu_config_str)  # type: ignore
     if my_rank != 0:
         spu_config.enable_action_trace = False
         spu_config.enable_hal_profile = False
@@ -572,7 +573,7 @@ def builtin_spu_init(
     logger.info(f"spu-runtime ({name}) initialized")
 
 
-def builtin_fetch_meta(server, vals: List[ValueWrapper]):
+def builtin_fetch_meta(server, vals: list[ValueWrapper]):
     return [(v.shape, v.dtype, v.vtype) for v in vals]
 
 
@@ -580,13 +581,13 @@ def builtin_spu_run(
     server,
     device_name: str,
     exec_str: str,
-    args_flat: List[Union[ObjectRef, Any]],
+    args_flat: list[ObjectRef | Any],
 ):
     rt = server._locals[f"{device_name}-rt"]
     io = server._locals[f"{device_name}-io"]
 
     spu_exec = libspu.Executable()
-    spu_exec.ParseFromString(exec_str)
+    spu_exec.ParseFromString(exec_str)  # type: ignore
 
     # do infeed.
     for idx, arg in enumerate(args_flat):
@@ -605,11 +606,11 @@ def builtin_spu_run(
     rets = [
         ValueWrapper(
             shape_spu_to_np(value_meta.shape),
-            dtype_spu_to_np(value_meta.data_type),
+            dtype_spu_to_np(value_meta.data_type),  # type: ignore
             value_meta.visibility,
             spu_share,
         )
-        for spu_share, value_meta in zip(values_str, values_meta)
+        for spu_share, value_meta in zip(values_str, values_meta, strict=False)
     ]
 
     # cleanup
@@ -710,7 +711,9 @@ class SPU(Device):
 
             ret_flat = [
                 SPU.Object(self.device, share_refs, *meta)
-                for share_refs, meta in zip(zip(*results), metas)
+                for share_refs, meta in zip(
+                    zip(*results, strict=False), metas, strict=False
+                )
             ]
 
             from jax.tree_util import tree_unflatten
@@ -722,10 +725,10 @@ class SPU(Device):
             executable, *_ = self._compile_jax_func(
                 self.pyfunc, self.static_argnums, self.copts, *args, **kwargs
             )
-            return executable.code.decode("utf-8")
+            return executable.code.decode("utf-8")  # type: ignore
 
         def _compile_jax_func(self, fn, static_argnums, copts, *args, **kwargs):
-            def mock_parameters(obj: Union[SPU.Object, np.ndarray]):
+            def mock_parameters(obj: SPU.Object | np.ndarray):
                 if isinstance(obj, SPU.Object):
                     return np.zeros(shape=obj.shape, dtype=obj.dtype)
                 else:
@@ -737,7 +740,7 @@ class SPU(Device):
             try:
                 import jax.extend.linear_util as lu
             except ImportError:
-                import jax.linear_util as lu  # fallback
+                import jax.linear_util as lu  # type: ignore # fallback
             from jax._src import api_util as japi_util
             from jax.tree_util import tree_flatten, tree_map
 
@@ -760,7 +763,7 @@ class SPU(Device):
 
             in_names = [f"{id(fn_name)}-in{idx}" for idx in range(len(args_flat))]
 
-            def outputNameGen(out_flat: List):
+            def outputNameGen(out_flat: list):
                 return [f"{id(fn_name)}-out{idx}" for idx in range(len(out_flat))]
 
             executable, output = spu_fe.compile(
@@ -789,7 +792,7 @@ class SPU(Device):
             super().__init__(device, pyfunc)
             self.copts = copts
 
-        def __call__(self, *args, **kwargs):
+        def __call__(self, *args, **kwargs):  # type: ignore
             args, kwargs = self.device._place_arguments(*args, **kwargs)
 
             # now, all object are either PyObject or SPU.DeviceObject
@@ -822,7 +825,9 @@ class SPU(Device):
 
             ret_flat = [
                 SPU.Object(self.device, share_refs, *meta)
-                for share_refs, meta in zip(zip(*results), metas)
+                for share_refs, meta in zip(
+                    zip(*results, strict=False), metas, strict=False
+                )
             ]
 
             # FIXME(junfeng): check input-output alias.
@@ -833,7 +838,7 @@ class SPU(Device):
             )
 
         def _compile_tf_func(self, fn, copts, *args, **kwargs):
-            def mock_parameters(obj: Union[SPU.Object, np.ndarray]):
+            def mock_parameters(obj: SPU.Object | np.ndarray):
                 if isinstance(obj, SPU.Object):
                     return np.zeros(shape=obj.shape, dtype=obj.dtype)
                 else:
@@ -861,7 +866,7 @@ class SPU(Device):
 
             in_names = [f"{id(fn_name)}-in{idx}" for idx in range(len(args_flat))]
 
-            def outputNameGen(out_flat: List):
+            def outputNameGen(out_flat: list):
                 return [f"{id(fn_name)}-out{idx}" for idx in range(len(out_flat))]
 
             executable, output_tree = spu_fe.compile(
@@ -897,7 +902,7 @@ class SPU(Device):
 
             return tree_map(place, state_dict)
 
-        def __call__(self, state_dict, *args, **kwargs):
+        def __call__(self, state_dict, *args, **kwargs):  # type: ignore
             # place state_dict
             self.state_dict = self._place_state_dict(state_dict)
             args, kwargs = self.device._place_arguments(*args, **kwargs)
@@ -932,7 +937,9 @@ class SPU(Device):
 
             ret = [
                 SPU.Object(self.device, share_refs, *meta)
-                for share_refs, meta in zip(zip(*results), metas)
+                for share_refs, meta in zip(
+                    zip(*results, strict=False), metas, strict=False
+                )
             ]
 
             from torch.utils import _pytree as pytree
@@ -947,12 +954,12 @@ class SPU(Device):
             self.state_dict = self._place_state_dict(state_dict)
             args, kwargs = self.device._place_arguments(*args, **kwargs)
             executable, *_ = self._compile_torch_func(self.pyfunc, *args, **kwargs)
-            return executable.code.decode("utf-8")
+            return executable.code.decode("utf-8")  # type: ignore
 
         def _compile_torch_func(self, fn, copts, *args, **kwargs):
             import torch
 
-            def mock_parameters(obj: Union[SPU.Object, np.ndarray]):
+            def mock_parameters(obj: SPU.Object | np.ndarray):
                 if isinstance(obj, SPU.Object):
                     zeros = np.zeros(shape=obj.shape, dtype=obj.dtype)
                     return torch.from_numpy(zeros)
@@ -977,7 +984,7 @@ class SPU(Device):
                 exported_fn,
                 args_flat,
                 m_args_flat,
-                state_dict=self.state_dict,
+                state_dict=self.state_dict,  # type: ignore
                 copts=self.copts,
             )
             return executable, args_flat, output_tree
@@ -986,10 +993,10 @@ class SPU(Device):
         self,
         host: HostContext,
         name: str,
-        node_clients: List[NodeClient],
-        internal_addrs: List[str],
-        runtime_config: Dict,
-        experimental_data_folder: List[str],
+        node_clients: list[NodeClient],
+        internal_addrs: list[str],
+        runtime_config: dict,
+        experimental_data_folder: list[str],
     ):
         super().__init__(host, name)
         self.node_clients = node_clients
@@ -1016,7 +1023,8 @@ class SPU(Device):
                 )
                 for idx, _ in enumerate(node_clients)
             ]
-        results = [future.result() for future in futures]
+        for future in futures:
+            future.result()
         self.experimental_data_folder = experimental_data_folder
 
     def __repr__(self):
@@ -1042,28 +1050,30 @@ class SPU(Device):
         else:
             raise Exception("unsupported frontend framework.")
 
-    def get(self, obj: SPU.Object):
-        value_wrappers = [nc.get(ref) for nc, ref in zip(self.node_clients, obj.refs)]
+    def get(self, obj: SPU.Object):  # type: ignore
+        value_wrappers = [
+            nc.get(ref) for nc, ref in zip(self.node_clients, obj.refs, strict=False)
+        ]
         io = spu_api.Io(len(self.internal_addrs), self.runtime_config)
         return io.reconstruct([w.spu_share for w in value_wrappers])
 
-    def save(self, spu_objects: List[SPU.Object], filename: str):
+    def save(self, spu_objects: list[SPU.Object], filename: str):
         assert self.experimental_data_folder, (
             "experimental_data_folder has not been provided."
         )
 
         refs_for_spu_objects = [obj.refs for obj in spu_objects]
-        transposed = list(zip(*refs_for_spu_objects))
+        transposed = list(zip(*refs_for_spu_objects, strict=False))
         refs_list = [list(sublist) for sublist in transposed]
 
         for nc, refs, folder in zip(
-            self.node_clients, refs_list, self.experimental_data_folder
+            self.node_clients, refs_list, self.experimental_data_folder, strict=False
         ):
             nc.save(refs, os.path.join(folder, filename))
 
     def load(
-        self, spu_object_metatdata: List[SPUObjectMetadata], filename: str
-    ) -> List[SPU.Object]:
+        self, spu_object_metatdata: list[SPUObjectMetadata], filename: str
+    ) -> list[SPU.Object]:
         assert self.experimental_data_folder, (
             "experimental_data_folder has not been provided."
         )
@@ -1072,22 +1082,25 @@ class SPU(Device):
             range(len(self.node_clients)),
             self.node_clients,
             self.experimental_data_folder,
+            strict=False,
         ):
             refs_list[i].extend(nc.load(os.path.join(folder, filename)))
 
-        transposed = list(zip(*refs_list))
+        transposed = list(zip(*refs_list, strict=False))
         refs_for_spu_objects = [list(sublist) for sublist in transposed]
 
         return [
             SPU.Object(self, refs, meta.shape, meta.dtype, meta.vtype)
-            for refs, meta in zip(refs_for_spu_objects, spu_object_metatdata)
+            for refs, meta in zip(
+                refs_for_spu_objects, spu_object_metatdata, strict=False
+            )
         ]
 
 
 class HostContext:
     """A host controls multiple virtual devices."""
 
-    def __init__(self, nodes_def: Dict[str, str], devices_def):
+    def __init__(self, nodes_def: dict[str, str], devices_def):
         self.nodes_def = nodes_def
         self.devices_def = devices_def
         self.node_clients = {
@@ -1111,12 +1124,12 @@ class HostContext:
                         config["experimental_data_folder"]
                         if "experimental_data_folder" in config
                         else None
-                    ),
+                    ),  # type: ignore
                 )
             else:
                 raise Exception("unknown kind {}".format(detail["kind"]))
         self._objrefs = Counter()
-        self._dead_refs: List[ObjectRef] = []
+        self._dead_refs: list[ObjectRef] = []
 
     _GC_COLLECT_THRESHOLD = 50
 
@@ -1138,10 +1151,10 @@ class HostContext:
         if len(self._dead_refs) < self._GC_COLLECT_THRESHOLD:
             return
 
-        def builtin_gc(server, ref_pairs: List[Tuple[str, str]]):
+        def builtin_gc(server, ref_pairs: list[tuple[str, str]]):
             # pass Tuple[str, str] to prevent auto _get_object
-            for uuid, from_nodeid in ref_pairs:
-                server._del_object(ObjectRef(uuid, from_nodeid))
+            for uid, from_nodeid in ref_pairs:
+                server._del_object(ObjectRef(uid, from_nodeid))
 
         try:
             # Note: `concurrent` maybe disposed before this call, but since the
@@ -1156,9 +1169,10 @@ class HostContext:
                     for _, client in self.node_clients.items()
                 ]
 
-            results = [future.result() for future in futures]
+            for future in futures:
+                future.result()
             self._dead_refs.clear()
-        except:
+        except Exception:
             # Just ignore it, not good for production but enough for demonstration.
             pass
 
@@ -1229,10 +1243,10 @@ def get(args):
     ]
 
     if _FRAMEWORK == Framework.EXP_TORCH:
-        return pytree.tree_unflatten(out_flat, tree_spec)
+        return pytree.tree_unflatten(out_flat, tree_spec)  # type: ignore
     from jax.tree_util import tree_unflatten
 
-    return tree_unflatten(tree, out_flat)
+    return tree_unflatten(tree, out_flat)  # type: ignore
 
 
 def save(args, filename=f"spu-{uuid.uuid4()}.txt"):
@@ -1287,9 +1301,9 @@ def PYU2PYU(to: PYU, obj: PYU.Object):
 
 def SPU2PYU(to: PYU, obj: SPU.Object):
     # tell PYU the object refs, and run reconstruct on it.
-    def reconstruct(wsize: int, spu_config_str: str, shares: List[ValueWrapper]):
+    def reconstruct(wsize: int, spu_config_str: str, shares: list[ValueWrapper]):
         spu_config = libspu.RuntimeConfig()
-        spu_config.ParseFromString(spu_config_str)
+        spu_config.ParseFromString(spu_config_str)  # type: ignore
         spu_io = spu_api.Io(wsize, spu_config)
 
         return spu_io.reconstruct([share.spu_share for share in shares])
@@ -1307,7 +1321,7 @@ def PYU2SPU(to: SPU, obj: PYU.Object, vtype=libspu.Visibility.VIS_SECRET):
         wsize: int, spu_config_str: str, x: np.ndarray, owner_rank: int = -1
     ):
         spu_config = libspu.RuntimeConfig()
-        spu_config.ParseFromString(spu_config_str)
+        spu_config.ParseFromString(spu_config_str)  # type: ignore
         spu_io = spu_api.Io(wsize, spu_config)
 
         if _FRAMEWORK == Framework.JAX:

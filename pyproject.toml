@@ -43,7 +43,7 @@ dev = [
     "pandas>=1.5.3",
     "scikit-learn>=1.5.2,<1.7.0",
     "statsmodels>=0.11.1",
-    "protobuf",
+    "protobuf>=4.25.8",
     "grpcio>=1.60.0",
 ]
 
@@ -76,6 +76,7 @@ filterwarnings = [
 # Enable the recommended ruleset
 line-length = 88
 target-version = "py310"
+exclude = ["*_pb2.py", "*_pb2_grpc.py"]
 
 [tool.ruff.lint]
 # Enable recommended rules plus some additional ones
