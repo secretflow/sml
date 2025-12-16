@@ -74,15 +74,25 @@ class RBF(Kernel):
     #     K = jnp.exp(-K / (2 * self.length_scale * self.length_scale))
 
     #     return K
-
     def __call__(self, X, Y=None):
+        """Compute the kernel matrix between X and Y."""
         if Y is None:
             Y = X
-        K = jnp.zeros((X.shape[0], Y.shape[0]), dtype=jnp.float32)
-        for i in range(X.shape[0]):
-            for j in range(Y.shape[0]):
-                K = K.at[i, j].set(jnp.sum((X[i] - Y[j]) ** 2))
-        return jnp.exp(-K / (2 * self.length_scale))
+
+        dtype = jnp.result_type(X, Y, jnp.float32)
+        X = X.astype(dtype)
+        Y = Y.astype(dtype)
+
+        # Compute squared Euclidean distances efficiently
+        X_sq = jnp.sum(X**2, axis=1, keepdims=True)
+        Y_sq = jnp.sum(Y**2, axis=1, keepdims=True)
+        sq_dists = X_sq + Y_sq.T - 2 * jnp.dot(X, Y.T)
+
+        # Numerical safety: clip small negatives due to floating point errors
+        sq_dists = jnp.maximum(sq_dists, 0.0)
+
+        # Apply RBF kernel
+        return jnp.exp(-sq_dists / (2 * self.length_scale**2))
 
     def diag(self, X):
         return jnp.ones(X.shape[0])
