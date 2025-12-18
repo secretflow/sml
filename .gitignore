@@ -122,3 +122,6 @@ dmypy.json
 
 # setuptools-scm generated version file
 sml/_version.py
+
+# tmp
+secretflow/
