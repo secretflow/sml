@@ -31,6 +31,7 @@ class Link(ABC):
 class Distribution(ABC):
     def unit_variance(self, mu): ...      # V(mu)
     def deviance(self, y, mu, weights=None): ...
+    def log_likelihood(self, y, mu, weights=None): ... # Log-Likelihood, 用于 AIC/BIC
     def starting_mu(self, y): ...         # 稳健初值
     def get_canonical_link(self) -> Link: ...
 ```
@@ -47,6 +48,7 @@ class Distribution(ABC):
 - `starting_mu`: 常用 `(y + mean(y)) / 2`，并 clip 正值区间。
 - `unit_variance`: 显式公式，避免分段导数爆炸。
 - `deviance`: 教科书定义，使用 `_clean` 避免 `log(0)`。
+- `log_likelihood`: 实现标准对数似然函数。虽然 $Deviance \approx -2LL + C$，但为了准确计算 AIC/BIC，建议显式实现 LL。
 
 ## Family 容器
 职责：绑定 distribution 与 link；若 link 未提供，使用 `distribution.get_canonical_link()`。
@@ -64,4 +66,4 @@ class Family:
 
 ## 扩展指引
 - 新增 link：实现四个方法；若为某分布 canonical，更新对应分布的 `get_canonical_link`。
-- 新增分布：实现四个方法；在工厂或注册表里登记 canonical link。
+- 新增分布：实现五个方法（含 log_likelihood）；在工厂或注册表里登记 canonical link。

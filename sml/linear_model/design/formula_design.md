@@ -12,6 +12,7 @@ class Formula(Protocol):
         - z_resid: (N,) 工作残差 (y - mu) * g'(mu)
         - mu: 期望
         - eta: 线性预测子
+        - deviance: (float) 当前点的 deviance (用于 Line Search 判定)
         - extras: 可选字典（如 loglike）
         """
 ```
@@ -25,17 +26,20 @@ class Formula(Protocol):
   5. `g_prime = family.link.link_deriv(mu)`
   6. `W = 1 / (v * g_prime**2)`，可 clip 到 `[w_min, w_max]`
   7. `z_resid = (y - mu) * g_prime`
-  8. 若 `sample_weight` 给定，则 `W *= sample_weight`
+  8. `dev = family.distribution.deviance(y, mu, sample_weight)`
+  9. 若 `sample_weight` 给定，则 `W *= sample_weight`
 
 - 数值要点：
   - 对 `eta`、`mu`、`W` 做裁剪，防止溢出或奇异。
   - `g_prime` 避免为 0，可加 eps。
+  - 顺手计算 `dev` 比在外部单独计算更高效（mu 已就绪）。
 
 ## OptimizedFormula（示例）
 - Tweedie + Log：
   - `eta = X@beta + offset`；`mu = exp(eta)`
   - `W = mu**(2-p)`
   - `z_resid = y/mu - 1`
+  - `dev`：使用优化后的 deviance 公式计算。
 - Gamma + Log：
   - `mu = exp(eta)`
   - `W = 1`
@@ -65,4 +69,4 @@ resolve(distribution, link) -> formula_instance
 
 ## 扩展指引
 - 新增优化公式：实现 `compute_components` 并注册。
-- 如需额外输出（loglike），放入 `extras` 字典，solver 可忽略或记录。
+- 如需额外输出，放入 `extras` 字典，solver 可忽略或记录。
