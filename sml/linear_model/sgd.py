@@ -247,7 +247,7 @@ class SGDBase:
 
         # Drop cached var with dependency
         if self._enable_spu_cache:
-            X_with_bias = sml_drop_cached_var(X_with_bias, w)
+            X_with_bias = sml_drop_cached_var(X_with_bias)
 
         self.n_features_ = n_features
         self.weights_ = w
