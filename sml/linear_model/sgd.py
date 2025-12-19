@@ -171,6 +171,10 @@ class SGDBase:
         4. Pass return values to drop_cached_var
         """
         n_samples, n_features = X.shape
+
+        if n_samples == 0:
+            raise ValueError("Number of samples must be > 0")
+
         batch_size = min(self._batch_size, n_samples)
         n_iters = max(1, n_samples // batch_size)
 
