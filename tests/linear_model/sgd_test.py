@@ -27,8 +27,8 @@ from sml.utils.dataset_utils import load_mock_datasets
     [
         ("none", 0, "weight_rel", False),
         ("l2", 0.1, "weight_rel", False),
-        ("none", 0, "weight_rel", True),  # Test with SPU cache enabled
-        ("l2", 0.01, "weight_abs", False),  # Test with absolute early stopping
+        ("none", 0, "weight_rel", True),
+        ("l2", 0.01, "weight_abs", False),
     ],
 )
 def test_sgd_classifier(
@@ -37,6 +37,7 @@ def test_sgd_classifier(
     early_stopping_metric: str,
     enable_spu_cache: bool,
 ):
+    """Test SGDClassifier with various parameter combinations."""
     sim = spsim.Simulator.simple(2, libspu.ProtocolKind.SEMI2K, libspu.FieldType.FM64)
 
     def proc(x: jax.Array, y: jax.Array):
@@ -48,9 +49,7 @@ def test_sgd_classifier(
             early_stopping_metric=early_stopping_metric,
             enable_spu_cache=enable_spu_cache,
         )
-
         y = y.reshape((y.shape[0], 1))
-
         return model.fit(x, y).predict(x)
 
     x, y = load_mock_datasets(
@@ -69,8 +68,8 @@ def test_sgd_classifier(
     [
         ("none", 0, "weight_rel", False),
         ("l2", 0.1, "weight_rel", False),
-        ("none", 0, "weight_rel", True),  # Test with SPU cache enabled
-        ("l2", 0.01, "weight_abs", False),  # Test with absolute early stopping
+        ("none", 0, "weight_rel", True),
+        ("l2", 0.01, "weight_abs", False),
     ],
 )
 def test_sgd_regressor(
@@ -79,6 +78,7 @@ def test_sgd_regressor(
     early_stopping_metric: str,
     enable_spu_cache: bool,
 ):
+    """Test SGDRegressor with various parameter combinations."""
     sim = spsim.Simulator.simple(2, libspu.ProtocolKind.SEMI2K, libspu.FieldType.FM64)
 
     def proc(x: jax.Array, y: jax.Array):
@@ -89,9 +89,7 @@ def test_sgd_regressor(
             early_stopping_metric=early_stopping_metric,
             enable_spu_cache=enable_spu_cache,
         )
-
         y = y.reshape((y.shape[0], 1))
-
         return model.fit(x, y).predict(x)
 
     x, y = load_mock_datasets(
@@ -105,7 +103,13 @@ def test_sgd_regressor(
     print(f"spu_score: {score}, enable_spu_cache: {enable_spu_cache}")
 
 
-def test_sgd_classifier_with_cache_and_profile():
+@pytest.mark.parametrize("enable_spu_cache", [False, True])
+def test_sgd_classifier_with_profile(enable_spu_cache: bool):
+    """Test SGDClassifier with profile enabled, comparing cache vs no-cache performance.
+
+    Args:
+        enable_spu_cache: Whether to enable SPU beaver cache optimization.
+    """
     config = libspu.RuntimeConfig(
         protocol=libspu.ProtocolKind.SEMI2K, field=libspu.FieldType.FM64
     )
@@ -118,15 +122,14 @@ def test_sgd_classifier_with_cache_and_profile():
         batch_size=1024,
         learning_rate=0.1,
         penalty="l2",
-        sig_type=SigType.T3,
+        sig_type=SigType.T5,  # use larger sig_type to benefit from cache
         early_stopping_threshold=0.0,
         early_stopping_metric="weight_rel",
-        enable_spu_cache=True,
+        enable_spu_cache=enable_spu_cache,
     )
 
     def proc(x: jax.Array, y: jax.Array):
         y = y.reshape((y.shape[0], 1))
-
         return model.fit(x, y).predict(x)
 
     x, y = load_mock_datasets(
@@ -137,39 +140,4 @@ def test_sgd_classifier_with_cache_and_profile():
     )
     y_pred = spsim.sim_jax(sim, proc)(x, y)
     score = roc_auc_score(y, y_pred)
-    print(f"spu_score: {score}, enable_spu_cache: True")
-
-
-def test_sgd_classifier_without_cache_and_profile():
-    config = libspu.RuntimeConfig(
-        protocol=libspu.ProtocolKind.SEMI2K, field=libspu.FieldType.FM64
-    )
-    config.enable_hal_profile = True
-    config.enable_pphlo_profile = True
-    sim = spsim.Simulator(2, config)
-
-    model = SGDClassifier(
-        epochs=5,
-        batch_size=1024,
-        learning_rate=0.1,
-        penalty="l2",
-        sig_type=SigType.T3,
-        early_stopping_threshold=0.0,
-        early_stopping_metric="weight_rel",
-        enable_spu_cache=False,
-    )
-
-    def proc(x: jax.Array, y: jax.Array):
-        y = y.reshape((y.shape[0], 1))
-
-        return model.fit(x, y).predict(x)
-
-    x, y = load_mock_datasets(
-        n_samples=50000,
-        n_features=100,
-        task_type="bi_classification",
-        need_split_train_test=False,
-    )
-    y_pred = spsim.sim_jax(sim, proc)(x, y)
-    score = roc_auc_score(y, y_pred)
-    print(f"spu_score: {score}, enable_spu_cache: True")
+    print(f"spu_score: {score}, enable_spu_cache: {enable_spu_cache}")
