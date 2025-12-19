@@ -46,8 +46,8 @@ sml/linear_model/
 
 2.  **SGD Solver**:
     - 新增随机梯度下降求解器。
+    - 支持 Batch 训练和 **Learning Rate Decay**。
     - 利用 `Formula` 计算梯度分量 $W \cdot z_{resid}$，避免重复造轮子。
-    - 支持 Batch 训练和 Learning Rate 配置。
 
 3.  **Metrics**:
     - 扩展支持 AIC, BIC, RMSE, AUC。
@@ -62,6 +62,6 @@ from sml.linear_model.glm.core.link import LogLink
 
 register_formula(dist_type=Tweedie, link_type=LogLink, formula_cls=TweedieLogFormula)
 
-model = GLM(dist=Tweedie(p=1.5), solver='sgd', learning_rate=0.01)
+model = GLM(dist=Tweedie(p=1.5), solver='sgd', learning_rate=0.01, decay_rate=0.95)
 model.fit(X, y)
 ```

@@ -67,7 +67,10 @@ class IRLSSolver(Solver):
         max_iter: int = 100,
         tol: float = 1e-4,
         learning_rate: float = 1e-2,  # Unused in IRLS
+        decay_rate: float = 1.0,      # Unused in IRLS
+        decay_steps: int = 100,       # Unused in IRLS
         batch_size: int = 128,        # Unused in IRLS
+        random_state: Optional[int] = None, # Unused in IRLS (deterministic)
         clip_eta: Optional[Tuple[float, float]] = None,
         clip_mu: Optional[Tuple[float, float]] = None,
     ) -> Tuple[jax.Array, jax.Array, Dict[str, Any]]:
@@ -105,6 +108,10 @@ class IRLSSolver(Solver):
             # b. Construct Working Response z
             # z = eta + (y - mu) * g'(mu)
             z = eta + z_resid
+            
+            # If offset is present, we are solving for X @ beta ~ z - offset
+            if offset is not None:
+                z = z - offset
 
             # c. Weighted Least Squares: Solve (X'WX + l2*I) beta_new = X'Wz
             # Construct Weighted Matrix Xw = sqrt(W) * X

@@ -10,7 +10,7 @@
 - 预测：`predict`（返回均值 `mu`），`predict_linear`（返回 `eta`）。
 - 评估：`summary`（支持 deviance, aic, bic, auc 等）。
 
-## 类接口（示例）
+## 类接口
 ```python
 class GLM:
     def __init__(
@@ -18,30 +18,33 @@ class GLM:
         dist,
         link=None,
         solver: str = "irls",
-        formula=None,
         max_iter: int = 100,
         tol: float = 1e-4,
-        learning_rate: float = 1e-2, # New: for SGD
-        batch_size: int = 128,       # New: for SGD
+        learning_rate: float = 1e-2, 
+        decay_rate: float = 1.0,     # New: SGD LR decay
+        decay_steps: int = 100,      # New: SGD decay steps
+        batch_size: int = 128,       
         l2: float = 0.0,
         fit_intercept: bool = True,
-        offset=None,
-        sample_weight=None,
+        random_state: int | None = None, # New: JAX PRNGKey seed
+        formula=None,
         dispatcher=None,
         clip_eta: tuple | None = None,
         clip_mu: tuple | None = None,
     ):
         ...
 
-    def fit(self, X, y):
-        """训练模型，保存 coef_, intercept_, dispersion_。"""
+    def fit(self, X, y, offset=None, sample_weight=None):
+        """
+        训练模型。
+        
+        Parameters:
+        - offset: (n_samples,) 偏置项，固定加在线性预测子上。
+        """
 
     def predict(self, X, offset=None):
         """返回均值预测 mu = link.inverse(eta)。"""
 
-    def score(self, X, y):
-        """默认返回负 deviance。"""
-    
     def evaluate(self, X, y, metrics=("deviance", "aic", "rmse")):
         """计算多种评估指标。"""
 ```
@@ -50,21 +53,16 @@ class GLM:
 1) 构造 `Family(dist, link)`。
 2) 通过 dispatcher 选择 `Formula`。
 3) 选择 `Solver`（'irls' 或 'sgd'）。
-4) 调 solver：`solver.solve(..., learning_rate, batch_size)`
+4) 调 solver：`solver.solve(..., learning_rate, decay_rate, decay_steps)`
    - 必须透传 SGD 特有的超参。
-   - Solver 内部必须遵循 **Naive Matrix Inversion** 约束（针对 IRLS）。
 5) 拆分与保存结果。
 
 ## 关键参数处理
-- `solver`: 字符串，'irls' (默认) 或 'sgd'。
-- `learning_rate` / `batch_size`: 仅当 `solver='sgd'` 时生效。
-- `fit_intercept`: 训练时在 X 右侧追加常数列；推理时自动加上 intercept。
+- `offset`: **Moved to fit()**. 这是一个数据依赖的参数，应与 X, y 同生命周期。
+- `decay_rate` / `decay_steps`: 用于 SGD 的学习率调度。
+- `random_state`: 用于初始化 JAX 的随机数生成器（如 SGD 初始化或 Shuffle）。
 
 ## 异常与校验
 - 校验 solver 名称。
-- 校验 SGD 参数（lr > 0, batch_size > 0）。
-- **Naive Inversion Warning**: 提示用户当前实现使用显式求逆，可能存在数值稳定性风险（尽管已加 jitter）。
-
-## 扩展点
-- 支持更多 solver（保持 solve 接口一致）。
-- 支持更多 metrics（summary 透传到 metrics 模块）。
+- 校验 SGD 参数。
+- 校验 X/y/offset 维度一致性。

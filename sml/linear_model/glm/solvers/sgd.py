@@ -50,6 +50,9 @@ class SGDSolver(Solver):
        beta_{t+1} = beta_t + learning_rate * Gradient_Batch
        (Plus L2 regularization term gradient adjustment)
 
+    4. Learning Rate Decay:
+       lr_t = learning_rate * decay_rate ^ (step / decay_steps)
+
     Supports Mini-Batch SGD via sequential slicing.
     """
 
@@ -66,7 +69,10 @@ class SGDSolver(Solver):
         max_iter: int = 100,  # Interpreted as Epochs
         tol: float = 1e-4,
         learning_rate: float = 1e-2,
+        decay_rate: float = 1.0,      # New: LR decay
+        decay_steps: int = 100,       # New: LR decay steps
         batch_size: int = 128,
+        random_state: Optional[int] = None, # Used for Shuffle if implemented (future)
         clip_eta: Optional[Tuple[float, float]] = None,
         clip_mu: Optional[Tuple[float, float]] = None,
     ) -> Tuple[jax.Array, jax.Array, Dict[str, Any]]:
@@ -81,7 +87,6 @@ class SGDSolver(Solver):
         # Handle batch size
         batch_size = min(batch_size, n_samples)
         n_batches = n_samples // batch_size
-        # For simplicity in JIT, we drop the last partial batch if not divisible
         
         # 2. Initialization
         beta_init = jnp.zeros(n_features, dtype=X.dtype)
@@ -90,7 +95,17 @@ class SGDSolver(Solver):
         init_val = (beta_init, False, 0, jnp.inf)
 
         # 3. Define Batch Step function
-        def batch_step(beta, batch_idx):
+        def batch_step(batch_idx, val):
+            beta, epoch = val
+            
+            # Calculate current step (global) for decay
+            global_step = epoch * n_batches + batch_idx
+            
+            # Decay learning rate
+            # lr = base_lr * decay_rate ^ (step / decay_steps)
+            decay_factor = jnp.power(decay_rate, global_step / decay_steps)
+            current_lr = learning_rate * decay_factor
+
             start = batch_idx * batch_size
             # Use dynamic_slice for JIT compatibility
             X_batch = jax.lax.dynamic_slice(
@@ -124,32 +139,27 @@ class SGDSolver(Solver):
             grad = X_batch.T @ grad_components
 
             # L2 Regularization
-            # Objective = LogLikelihood - 0.5 * l2 * ||beta||^2
-            # Gradient of Penalty = - l2 * beta (subtracted from LL gradient)
-            # Wait, maximizing J(beta) = LL - Penalty.
-            # dJ/dbeta = dLL/dbeta - dPenalty/dbeta = Grad_LL - l2 * beta
             if l2 > 0:
                 l2_grad = l2 * beta
                 if fit_intercept:
                     l2_grad = l2_grad.at[n_features - 1].set(0.0)
                 grad -= l2_grad
 
-            # Update: beta = beta + lr * grad
-            beta_new = beta + learning_rate * grad
-            return beta_new
+            # Update
+            beta_new = beta + current_lr * grad
+            return (beta_new, epoch)
 
         # 4. Define Epoch Loop (iterates over batches)
         def epoch_body(val):
             beta, _, epoch, _ = val
             
             # Loop over batches
-            # carry is just beta
-            beta_next = jax.lax.fori_loop(
-                0, n_batches, lambda i, b: batch_step(b, i), beta
+            # carry is (beta, epoch) because we need epoch for global step calculation
+            beta_next, _ = jax.lax.fori_loop(
+                0, n_batches, batch_step, (beta, epoch)
             )
             
             # Calculate full deviance for convergence check
-            # Note: This step is expensive but necessary for proper deviance tracking
             _, _, _, _, dev_full, _ = formula.compute_components(
                 X=X_train,
                 y=y,

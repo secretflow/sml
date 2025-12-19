@@ -73,14 +73,13 @@ class TestJAXGLM:
         np.testing.assert_allclose(coef, self.true_coef, rtol=0.2, atol=0.2)
         np.testing.assert_allclose(intercept, self.true_intercept, rtol=0.2, atol=0.2)
 
-    def test_poisson_sgd_jit(self):
-        """Test Poisson GLM with SGD Solver."""
+    def test_poisson_sgd_jit_with_decay(self):
+        """Test Poisson GLM with SGD Solver and LR Decay."""
         
-        print("\n--- Testing SGD Solver ---")
+        print("\n--- Testing SGD Solver with Decay ---")
         
         # Need careful tuning for SGD on Poisson
-        # Smaller LR and more epochs
-        lr = 1e-3
+        lr = 1e-2
         epochs = 200
         batch_size = 32
         
@@ -92,10 +91,13 @@ class TestJAXGLM:
                 dist=Poisson(), 
                 solver='sgd', 
                 learning_rate=lr, 
+                decay_rate=0.9,     # Decay LR every 500 steps
+                decay_steps=500,
                 max_iter=epochs, 
                 batch_size=batch_size,
                 fit_intercept=True, 
-                tol=1e-6
+                tol=1e-6,
+                random_state=42
             )
             model.fit(X, y)
             return model.coef_, model.intercept_
@@ -110,6 +112,36 @@ class TestJAXGLM:
         # SGD might be less precise than IRLS with limited epochs
         np.testing.assert_allclose(coef, self.true_coef, rtol=0.3, atol=0.3)
         np.testing.assert_allclose(intercept, self.true_intercept, rtol=0.3, atol=0.3)
+
+    def test_offset_handling(self):
+        """Test that offset is correctly handled in fit and predict."""
+        print("\n--- Testing Offset Handling ---")
+        
+        # Create a large offset that would change predictions significantly
+        offset = jnp.ones_like(self.y) * 2.0
+        
+        # Fit model with offset
+        # Effectively, we are fitting y ~ Poisson(exp(X@beta + intercept + offset))
+        # The true intercept should now be (true_intercept - 2.0) approx if offset was capturing part of it?
+        # No, if we pass offset, the model learns the residual. 
+        
+        model = GLM(dist=Poisson(), solver='irls')
+        model.fit(self.X, self.y, offset=offset)
+        
+        # Since true data was generated with intercept=1.0 and offset=0
+        # Now we force offset=2.0. The model should compensate by learning intercept approx -1.0
+        # exp(1.0) = exp(-1.0 + 2.0)
+        
+        print("Intercept with offset=2.0:", model.intercept_)
+        np.testing.assert_allclose(model.intercept_, self.true_intercept - 2.0, atol=0.2)
+        
+        # Test predict with offset
+        mu_pred = model.predict(self.X, offset=offset)
+        dev = model.evaluate(self.X, self.y, metrics=["deviance"], offset=offset)['deviance']
+        print("Deviance with offset:", dev)
+        
+        # It should be close to the original model's deviance
+        assert dev < 300 # Heuristic check
 
     def test_metrics(self):
         """Test extended metrics evaluation."""
@@ -136,6 +168,7 @@ if __name__ == "__main__":
     t = TestJAXGLM()
     t.setup_method()
     t.test_poisson_generic_jit_naive_inv()
-    t.test_poisson_sgd_jit()
+    t.test_poisson_sgd_jit_with_decay()
+    t.test_offset_handling()
     t.test_metrics()
     t.test_sgd_batching()

@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections.abc import Sequence
-from typing import Any
+from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 import jax
-
+import jax.numpy as jnp
 from sml.linear_model.glm.core.distribution import Distribution
 from sml.linear_model.glm.core.family import Family
 from sml.linear_model.glm.core.link import Link
@@ -52,14 +51,18 @@ class GLM:
         Convergence tolerance for the solver.
     learning_rate : float, default=1e-2
         Learning rate for SGD solver.
+    decay_rate : float, default=1.0
+        Learning rate decay factor for SGD (1.0 means no decay).
+    decay_steps : int, default=100
+        Decay steps for SGD learning rate schedule.
     batch_size : int, default=128
         Batch size for SGD solver.
     l2 : float, default=0.0
         L2 regularization strength (Ridge penalty).
     fit_intercept : bool, default=True
         Whether to calculate the intercept for this model.
-    offset : jax.Array, optional
-        A fixed offset added to the linear predictor.
+    random_state : int, optional, default=None
+        Seed for JAX PRNG (e.g., for SGD initialization or shuffling).
     formula : Formula, optional
         Custom formula implementation. If None, it is resolved via the dispatcher.
     clip_eta : Tuple[float, float], optional
@@ -71,18 +74,20 @@ class GLM:
     def __init__(
         self,
         dist: Distribution,
-        link: Link | None = None,
+        link: Optional[Link] = None,
         solver: str = "irls",
         max_iter: int = 100,
         tol: float = 1e-4,
         learning_rate: float = 1e-2,
+        decay_rate: float = 1.0,
+        decay_steps: int = 100,
         batch_size: int = 128,
         l2: float = 0.0,
         fit_intercept: bool = True,
-        offset: jax.Array | None = None,
-        formula: Formula | None = None,
-        clip_eta: tuple[float, float] | None = None,
-        clip_mu: tuple[float, float] | None = None,
+        random_state: Optional[int] = None,
+        formula: Optional[Formula] = None,
+        clip_eta: Optional[Tuple[float, float]] = None,
+        clip_mu: Optional[Tuple[float, float]] = None,
     ):
         self.dist = dist
         self.link = link
@@ -90,20 +95,22 @@ class GLM:
         self.max_iter = max_iter
         self.tol = tol
         self.learning_rate = learning_rate
+        self.decay_rate = decay_rate
+        self.decay_steps = decay_steps
         self.batch_size = batch_size
         self.l2 = l2
         self.fit_intercept = fit_intercept
-        self.offset = offset
+        self.random_state = random_state
         self.formula = formula
         self.clip_eta = clip_eta
         self.clip_mu = clip_mu
 
         # Fitted attributes
-        self.family_: Family | None = None
-        self.coef_: jax.Array | None = None
-        self.intercept_: jax.Array | None = None
-        self.dispersion_: jax.Array | None = None
-        self.history_: dict[str, Any] | None = None
+        self.family_: Optional[Family] = None
+        self.coef_: Optional[jax.Array] = None
+        self.intercept_: Optional[jax.Array] = None
+        self.dispersion_: Optional[jax.Array] = None
+        self.history_: Optional[Dict[str, Any]] = None
 
     def _get_solver(self) -> Solver:
         if self.solver_name == "irls":
@@ -117,7 +124,8 @@ class GLM:
         self,
         X: jax.Array,
         y: jax.Array,
-        sample_weight: jax.Array | None = None,
+        offset: Optional[jax.Array] = None,
+        sample_weight: Optional[jax.Array] = None,
     ) -> "GLM":
         """
         Fit the GLM model.
@@ -128,6 +136,9 @@ class GLM:
             Training data of shape (n_samples, n_features).
         y : jax.Array
             Target values of shape (n_samples,).
+        offset : jax.Array, optional
+            A fixed offset added to the linear predictor.
+            Shape must be broadcastable to (n_samples,).
         sample_weight : jax.Array, optional
             Individual weights for each sample.
 
@@ -155,13 +166,16 @@ class GLM:
             family=self.family_,
             formula=formula_impl,
             fit_intercept=self.fit_intercept,
-            offset=self.offset,
+            offset=offset,
             sample_weight=sample_weight,
             l2=self.l2,
             max_iter=self.max_iter,
             tol=self.tol,
             learning_rate=self.learning_rate,
+            decay_rate=self.decay_rate,
+            decay_steps=self.decay_steps,
             batch_size=self.batch_size,
+            random_state=self.random_state,
             clip_eta=self.clip_eta,
             clip_mu=self.clip_mu,
         )
@@ -173,7 +187,7 @@ class GLM:
 
         return self
 
-    def predict(self, X: jax.Array, offset: jax.Array | None = None) -> jax.Array:
+    def predict(self, X: jax.Array, offset: Optional[jax.Array] = None) -> jax.Array:
         """
         Predict mean values.
 
@@ -196,7 +210,7 @@ class GLM:
              raise RuntimeError("Model is not fitted yet.")
         return self.family_.link.inverse(eta)
 
-    def predict_linear(self, X: jax.Array, offset: jax.Array | None = None) -> jax.Array:
+    def predict_linear(self, X: jax.Array, offset: Optional[jax.Array] = None) -> jax.Array:
         """
         Predict linear predictor values (eta).
 
@@ -224,7 +238,7 @@ class GLM:
 
         return eta
 
-    def score(self, X: jax.Array, y: jax.Array, sample_weight: jax.Array | None = None) -> jax.Array:
+    def score(self, X: jax.Array, y: jax.Array, offset: Optional[jax.Array] = None, sample_weight: Optional[jax.Array] = None) -> jax.Array:
         """
         Compute the deviance score (lower is better).
 
@@ -235,17 +249,18 @@ class GLM:
         """
         if self.family_ is None:
              raise RuntimeError("Model is not fitted yet.")
-        mu = self.predict(X)
+        mu = self.predict(X, offset=offset)
         deviance = self.family_.distribution.deviance(y, mu, sample_weight)
         return -deviance
     
     def evaluate(
-        self,
-        X: jax.Array,
-        y: jax.Array,
+        self, 
+        X: jax.Array, 
+        y: jax.Array, 
         metrics: Sequence[str] = ("deviance", "aic", "rmse"),
-        sample_weight: jax.Array | None = None
-    ) -> dict[str, jax.Array]:
+        offset: Optional[jax.Array] = None,
+        sample_weight: Optional[jax.Array] = None
+    ) -> Dict[str, jax.Array]:
         """
         Evaluate the model using multiple metrics.
         
@@ -257,6 +272,8 @@ class GLM:
             True targets.
         metrics : Sequence[str]
             List of metrics to compute. Options: 'deviance', 'aic', 'bic', 'rmse', 'auc'.
+        offset : jax.Array, optional
+            Offset.
         sample_weight : jax.Array, optional
             Weights.
             
@@ -268,7 +285,7 @@ class GLM:
         if self.family_ is None or self.coef_ is None:
              raise RuntimeError("Model is not fitted yet.")
         
-        mu = self.predict(X)
+        mu = self.predict(X, offset=offset)
         n_samples = X.shape[0]
         # Rank = features + intercept
         rank = self.coef_.shape[0] + (1 if self.fit_intercept else 0)

@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Protocol
+from typing import Any, Dict, Optional, Protocol, Tuple
 
 import jax
-
 from sml.linear_model.glm.core.family import Family
 from sml.linear_model.glm.formula.base import Formula
 
@@ -30,16 +29,19 @@ class Solver(Protocol):
         family: Family,
         formula: Formula,
         fit_intercept: bool = True,
-        offset: jax.Array | None = None,
-        sample_weight: jax.Array | None = None,
+        offset: Optional[jax.Array] = None,
+        sample_weight: Optional[jax.Array] = None,
         l2: float = 0.0,
         max_iter: int = 100,
         tol: float = 1e-4,
         learning_rate: float = 1e-2,
+        decay_rate: float = 1.0,      # New: LR decay
+        decay_steps: int = 100,       # New: LR decay steps
         batch_size: int = 128,
-        clip_eta: tuple[float, float] | None = None,
-        clip_mu: tuple[float, float] | None = None,
-    ) -> tuple[jax.Array, jax.Array, dict[str, Any]]:
+        random_state: Optional[int] = None, # New: PRNGKey
+        clip_eta: Optional[Tuple[float, float]] = None,
+        clip_mu: Optional[Tuple[float, float]] = None,
+    ) -> Tuple[jax.Array, jax.Array, Dict[str, Any]]:
         """
         Solve the GLM optimization problem.
 
@@ -67,8 +69,14 @@ class Solver(Protocol):
             Convergence tolerance.
         learning_rate : float
             Learning rate for gradient-based solvers (SGD).
+        decay_rate : float
+            Learning rate decay factor.
+        decay_steps : int
+            Steps for learning rate decay.
         batch_size : int
             Batch size for gradient-based solvers (SGD).
+        random_state : int, optional
+            Seed for PRNGKey.
         clip_eta : Tuple[float, float], optional
             Bounds for eta clipping.
         clip_mu : Tuple[float, float], optional
