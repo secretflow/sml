@@ -21,7 +21,7 @@ from sml.linear_model.glm.formula.base import Formula
 
 
 class Solver(Protocol):
-    """Protocol for GLM solvers (IRLS, Newton-CG, etc.)."""
+    """Protocol for GLM solvers (IRLS, Newton-CG, SGD, etc.)."""
 
     def solve(
         self,
@@ -35,6 +35,8 @@ class Solver(Protocol):
         l2: float = 0.0,
         max_iter: int = 100,
         tol: float = 1e-4,
+        learning_rate: float = 1e-2,
+        batch_size: int = 128,
         clip_eta: tuple[float, float] | None = None,
         clip_mu: tuple[float, float] | None = None,
     ) -> tuple[jax.Array, jax.Array, dict[str, Any]]:
@@ -60,9 +62,13 @@ class Solver(Protocol):
         l2 : float
             L2 regularization strength.
         max_iter : int
-            Maximum number of iterations.
+            Maximum number of iterations (or epochs for SGD).
         tol : float
             Convergence tolerance.
+        learning_rate : float
+            Learning rate for gradient-based solvers (SGD).
+        batch_size : int
+            Batch size for gradient-based solvers (SGD).
         clip_eta : Tuple[float, float], optional
             Bounds for eta clipping.
         clip_mu : Tuple[float, float], optional

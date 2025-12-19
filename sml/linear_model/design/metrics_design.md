@@ -1,32 +1,61 @@
 # metrics 设计细化（Deviance & More）
 
-当前主要提供 deviance 指标，保持独立、无副作用。后续支持 AIC/BIC。
+提供丰富的评估指标，包括 Deviance, AIC, BIC, RMSE, AUC 等。
 
 ## 接口
 ```python
 def deviance(y, mu, family, sample_weight=None):
-    """
-    计算 deviance，委托到 family.distribution.deviance。
-    返回标量。
-    """
+    """Deviance (lower is better)."""
 
 def log_likelihood(y, mu, family, sample_weight=None):
+    """Log-Likelihood (higher is better)."""
+
+def aic(y, mu, family, rank, sample_weight=None):
     """
-    计算对数似然，委托到 family.distribution.log_likelihood。
-    返回标量。
+    Akaike Information Criterion.
+    AIC = -2 * LL + 2 * rank
+    """
+
+def bic(y, mu, family, rank, n_samples, sample_weight=None):
+    """
+    Bayesian Information Criterion.
+    BIC = -2 * LL + rank * log(n_samples)
+    """
+
+def rmse(y, mu, sample_weight=None):
+    """
+    Root Mean Squared Error.
+    sqrt(mean((y - mu)^2))
+    """
+
+def auc(y, mu, sample_weight=None):
+    """
+    Area Under the ROC Curve (for binary classification).
+    Requires sorting predictions, which is expensive in MPC.
     """
 ```
 
 ## 实现要点
-- 调用 `family.distribution.deviance` 或 `log_likelihood`。
-- 输入校验：`y.shape == mu.shape`；sample_weight 若给定，与 y 同形或可广播。
-- 不在 metrics 内部做裁剪，假设上游 predict 已处理 `mu` 稳定性。
 
-## 扩展点 (AIC / BIC)
-AIC 和 BIC 依赖于 Log-Likelihood。虽然 $Deviance \approx -2 LL + C$，但为了精确计算，我们优先使用显式的 `log_likelihood`。
-- `AIC = -2 * LL + 2 * k`
-- `BIC = -2 * LL + k * ln(n)`
-- 其中 `k` 为模型参数个数 (df_model + 1)，`n` 为样本数。
+### AIC / BIC
+- 依赖 `family.distribution.log_likelihood`。
+- `rank` 等于模型自由度（特征数 + intercept）。
+- `n_samples` 为样本数量。
+
+### RMSE
+- 通用回归指标。
+- `mse = average((y - mu)**2, weights=sample_weight)`
+- `rmse = sqrt(mse)`
+
+### AUC (ROC)
+- **MPC 挑战**：计算 AUC 需要对预测值 `mu` 进行排序（`O(N log N)`），在 MPC（尤其是 SPU）中通过 Oblivious Sort 实现，开销极大。
+- **设计**：
+  - 提供标准实现，基于 `jax.numpy.argsort`。
+  - **文档警告**：明确标注在大数据量 MPC 场景下的性能风险，建议仅在小数据或明文通过 `reveal` 后计算。
+
+## 扩展点
+- **Confusion Matrix**: 需要阈值切分。
+- **R2 Score**: 传统的 $1 - SS_{res} / SS_{tot}$。
 
 ## 依赖边界
-- 所有指标函数应保持纯函数签名，避免依赖 solver 状态。
+- 指标函数保持纯函数签名。

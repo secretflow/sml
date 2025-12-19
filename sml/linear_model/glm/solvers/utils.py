@@ -59,34 +59,26 @@ def split_coef(beta: jax.Array, fit_intercept: bool) -> tuple[jax.Array, jax.Arr
     return beta, jnp.array(0.0, dtype=beta.dtype)
 
 
-def solve_cholesky(A: jax.Array, b: jax.Array, l2: float = 0.0) -> jax.Array:
+def invert_matrix(A: jax.Array, eps: float = 1e-9) -> jax.Array:
     """
-    Solve linear system Ax = b using Cholesky decomposition with L2 regularization.
-    Solves (A + l2*I)x = b.
+    Invert a square matrix using naive inversion with jitter for stability.
+
+    This function is used instead of jnp.linalg.solve or cholesky decomposition
+    to accommodate specific backend constraints (e.g., MPC).
 
     Parameters
     ----------
     A : jax.Array
-        Symmetric positive semi-definite matrix (Hessian approximation).
-    b : jax.Array
-        Right-hand side vector.
-    l2 : float
-        L2 regularization strength.
+        Square matrix to invert.
+    eps : float
+        Small value added to the diagonal for numerical stability.
 
     Returns
     -------
-    x : jax.Array
-        Solution vector.
+    A_inv : jax.Array
+        The inverse of the matrix.
     """
-    if l2 > 0:
-        diag_indices = jnp.diag_indices_from(A)
-        # We assume A is already X'WX.
-        # Regularization is typically not applied to the intercept (last element).
-        # However, for simple implementation here, we might apply to all or handle outside.
-        # This function assumes 'l2' is already incorporated or A is raw.
-        # Let's add l2 to diagonal for stability.
-        A = A.at[diag_indices].add(l2)
-
-    # Use jax.scipy.linalg.solve (which usually uses LU or Cholesky internally)
-    # For SPD matrices, we can use solve directly or cholesky + solve_triangular.
-    return jnp.linalg.solve(A, b)
+    diag_indices = jnp.diag_indices_from(A)
+    # Add jitter to diagonal
+    A_stable = A.at[diag_indices].add(eps)
+    return jnp.linalg.inv(A_stable)

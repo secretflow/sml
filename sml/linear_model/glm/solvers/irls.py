@@ -12,25 +12,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any
+from typing import Any, Dict, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
-
 from sml.linear_model.glm.core.family import Family
 from sml.linear_model.glm.formula.base import Formula
 
 from .base import Solver
-from .utils import add_intercept
+from .utils import add_intercept, invert_matrix
 
 
 class IRLSSolver(Solver):
     """
     Iteratively Reweighted Least Squares (IRLS) solver for GLMs.
 
-    IRLS is equivalent to Fisher Scoring and is the standard algorithm for GLMs.
-    It solves the maximization of the likelihood by iteratively solving weighted
-    least squares problems.
+    Mathematical Derivation:
+    ------------------------
+    IRLS maximizes the log-likelihood L(beta) by using Newton-Raphson (Fisher Scoring) updates.
+
+    1. Newton Update Rule:
+       beta_{new} = beta_{old} + H^{-1} * Score
+       where H = E[-d^2L/dbeta^2] (Fisher Information) and Score = dL/dbeta (Gradient).
+
+    2. Components:
+       - Score = X^T * W * z_resid
+       - H = X^T * W * X
+       where W are working weights and z_resid are working residuals (see Formula).
+
+    3. Transformation to Weighted Least Squares:
+       beta_{new} = beta_{old} + (X^T W X)^{-1} X^T W z_resid
+                  = (X^T W X)^{-1} [ (X^T W X) beta_{old} + X^T W z_resid ]
+                  = (X^T W X)^{-1} X^T W [ X beta_{old} + z_resid ]
+       Let z (adjusted response) = eta + z_resid = X beta_{old} + z_resid.
+       Then:
+       beta_{new} = (X^T W X)^{-1} X^T W z
+
+    This implementation solves this Weighted Least Squares problem iteratively.
+
+    NOTE: This implementation uses naive matrix inversion (inv) instead of
+    solving linear systems (solve/cholesky) to meet specific backend constraints.
     """
 
     def solve(
@@ -40,14 +61,16 @@ class IRLSSolver(Solver):
         family: Family,
         formula: Formula,
         fit_intercept: bool = True,
-        offset: jax.Array | None = None,
-        sample_weight: jax.Array | None = None,
+        offset: Optional[jax.Array] = None,
+        sample_weight: Optional[jax.Array] = None,
         l2: float = 0.0,
         max_iter: int = 100,
         tol: float = 1e-4,
-        clip_eta: tuple[float, float] | None = None,
-        clip_mu: tuple[float, float] | None = None,
-    ) -> tuple[jax.Array, jax.Array, dict[str, Any]]:
+        learning_rate: float = 1e-2,  # Unused in IRLS
+        batch_size: int = 128,        # Unused in IRLS
+        clip_eta: Optional[Tuple[float, float]] = None,
+        clip_mu: Optional[Tuple[float, float]] = None,
+    ) -> Tuple[jax.Array, jax.Array, Dict[str, Any]]:
         # 1. Preprocessing
         if fit_intercept:
             X_train = add_intercept(X)
@@ -57,28 +80,17 @@ class IRLSSolver(Solver):
         n_samples, n_features = X_train.shape
 
         # 2. Initialization
-        # Initialize beta with zeros or via starting_mu
-        # Strategy: Get starting mu -> link(mu) -> Solve linear system for rough beta
-        # For simplicity in JIT, we often start with zero or a simple guess.
-        # Here we try a simple initialization: beta = 0
         beta_init = jnp.zeros(n_features, dtype=X.dtype)
 
-        # Better initialization:
-        # mu_init = family.distribution.starting_mu(y)
-        # eta_init = family.link.link(mu_init)
-        # However, solving X @ beta = eta_init requires an initial solve.
-        # Let's stick to zeros for robustness in pure JAX static graph,
-        # or we could do one step of OLS on projected eta.
-
-        # State structure for loop: (beta, converged, n_iter, deviance)
+        # State structure: (beta, converged, n_iter, deviance)
         init_val = (beta_init, False, 0, jnp.inf)
 
-        # 3. Define the loop body
+        # 3. Define loop body
         def body_fun(val):
             beta, _, iter_num, _ = val
 
-            # a. Compute components via Formula
-            # We assume formula handles numerical stability inside
+            # a. Compute components
+            # Returns W and z_resid based on current beta
             w, z_resid, mu, eta, dev, _ = formula.compute_components(
                 X=X_train,
                 y=y,
@@ -91,37 +103,36 @@ class IRLSSolver(Solver):
             )
 
             # b. Construct Working Response z
-            # z = eta + z_resid
+            # z = eta + (y - mu) * g'(mu)
             z = eta + z_resid
 
             # c. Weighted Least Squares: Solve (X'WX + l2*I) beta_new = X'Wz
             # Construct Weighted Matrix Xw = sqrt(W) * X
-            # Note: W is (N,), sqrt(W) is (N,). Broadcast multiply.
             w_sqrt = jnp.sqrt(w)[:, None]
             Xw = X_train * w_sqrt
             zw = z * w_sqrt.flatten()
 
-            # Normal Equations: (Xw.T @ Xw) beta = Xw.T @ zw
-            XtX = Xw.T @ Xw
-            Xtz = Xw.T @ zw
+            # Normal Equations Matrix H = Xw.T @ Xw = X^T * W * X
+            H = Xw.T @ Xw
+            # Score-like vector = X^T * W * z
+            score = Xw.T @ zw
 
-            # Apply L2 Regularization
+            # Apply L2 Regularization to H
+            # H_reg = H + l2 * I (excluding intercept)
             if l2 > 0:
-                # Add l2 to diagonal
                 diag_indices = jnp.diag_indices(n_features)
-                XtX = XtX.at[diag_indices].add(l2)
-                # Don't penalize intercept (last element if fit_intercept=True)
+                H = H.at[diag_indices].add(l2)
+                # Don't penalize intercept
                 if fit_intercept:
-                    XtX = XtX.at[n_features - 1, n_features - 1].add(-l2)
+                    H = H.at[n_features - 1, n_features - 1].add(-l2)
 
-            # Solve system
-            # Use jnp.linalg.solve (assumes XtX is non-singular/SPD)
-            # Add small jitter for numerical stability if needed
-            XtX = XtX.at[jnp.diag_indices_from(XtX)].add(1e-9)
-            beta_new = jnp.linalg.solve(XtX, Xtz)
+            # d. Naive Update with Explicit Inversion
+            # beta_new = inv(H + eps*I) @ score
+            # We add epsilon jitter inside invert_matrix for stability
+            H_inv = invert_matrix(H, eps=1e-9)
+            beta_new = H_inv @ score
 
-            # d. Check convergence
-            # Relative change in coefficients
+            # e. Convergence check
             beta_diff = jnp.linalg.norm(beta_new - beta)
             beta_norm = jnp.linalg.norm(beta)
             rel_change = beta_diff / (beta_norm + 1e-12)
@@ -129,7 +140,7 @@ class IRLSSolver(Solver):
 
             return beta_new, converged, iter_num + 1, dev
 
-        # 4. Define loop condition
+        # 4. Loop condition
         def cond_fun(val):
             _, converged, iter_num, _ = val
             return jnp.logical_and(iter_num < max_iter, jnp.logical_not(converged))
@@ -139,9 +150,8 @@ class IRLSSolver(Solver):
             cond_fun, body_fun, init_val
         )
 
-        # 6. Estimate Dispersion (optional, simplified)
+        # 6. Estimate Dispersion
         # dispersion = deviance / (n - p)
-        # For now, return 1.0 or implement specific logic
         dispersion = dev_final / (n_samples - n_features)
 
         history = {

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections.abc import Sequence
 from typing import Any
 
 import jax
@@ -21,8 +22,10 @@ from sml.linear_model.glm.core.family import Family
 from sml.linear_model.glm.core.link import Link
 from sml.linear_model.glm.formula.base import Formula
 from sml.linear_model.glm.formula.dispatch import dispatcher
+from sml.linear_model.glm.metrics import metrics as metric_funcs
 from sml.linear_model.glm.solvers.base import Solver
 from sml.linear_model.glm.solvers.irls import IRLSSolver
+from sml.linear_model.glm.solvers.sgd import SGDSolver
 from sml.linear_model.glm.solvers.utils import split_coef
 
 
@@ -42,10 +45,15 @@ class GLM:
     solver : str, default='irls'
         The solver algorithm to use. Currently supports:
         - 'irls': Iteratively Reweighted Least Squares.
+        - 'sgd': Stochastic Gradient Descent.
     max_iter : int, default=100
-        Maximum number of iterations for the solver.
+        Maximum number of iterations for the solver (or epochs for SGD).
     tol : float, default=1e-4
         Convergence tolerance for the solver.
+    learning_rate : float, default=1e-2
+        Learning rate for SGD solver.
+    batch_size : int, default=128
+        Batch size for SGD solver.
     l2 : float, default=0.0
         L2 regularization strength (Ridge penalty).
     fit_intercept : bool, default=True
@@ -67,6 +75,8 @@ class GLM:
         solver: str = "irls",
         max_iter: int = 100,
         tol: float = 1e-4,
+        learning_rate: float = 1e-2,
+        batch_size: int = 128,
         l2: float = 0.0,
         fit_intercept: bool = True,
         offset: jax.Array | None = None,
@@ -79,6 +89,8 @@ class GLM:
         self.solver_name = solver
         self.max_iter = max_iter
         self.tol = tol
+        self.learning_rate = learning_rate
+        self.batch_size = batch_size
         self.l2 = l2
         self.fit_intercept = fit_intercept
         self.offset = offset
@@ -96,6 +108,8 @@ class GLM:
     def _get_solver(self) -> Solver:
         if self.solver_name == "irls":
             return IRLSSolver()
+        elif self.solver_name == "sgd":
+            return SGDSolver()
         else:
             raise ValueError(f"Unknown solver: {self.solver_name}")
 
@@ -146,6 +160,8 @@ class GLM:
             l2=self.l2,
             max_iter=self.max_iter,
             tol=self.tol,
+            learning_rate=self.learning_rate,
+            batch_size=self.batch_size,
             clip_eta=self.clip_eta,
             clip_mu=self.clip_mu,
         )
@@ -203,8 +219,6 @@ class GLM:
 
         eta = X @ self.coef_ + self.intercept_
 
-        # Add training offset if provided and no new offset provided?
-        # Standard behavior: Use new offset if provided, otherwise use nothing (offsets are per-sample).
         if offset is not None:
             eta += offset
 
@@ -213,10 +227,6 @@ class GLM:
     def score(self, X: jax.Array, y: jax.Array, sample_weight: jax.Array | None = None) -> jax.Array:
         """
         Compute the deviance score (lower is better).
-
-        Note: In scikit-learn, score() typically returns R^2 or accuracy (higher is better).
-        For GLMs, we return negative deviance so that higher is better, or just deviance.
-        Here we return the negative deviance (log-likelihood proxy).
 
         Returns
         -------
@@ -228,3 +238,54 @@ class GLM:
         mu = self.predict(X)
         deviance = self.family_.distribution.deviance(y, mu, sample_weight)
         return -deviance
+    
+    def evaluate(
+        self,
+        X: jax.Array,
+        y: jax.Array,
+        metrics: Sequence[str] = ("deviance", "aic", "rmse"),
+        sample_weight: jax.Array | None = None
+    ) -> dict[str, jax.Array]:
+        """
+        Evaluate the model using multiple metrics.
+        
+        Parameters
+        ----------
+        X : jax.Array
+            Data to evaluate.
+        y : jax.Array
+            True targets.
+        metrics : Sequence[str]
+            List of metrics to compute. Options: 'deviance', 'aic', 'bic', 'rmse', 'auc'.
+        sample_weight : jax.Array, optional
+            Weights.
+            
+        Returns
+        -------
+        results : Dict[str, jax.Array]
+            Dictionary of computed metrics.
+        """
+        if self.family_ is None or self.coef_ is None:
+             raise RuntimeError("Model is not fitted yet.")
+        
+        mu = self.predict(X)
+        n_samples = X.shape[0]
+        # Rank = features + intercept
+        rank = self.coef_.shape[0] + (1 if self.fit_intercept else 0)
+        
+        results = {}
+        for metric in metrics:
+            if metric == "deviance":
+                results[metric] = metric_funcs.deviance(y, mu, self.family_, sample_weight)
+            elif metric == "aic":
+                results[metric] = metric_funcs.aic(y, mu, self.family_, rank, sample_weight)
+            elif metric == "bic":
+                results[metric] = metric_funcs.bic(y, mu, self.family_, rank, n_samples, sample_weight)
+            elif metric == "rmse":
+                results[metric] = metric_funcs.rmse(y, mu, sample_weight)
+            elif metric == "auc":
+                results[metric] = metric_funcs.auc(y, mu, sample_weight)
+            else:
+                raise ValueError(f"Unknown metric: {metric}")
+        
+        return results
