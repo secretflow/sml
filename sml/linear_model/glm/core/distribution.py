@@ -174,12 +174,7 @@ class Bernoulli(Distribution):
     ) -> jax.Array:
         # Deviance formula for Bernoulli
         # D = 2 * sum(y * log(y/mu) + (1-y) * log((1-y)/(1-mu)))
-        # Added small epsilon to denominators to prevent log(0) and division by zero.
-        mu = jnp.clip(mu, 1e-7, 1 - 1e-7)
         eps = 1e-10
-        # Use a numerically stable formulation:
-        # When y=1, term is 2*log(1/mu). When y=0, term is 2*log(1/(1-mu)).
-        # Here we follow the standard formulation with eps.
         dev = 2.0 * (
             y * jnp.log(y / mu + eps)
             + (1.0 - y) * jnp.log((1.0 - y) / (1.0 - mu) + eps)
@@ -190,7 +185,6 @@ class Bernoulli(Distribution):
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
         # LL = y * log(mu) + (1-y) * log(1-mu)
-        mu = jnp.clip(mu, 1e-7, 1 - 1e-7)
         ll = y * jnp.log(mu) + (1.0 - y) * jnp.log(1.0 - mu)
         return jnp.sum(ll * weights) if weights is not None else jnp.sum(ll)
 
@@ -215,10 +209,7 @@ class Poisson(Distribution):
     def deviance(
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
-        # Deviance formula for Poisson
-        # D = 2 * sum(y * log(y/mu) - (y - mu))
-        # Clip mu to ensure positiveness
-        mu = jnp.clip(mu, 1e-7, 1e14)
+        # Deviance formula for Poisson: D = 2 * sum(y * log(y/mu) - (y - mu))
         eps = 1e-10
         dev = 2.0 * (y * jnp.log(y / mu + eps) - (y - mu))
         return jnp.sum(dev * weights) if weights is not None else jnp.sum(dev)
@@ -228,7 +219,6 @@ class Poisson(Distribution):
     ) -> jax.Array:
         # LL = y * log(mu) - mu - log(y!)
         # We omit log(y!) here as it is constant w.r.t parameters.
-        mu = jnp.clip(mu, 1e-7, 1e14)
         ll = y * jnp.log(mu) - mu
         return jnp.sum(ll * weights) if weights is not None else jnp.sum(ll)
 
@@ -253,9 +243,7 @@ class Gamma(Distribution):
     def deviance(
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
-        # Deviance = 2 * sum( -log(y/mu) + (y - mu)/mu )
-        #          = 2 * sum( (y - mu)/mu - log(y/mu) )
-        mu = jnp.clip(mu, 1e-7, 1e14)
+        # Deviance = 2 * sum( (y - mu)/mu - log(y/mu) )
         eps = 1e-10
         dev = 2.0 * ((y - mu) / mu - jnp.log(y / mu + eps))
         return jnp.sum(dev * weights) if weights is not None else jnp.sum(dev)
@@ -263,19 +251,13 @@ class Gamma(Distribution):
     def log_likelihood(
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
-        # LL depends on dispersion phi (which we often don't know exactly during training).
-        # Standard form: LL(mu; y, phi) = -1/phi * (y/mu + log(mu)) + ...
-        # For simplified LL maximization/comparison, we can use the main term:
-        # - (y/mu + log(mu))
-        mu = jnp.clip(mu, 1e-7, 1e14)
+        # Simplified LL: -(y/mu + log(mu))
         ll = -1.0 * (y / mu + jnp.log(mu))
         return jnp.sum(ll * weights) if weights is not None else jnp.sum(ll)
 
     def starting_mu(self, y: jax.Array) -> jax.Array:
         # R-style initialization: (y + mean(y)) / 2
-        mu_start = (y + jnp.mean(y)) / 2.0
-        # Gamma requires positive values
-        return jnp.maximum(mu_start, 1e-7)
+        return (y + jnp.mean(y)) / 2.0
 
     def get_canonical_link(self) -> Link:
         return ReciprocalLink()
@@ -311,17 +293,13 @@ class Tweedie(Distribution):
 
     def unit_variance(self, mu: jax.Array) -> jax.Array:
         # V(mu) = mu^p
-        mu = jnp.clip(mu, 1e-7, 1e14)
         return jnp.power(mu, self.power)
 
     def deviance(
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
         # Deviance for Tweedie depends on power parameter
-        mu = jnp.clip(mu, 1e-7, 1e14)
-        y = jnp.maximum(y, 1e-10)  # Ensure y > 0
         eps = 1e-10
-
         p = self.power
 
         if abs(p - 0) < 1e-10:  # Normal
@@ -331,18 +309,18 @@ class Tweedie(Distribution):
         elif abs(p - 2) < 1e-10:  # Gamma
             dev = 2.0 * ((y - mu) / mu - jnp.log(y / mu + eps))
         elif abs(p - 3) < 1e-10:  # Inverse Gaussian
-            dev = (y - mu) ** 2 / (mu**2 * y)
+            dev = (y - mu) ** 2 / (mu**2 * y + eps)
         elif 1 < p < 2:  # Compound Poisson-Gamma
             # Use approximation for compound distribution
             # This is generalized deviance
             dev = 2.0 * (
-                jnp.maximum(y, 0) ** (2 - p) / ((2 - p) * mu ** (1 - p))
-                - y ** (2 - p) / ((1 - p) * mu ** (2 - p))
+                y ** (2 - p) / ((2 - p) * mu ** (1 - p) + eps)
+                - y ** (2 - p) / ((1 - p) * mu ** (2 - p) + eps)
                 + mu ** (2 - p) / ((2 - p) * (1 - p))
             )
         else:
             # General case using approximation
-            dev = jnp.abs(y - mu) ** (2 - p) / (mu ** (1 - p))
+            dev = jnp.abs(y - mu) ** (2 - p) / (mu ** (1 - p) + eps)
 
         return jnp.sum(dev * weights) if weights is not None else jnp.sum(dev)
 
@@ -350,9 +328,6 @@ class Tweedie(Distribution):
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
         # Log-likelihood approximation for Tweedie
-        mu = jnp.clip(mu, 1e-7, 1e14)
-        y = jnp.maximum(y, 1e-10)
-
         p = self.power
 
         if abs(p - 0) < 1e-10:  # Normal
@@ -363,17 +338,13 @@ class Tweedie(Distribution):
             ll = -y / mu - jnp.log(mu)
         else:
             # Approximation for other powers
-            ll = -(y ** (2 - p)) / ((2 - p) * mu ** (1 - p))
+            ll = -(y ** (2 - p)) / ((2 - p) * mu ** (1 - p) + 1e-10)
 
         return jnp.sum(ll * weights) if weights is not None else jnp.sum(ll)
 
     def starting_mu(self, y: jax.Array) -> jax.Array:
         # R-style initialization
-        # For Tweedie, we need to ensure positivity
-        mu_start = (y + jnp.mean(y)) / 2.0
-        if self.power > 1:  # Ensure positive mu for powers > 1
-            mu_start = jnp.maximum(mu_start, 1e-7)
-        return mu_start
+        return (y + jnp.mean(y)) / 2.0
 
     def get_canonical_link(self) -> Link:
         # Canonical link depends on power
@@ -421,11 +392,7 @@ class NegativeBinomial(Distribution):
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
         # Deviance for Negative Binomial
-        # D = 2 * sum(y * log(y/mu) - (y + 1/alpha) * log((y*alpha + 1)/(mu*alpha + 1)))
-        mu = jnp.clip(mu, 1e-7, 1e14)
-        y = jnp.maximum(y, 0)
         eps = 1e-10
-
         alpha = self.alpha
 
         # Avoid division by zero
@@ -443,10 +410,7 @@ class NegativeBinomial(Distribution):
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
         # Log-likelihood for Negative Binomial
-        mu = jnp.clip(mu, 1e-7, 1e14)
-        y = jnp.maximum(y, 0)
         eps = 1e-10
-
         alpha = self.alpha
         alpha_mu = alpha * mu
 
@@ -475,36 +439,28 @@ class InverseGaussian(Distribution):
 
     def unit_variance(self, mu: jax.Array) -> jax.Array:
         # V(mu) = mu^3
-        mu = jnp.clip(mu, 1e-7, 1e14)
         return mu**3
 
     def deviance(
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
         # Deviance for Inverse Gaussian
-        mu = jnp.clip(mu, 1e-7, 1e14)
-        y = jnp.maximum(y, 1e-10)
         eps = 1e-10
-
-        dev = (y - mu) ** 2 / (mu**2 * y)
-
+        dev = (y - mu) ** 2 / (mu**2 * y + eps)
         return jnp.sum(dev * weights) if weights is not None else jnp.sum(dev)
 
     def log_likelihood(
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
         # Log-likelihood for Inverse Gaussian (simplified)
-        mu = jnp.clip(mu, 1e-7, 1e14)
-        y = jnp.maximum(y, 1e-10)
-
-        ll = -0.5 * ((y - mu) ** 2 / (mu**2 * y) + 1.5 * jnp.log(y) + jnp.log(mu))
-
+        ll = -0.5 * (
+            (y - mu) ** 2 / (mu**2 * y + 1e-10) + 1.5 * jnp.log(y) + jnp.log(mu)
+        )
         return jnp.sum(ll * weights) if weights is not None else jnp.sum(ll)
 
     def starting_mu(self, y: jax.Array) -> jax.Array:
         # R-style initialization
-        mu_start = (y + jnp.mean(y)) / 2.0
-        return jnp.maximum(mu_start, 1e-7)
+        return (y + jnp.mean(y)) / 2.0
 
     def get_canonical_link(self) -> Link:
         # Canonical link is 1/mu^2

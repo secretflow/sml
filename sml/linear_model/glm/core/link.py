@@ -127,12 +127,7 @@ class LogLink(Link):
         avoiding log(0) or overflow. Default is (1e-7, 1e14).
     """
 
-    def __init__(self, clip_mu: tuple[float, float] = (1e-7, 1e14)):
-        self.clip_mu = clip_mu
-
     def link(self, mu: jax.Array) -> jax.Array:
-        # Clip mu to avoid log(<=0) which results in nan or -inf
-        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
         return jnp.log(mu)
 
     def inverse(self, eta: jax.Array) -> jax.Array:
@@ -142,7 +137,6 @@ class LogLink(Link):
 
     def link_deriv(self, mu: jax.Array) -> jax.Array:
         # d(log(mu))/dmu = 1/mu
-        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
         return 1.0 / mu
 
     def inverse_deriv(self, eta: jax.Array) -> jax.Array:
@@ -154,31 +148,17 @@ class LogitLink(Link):
     """
     The logit link function: g(mu) = log(mu / (1 - mu)).
     Canonical link for the Bernoulli/Binomial distribution.
-
-    Parameters
-    ----------
-    clip_mu : Tuple[float, float], optional
-        The lower and upper bounds to clip mu to avoid division by zero
-        in the logit function. Default is (1e-7, 1 - 1e-7).
     """
 
-    def __init__(self, clip_mu: tuple[float, float] = (1e-7, 1 - 1e-7)):
-        self.clip_mu = clip_mu
-
     def link(self, mu: jax.Array) -> jax.Array:
-        # Clip mu to avoid log(0) or division by zero
-        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
         return jnp.log(mu / (1.0 - mu))
 
     def inverse(self, eta: jax.Array) -> jax.Array:
         # Sigmoid function: 1 / (1 + exp(-eta))
-        # Using specific implementation for better numerical stability could be added,
-        # but jax.nn.sigmoid is also an option. Here we use the raw formula.
         return 1.0 / (1.0 + jnp.exp(-eta))
 
     def link_deriv(self, mu: jax.Array) -> jax.Array:
         # d(log(mu/(1-mu)))/dmu = 1 / (mu * (1 - mu))
-        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
         return 1.0 / (mu * (1.0 - mu))
 
     def inverse_deriv(self, eta: jax.Array) -> jax.Array:
@@ -196,13 +176,8 @@ class ProbitLink(Link):
     Canonical link for approximated binary responses when using normal latent variables.
     """
 
-    def __init__(self, clip_mu: tuple[float, float] = (1e-7, 1 - 1e-7)):
-        self.clip_mu = clip_mu
-
     def link(self, mu: jax.Array) -> jax.Array:
         # Probit link: inverse of standard normal CDF
-        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
-        # Use jax.lax.erf_inv for numerical stability
         # Phi^(-1)(p) = sqrt(2) * erf^(-1)(2p - 1)
         return jnp.sqrt(2.0) * jax.lax.erf_inv(2.0 * mu - 1.0)
 
@@ -213,15 +188,14 @@ class ProbitLink(Link):
     def link_deriv(self, mu: jax.Array) -> jax.Array:
         # Derivative of probit link: 1 / phi(g(mu))
         # where phi is the standard normal PDF
-        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
         eta = self.link(mu)
         # Standard normal PDF: phi(eta) = exp(-eta^2/2) / sqrt(2*pi)
-        phi_eta = jnp.exp(-0.5 * eta ** 2) / jnp.sqrt(2.0 * jnp.pi)
+        phi_eta = jnp.exp(-0.5 * eta**2) / jnp.sqrt(2.0 * jnp.pi)
         return 1.0 / phi_eta
 
     def inverse_deriv(self, eta: jax.Array) -> jax.Array:
         # Derivative of standard normal CDF
-        phi_eta = jnp.exp(-0.5 * eta ** 2) / jnp.sqrt(2.0 * jnp.pi)
+        phi_eta = jnp.exp(-0.5 * eta**2) / jnp.sqrt(2.0 * jnp.pi)
         return phi_eta
 
 
@@ -233,12 +207,8 @@ class CLogLogLink(Link):
     the upper asymptote is approached more slowly than the lower one.
     """
 
-    def __init__(self, clip_mu: tuple[float, float] = (1e-7, 1 - 1e-7)):
-        self.clip_mu = clip_mu
-
     def link(self, mu: jax.Array) -> jax.Array:
         # CLogLog link: log(-log(1 - mu))
-        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
         return jnp.log(-jnp.log(1.0 - mu))
 
     def inverse(self, eta: jax.Array) -> jax.Array:
@@ -247,9 +217,7 @@ class CLogLogLink(Link):
 
     def link_deriv(self, mu: jax.Array) -> jax.Array:
         # Derivative of CLogLog: 1 / ((1 - mu) * log(1 - mu))
-        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
-        eps = 1e-10
-        return 1.0 / ((1.0 - mu) * jnp.log(1.0 - mu + eps))
+        return 1.0 / ((1.0 - mu) * jnp.log(1.0 - mu))
 
     def inverse_deriv(self, eta: jax.Array) -> jax.Array:
         # Derivative of inverse CLogLog: exp(eta - exp(eta))
@@ -272,49 +240,30 @@ class PowerLink(Link):
     ----------
     power : float
         The power parameter. Must not be 0 for direct use (use LogLink for power=0).
-    clip_mu : Tuple[float, float], optional
-        The lower and upper bounds to clip mu for numerical stability.
     """
 
-    def __init__(self, power: float = 1.0, clip_mu: tuple[float, float] = (1e-7, 1e14)):
+    def __init__(self, power: float = 1.0):
         self.power = power
-        self.clip_mu = clip_mu
         if abs(power) < 1e-10:
-            raise ValueError(f"PowerLink power cannot be 0. Use LogLink instead. Got {power}")
+            raise ValueError(
+                f"PowerLink power cannot be 0. Use LogLink instead. Got {power}"
+            )
 
     def link(self, mu: jax.Array) -> jax.Array:
         # Power link: mu^power
-        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
         return jnp.power(mu, self.power)
 
     def inverse(self, eta: jax.Array) -> jax.Array:
         # Inverse power link: eta^(1/power)
-        # Handle negative eta for odd powers
-        if abs(self.power - int(self.power)) < 1e-10:
-            # Integer power
-            sign = jnp.sign(eta)
-            return sign * jnp.power(jnp.abs(eta), 1.0 / self.power)
-        else:
-            # Non-integer power - ensure eta is non-negative for real roots
-            eta = jnp.maximum(eta, 0)
-            return jnp.power(eta, 1.0 / self.power)
+        return jnp.power(eta, 1.0 / self.power)
 
     def link_deriv(self, mu: jax.Array) -> jax.Array:
         # Derivative of power link: power * mu^(power-1)
-        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
         return self.power * jnp.power(mu, self.power - 1.0)
 
     def inverse_deriv(self, eta: jax.Array) -> jax.Array:
         # Derivative of inverse: (1/power) * eta^(1/power - 1)
-        if abs(self.power - int(self.power)) < 1e-10:
-            # Integer power
-            sign = jnp.sign(eta)
-            abs_eta = jnp.abs(eta)
-            return (1.0 / self.power) * sign * jnp.power(abs_eta, 1.0 / self.power - 1.0)
-        else:
-            # Non-integer power
-            eta = jnp.maximum(eta, 0)
-            return (1.0 / self.power) * jnp.power(eta, 1.0 / self.power - 1.0)
+        return (1.0 / self.power) * jnp.power(eta, 1.0 / self.power - 1.0)
 
 
 class ReciprocalLink(Link):
@@ -324,27 +273,18 @@ class ReciprocalLink(Link):
     Canonical link for Gamma distribution.
     """
 
-    def __init__(self, clip_mu: tuple[float, float] = (1e-7, 1e14)):
-        self.clip_mu = clip_mu
-
     def link(self, mu: jax.Array) -> jax.Array:
         # Reciprocal link: 1/mu
-        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
         return 1.0 / mu
 
     def inverse(self, eta: jax.Array) -> jax.Array:
         # Inverse reciprocal: 1/eta
-        # Avoid division by zero
-        eta = jnp.where(jnp.abs(eta) < 1e-10, jnp.sign(eta) * 1e-10, eta)
         return 1.0 / eta
 
     def link_deriv(self, mu: jax.Array) -> jax.Array:
         # Derivative of reciprocal: -1/mu^2
-        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
-        return -1.0 / (mu ** 2)
+        return -1.0 / (mu**2)
 
     def inverse_deriv(self, eta: jax.Array) -> jax.Array:
         # Derivative of inverse reciprocal: -1/eta^2
-        # Avoid division by zero
-        eta = jnp.where(jnp.abs(eta) < 1e-10, jnp.sign(eta) * 1e-10, eta)
-        return -1.0 / (eta ** 2)
+        return -1.0 / (eta**2)

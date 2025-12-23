@@ -40,7 +40,7 @@ class Distribution(ABC):
 - Gaussian -> IdentityLink
 - Bernoulli -> LogitLink
 - Poisson -> LogLink
-- Gamma -> LogLink
+- Gamma -> ReciprocalLink（数学上正确的 canonical link，即 $g(\mu) = 1/\mu$）
 - Tweedie(p) -> LogLink（约定默认）
 - NegativeBinomial -> LogLink
 
