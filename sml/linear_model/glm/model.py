@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Optional, Sequence, Tuple, Union
+from collections.abc import Sequence
+from typing import Any
 
 import jax
-import jax.numpy as jnp
+
 from sml.linear_model.glm.core.distribution import Distribution
 from sml.linear_model.glm.core.family import Family
 from sml.linear_model.glm.core.link import Link
@@ -68,7 +69,7 @@ class GLM:
     def __init__(
         self,
         dist: Distribution,
-        link: Optional[Link] = None,
+        link: Link | None = None,
         solver: str = "irls",
         max_iter: int = 10,
         tol: float = 1e-3,
@@ -78,7 +79,7 @@ class GLM:
         batch_size: int = 1024,
         l2: float = 0.0,
         fit_intercept: bool = True,
-        formula: Optional[Formula] = None,
+        formula: Formula | None = None,
     ):
         self.dist = dist
         self.link = link
@@ -94,11 +95,11 @@ class GLM:
         self.formula = formula
 
         # Fitted attributes
-        self.family_: Optional[Family] = None
-        self.coef_: Optional[jax.Array] = None
-        self.intercept_: Optional[jax.Array] = None
-        self.dispersion_: Optional[jax.Array] = None
-        self.history_: Optional[Dict[str, Any]] = None
+        self.family_: Family | None = None
+        self.coef_: jax.Array | None = None
+        self.intercept_: jax.Array | None = None
+        self.dispersion_: jax.Array | None = None
+        self.history_: dict[str, Any] | None = None
 
     def _get_solver(self) -> Solver:
         if self.solver_name == "irls":
@@ -112,8 +113,8 @@ class GLM:
         self,
         X: jax.Array,
         y: jax.Array,
-        offset: Optional[jax.Array] = None,
-        sample_weight: Optional[jax.Array] = None,
+        offset: jax.Array | None = None,
+        sample_weight: jax.Array | None = None,
         scale: float = 1.0,
     ) -> "GLM":
         """
@@ -202,7 +203,7 @@ class GLM:
         return self
 
     def predict(
-        self, X: jax.Array, offset: Optional[jax.Array] = None, scale: float = 1.0
+        self, X: jax.Array, offset: jax.Array | None = None, scale: float = 1.0
     ) -> jax.Array:
         """
         Predict mean values.
@@ -235,7 +236,7 @@ class GLM:
         return mu_scaled * scale
 
     def predict_linear(
-        self, X: jax.Array, offset: Optional[jax.Array] = None
+        self, X: jax.Array, offset: jax.Array | None = None
     ) -> jax.Array:
         """
         Predict linear predictor values (eta).
@@ -268,8 +269,8 @@ class GLM:
         self,
         X: jax.Array,
         y: jax.Array,
-        offset: Optional[jax.Array] = None,
-        sample_weight: Optional[jax.Array] = None,
+        offset: jax.Array | None = None,
+        sample_weight: jax.Array | None = None,
         scale: float = 1.0,
     ) -> jax.Array:
         """
@@ -300,10 +301,10 @@ class GLM:
         X: jax.Array,
         y: jax.Array,
         metrics: Sequence[str] = ("deviance", "aic", "rmse"),
-        offset: Optional[jax.Array] = None,
-        sample_weight: Optional[jax.Array] = None,
+        offset: jax.Array | None = None,
+        sample_weight: jax.Array | None = None,
         scale: float = 1.0,
-    ) -> Dict[str, jax.Array]:
+    ) -> dict[str, jax.Array]:
         """
         Evaluate the model using multiple metrics.
 

@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import jax
 import jax.numpy as jnp
+
 from sml.linear_model.glm.core.family import Family
 from sml.linear_model.glm.formula.base import Formula
 
@@ -61,8 +62,8 @@ class IRLSSolver(Solver):
         family: Family,
         formula: Formula,
         fit_intercept: bool = True,
-        offset: Optional[jax.Array] = None,
-        sample_weight: Optional[jax.Array] = None,
+        offset: jax.Array | None = None,
+        sample_weight: jax.Array | None = None,
         l2: float = 0.0,
         max_iter: int = 100,
         tol: float = 1e-4,
@@ -70,7 +71,7 @@ class IRLSSolver(Solver):
         decay_rate: float = 1.0,      # Unused in IRLS
         decay_steps: int = 100,       # Unused in IRLS
         batch_size: int = 128,        # Unused in IRLS
-    ) -> Tuple[jax.Array, jax.Array, Dict[str, Any]]:
+    ) -> tuple[jax.Array, jax.Array, dict[str, Any]]:
         # 1. Preprocessing
         if fit_intercept:
             X_train = add_intercept(X)
@@ -141,7 +142,7 @@ class IRLSSolver(Solver):
             # d. Naive Update with Explicit Inversion
             # beta_new = inv(H + eps*I) @ score
             # We add epsilon jitter inside invert_matrix for stability.
-            # We use naive inversion (inv) instead of solve() to accommodate specific backend 
+            # We use naive inversion (inv) instead of solve() to accommodate specific backend
             # constraints (e.g., MPC/SPU where triangular solves are expensive or unstable).
             H_inv = invert_matrix(H, eps=1e-9)
             beta_new = H_inv @ score

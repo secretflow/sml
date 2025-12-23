@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Optional, Protocol, Tuple
+from typing import Any, Protocol
 
 import jax
+
 from sml.linear_model.glm.core.family import Family
 from sml.linear_model.glm.formula.base import Formula
 
@@ -29,8 +30,8 @@ class Solver(Protocol):
         family: Family,
         formula: Formula,
         fit_intercept: bool = True,
-        offset: Optional[jax.Array] = None,
-        sample_weight: Optional[jax.Array] = None,
+        offset: jax.Array | None = None,
+        sample_weight: jax.Array | None = None,
         l2: float = 0.0,
         max_iter: int = 100,
         tol: float = 1e-4,
@@ -38,7 +39,7 @@ class Solver(Protocol):
         decay_rate: float = 1.0,      # New: LR decay
         decay_steps: int = 100,       # New: LR decay steps
         batch_size: int = 128,
-    ) -> Tuple[jax.Array, jax.Array, Dict[str, Any]]:
+    ) -> tuple[jax.Array, jax.Array, dict[str, Any]]:
         """
         Solve the GLM optimization problem.
 

@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Optional, Protocol, Tuple
+from typing import Any, Protocol
 
 import jax
+
 from sml.linear_model.glm.core.family import Family
 
 
@@ -49,10 +50,10 @@ class Formula(Protocol):
         X: jax.Array,
         y: jax.Array,
         beta: jax.Array,
-        offset: Optional[jax.Array],
+        offset: jax.Array | None,
         family: Family,
-        sample_weight: Optional[jax.Array] = None,
-    ) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array, Dict[str, Any]]:
+        sample_weight: jax.Array | None = None,
+    ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array, dict[str, Any]]:
         """
         Compute the components for a single solver iteration.
 

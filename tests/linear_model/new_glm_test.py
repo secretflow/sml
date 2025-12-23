@@ -97,7 +97,6 @@ class TestJAXGLM:
                 batch_size=batch_size,
                 fit_intercept=True, 
                 tol=1e-6,
-                random_state=42
             )
             model.fit(X, y)
             return model.coef_, model.intercept_

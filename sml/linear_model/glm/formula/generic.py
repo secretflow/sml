@@ -15,7 +15,6 @@
 from typing import Any
 
 import jax
-import jax.numpy as jnp
 
 from sml.linear_model.glm.core.family import Family
 
