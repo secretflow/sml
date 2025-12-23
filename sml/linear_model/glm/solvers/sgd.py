@@ -54,6 +54,13 @@ class SGDSolver(Solver):
     4. Learning Rate Decay:
        lr_t = learning_rate * decay_rate ^ (step / decay_steps)
 
+    Intercept-Only Initialization (sklearn/H2O style):
+    --------------------------------------------------
+    Instead of starting with beta=0 or full R-style least squares:
+    1. Set all feature coefficients to 0
+    2. Set intercept to link(mean(y))
+    This is simpler, more efficient for SGD, and commonly used in practice.
+
     Supports Mini-Batch SGD via sequential slicing.
     """
 
@@ -70,8 +77,8 @@ class SGDSolver(Solver):
         max_iter: int = 100,  # Interpreted as Epochs
         tol: float = 1e-4,
         learning_rate: float = 1e-2,
-        decay_rate: float = 1.0,      # New: LR decay
-        decay_steps: int = 100,       # New: LR decay steps
+        decay_rate: float = 1.0,  # New: LR decay
+        decay_steps: int = 100,  # New: LR decay steps
         batch_size: int = 128,
     ) -> tuple[jax.Array, jax.Array, dict[str, Any]]:
         # 1. Preprocessing
@@ -85,9 +92,22 @@ class SGDSolver(Solver):
         # Handle batch size
         batch_size = min(batch_size, n_samples)
         n_batches = n_samples // batch_size
-        
-        # 2. Initialization
+
+        # 2. Intercept-Only Initialization (sklearn/H2O style)
+        # Initialize all coefficients to 0, then set intercept to link(mean(y))
+        # This is simpler and more efficient for SGD than R-style full least squares
         beta_init = jnp.zeros(n_features, dtype=X.dtype)
+        if fit_intercept:
+            # Compute starting mu from y mean (or distribution-specific starting value)
+            mu_init = family.distribution.starting_mu(y)
+            y_mean = jnp.mean(mu_init)
+            # Compute intercept as link(y_mean)
+            intercept_init = family.link.link(y_mean)
+            # Handle offset: if offset is provided, adjust intercept
+            if offset is not None:
+                intercept_init = intercept_init - jnp.mean(offset)
+            # Set intercept (last element in beta when fit_intercept=True)
+            beta_init = beta_init.at[n_features - 1].set(intercept_init)
 
         # State: (beta, converged, epoch, deviance)
         init_val = (beta_init, False, 0, jnp.inf)
@@ -95,10 +115,10 @@ class SGDSolver(Solver):
         # 3. Define Batch Step function
         def batch_step(batch_idx, val):
             beta, epoch = val
-            
+
             # Calculate current step (global) for decay
             global_step = epoch * n_batches + batch_idx
-            
+
             # Decay learning rate
             # lr = base_lr * decay_rate ^ (step / decay_steps)
             decay_factor = jnp.power(decay_rate, global_step / decay_steps)
@@ -151,13 +171,11 @@ class SGDSolver(Solver):
         # 4. Define Epoch Loop (iterates over batches)
         def epoch_body(val):
             beta, _, epoch, _ = val
-            
+
             # Loop over batches
             # carry is (beta, epoch) because we need epoch for global step calculation
-            beta_next, _ = jax.lax.fori_loop(
-                0, n_batches, batch_step, (beta, epoch)
-            )
-            
+            beta_next, _ = jax.lax.fori_loop(0, n_batches, batch_step, (beta, epoch))
+
             # Calculate full deviance for convergence check
             _, _, _, _, dev_full, _ = formula.compute_components(
                 X=X_train,
@@ -172,7 +190,7 @@ class SGDSolver(Solver):
             beta_norm = jnp.linalg.norm(beta)
             rel_change = beta_diff / (beta_norm + 1e-12)
             converged = rel_change < tol
-            
+
             return beta_next, converged, epoch + 1, dev_full
 
         # 5. Define Cond function

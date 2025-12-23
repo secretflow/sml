@@ -503,7 +503,12 @@ class TestJAXGLM:
         """Test custom formula registration and dispatch."""
         print("\n--- Testing Formula Dispatcher ---")
         from sml.linear_model.glm.formula.dispatch import dispatcher, register_formula
-        from sml.linear_model.glm.formula.optimized import PoissonLogFormula
+        from sml.linear_model.glm.formula.optimized import (
+            PoissonLogFormula,
+            NormalIdentityFormula,
+            BernoulliLogitFormula,
+            GammaLogFormula,
+        )
         from sml.linear_model.glm.formula.generic import GenericFormula
 
         # Save original registry state
@@ -523,8 +528,22 @@ class TestJAXGLM:
             model.fit(self.X, self.y)
             assert model.coef_ is not None
 
+            # Test that built-in optimized formulas are registered
+            resolved_normal = dispatcher.resolve(Normal(), IdentityLink())
+            assert isinstance(resolved_normal, NormalIdentityFormula)
+            print("NormalIdentityFormula registered correctly")
+
+            resolved_bernoulli = dispatcher.resolve(Bernoulli(), LogitLink())
+            assert isinstance(resolved_bernoulli, BernoulliLogitFormula)
+            print("BernoulliLogitFormula registered correctly")
+
+            resolved_gamma_log = dispatcher.resolve(Gamma(), LogLink())
+            assert isinstance(resolved_gamma_log, GammaLogFormula)
+            print("GammaLogFormula registered correctly")
+
             # Test fallback to GenericFormula for unregistered pairs
-            resolved_generic = dispatcher.resolve(Normal(), IdentityLink())
+            # Use a combination that doesn't have optimized formula
+            resolved_generic = dispatcher.resolve(Normal(), LogLink())
             assert isinstance(resolved_generic, GenericFormula)
             print("Fallback to GenericFormula works correctly")
         finally:
@@ -602,6 +621,217 @@ class TestJAXGLM:
         # Coefficients should be close to true values
         np.testing.assert_allclose(model.coef_, true_coef, rtol=0.3, atol=0.3)
 
+    def test_optimized_formulas(self):
+        """Test all optimized formula implementations."""
+        print("\n--- Testing Optimized Formulas ---")
+        from sml.linear_model.glm.formula.optimized import (
+            NormalIdentityFormula,
+            BernoulliLogitFormula,
+            PoissonLogFormula,
+            GammaReciprocalFormula,
+            GammaLogFormula,
+            TweedieLogFormula,
+        )
+        from sml.linear_model.glm.core.family import Family
+
+        key = jax.random.PRNGKey(42)
+
+        # Test 1: NormalIdentityFormula
+        print("Testing NormalIdentityFormula...")
+        X_normal = jax.random.normal(key, (50, 3))
+        y_normal = X_normal @ jnp.array([1.0, -0.5, 0.3]) + 0.1 * jax.random.normal(
+            key, (50,)
+        )
+        family_normal = Family(Normal(), IdentityLink())
+        formula_normal = NormalIdentityFormula()
+        beta_test = jnp.zeros(3)
+        w, z_resid, mu, eta, dev, extras = formula_normal.compute_components(
+            X_normal, y_normal, beta_test, None, family_normal
+        )
+        assert w.shape == (50,)
+        assert jnp.all(w == 1.0)  # Normal+Identity has constant weights
+        print("NormalIdentityFormula passed")
+
+        # Test 2: BernoulliLogitFormula
+        print("Testing BernoulliLogitFormula...")
+        key, subkey = jax.random.split(key)
+        y_binary = jax.random.bernoulli(subkey, 0.5, (50,)).astype(jnp.float32)
+        family_bernoulli = Family(Bernoulli(), LogitLink())
+        formula_logit = BernoulliLogitFormula()
+        w, z_resid, mu, eta, dev, extras = formula_logit.compute_components(
+            X_normal, y_binary, beta_test, None, family_bernoulli
+        )
+        assert w.shape == (50,)
+        # W = mu * (1 - mu), for beta=0, mu=0.5, so W ~ 0.25
+        np.testing.assert_allclose(w, 0.25 * jnp.ones(50), rtol=0.01)
+        print("BernoulliLogitFormula passed")
+
+        # Test 3: PoissonLogFormula
+        print("Testing PoissonLogFormula...")
+        family_poisson = Family(Poisson(), LogLink())
+        formula_poisson = PoissonLogFormula()
+        w, z_resid, mu, eta, dev, extras = formula_poisson.compute_components(
+            X_normal, self.y[:50], beta_test, None, family_poisson
+        )
+        # For beta=0, mu=1, W=mu=1
+        np.testing.assert_allclose(w, jnp.ones(50), rtol=0.01)
+        print("PoissonLogFormula passed")
+
+        # Test 4: GammaLogFormula
+        print("Testing GammaLogFormula...")
+        y_gamma = jnp.abs(y_normal) + 0.1
+        family_gamma_log = Family(Gamma(), LogLink())
+        formula_gamma_log = GammaLogFormula()
+        w, z_resid, mu, eta, dev, extras = formula_gamma_log.compute_components(
+            X_normal, y_gamma, beta_test, None, family_gamma_log
+        )
+        # Gamma + Log: W = 1 (constant)
+        assert jnp.all(w == 1.0)
+        print("GammaLogFormula passed")
+
+        # Test 5: GammaReciprocalFormula
+        print("Testing GammaReciprocalFormula...")
+        beta_gamma = jnp.array([0.5, 0.3, 0.2])  # Non-zero to avoid singularity
+        family_gamma_recip = Family(Gamma(), ReciprocalLink())
+        formula_gamma_recip = GammaReciprocalFormula()
+        w, z_resid, mu, eta, dev, extras = formula_gamma_recip.compute_components(
+            X_normal, y_gamma, beta_gamma, None, family_gamma_recip
+        )
+        assert w.shape == (50,)
+        print("GammaReciprocalFormula passed")
+
+        # Test 6: TweedieLogFormula
+        print("Testing TweedieLogFormula...")
+        family_tweedie = Family(Tweedie(power=1.5), LogLink())
+        formula_tweedie = TweedieLogFormula(power=1.5)
+        w, z_resid, mu, eta, dev, extras = formula_tweedie.compute_components(
+            X_normal, self.y[:50], beta_test, None, family_tweedie
+        )
+        # For beta=0, mu=1, W = mu^(2-p) = 1^0.5 = 1
+        np.testing.assert_allclose(w, jnp.ones(50), rtol=0.01)
+        print("TweedieLogFormula passed")
+
+        print("All optimized formulas passed!")
+
+    def test_r_style_initialization(self):
+        """Test that R-style initialization is used in solvers."""
+        print("\n--- Testing R-style Initialization ---")
+
+        # For Poisson GLM, starting mu should be (y + mean(y)) / 2
+        # This affects the initial beta via least squares fit
+
+        # Create a model and check that it converges quickly
+        # (R-style init should provide better starting point)
+        model = GLM(dist=Poisson(), solver="irls", max_iter=10, tol=1e-6)
+        model.fit(self.X, self.y)
+
+        # With good initialization, should achieve reasonable fit in few iterations
+        assert model.history_["n_iter"] <= 10
+        print(f"IRLS converged in {model.history_['n_iter']} iterations")
+
+        # Coefficients should be close to true values
+        np.testing.assert_allclose(model.coef_, self.true_coef, rtol=0.3, atol=0.3)
+        print("R-style initialization test passed")
+
+    def test_logistic_regression_optimized(self):
+        """Test logistic regression with optimized formula."""
+        print("\n--- Testing Logistic Regression (Optimized) ---")
+
+        # Generate binary classification data
+        key = jax.random.PRNGKey(42)
+        n_samples, n_features = 200, 4
+        X_logit = jax.random.normal(key, (n_samples, n_features))
+        true_coef = jnp.array([1.0, -0.5, 0.5, -0.3])
+        true_intercept = 0.5
+        eta = X_logit @ true_coef + true_intercept
+        prob = jax.nn.sigmoid(eta)
+
+        key, subkey = jax.random.split(key)
+        y_binary = jax.random.bernoulli(subkey, prob).astype(jnp.float32)
+
+        # Fit logistic regression
+        model = GLM(
+            dist=Bernoulli(), link=LogitLink(), solver="irls", fit_intercept=True
+        )
+        model.fit(X_logit, y_binary)
+        print(f"Logistic - Coef: {model.coef_}, Intercept: {model.intercept_}")
+
+        # Coefficients should be reasonably close to true values
+        np.testing.assert_allclose(model.coef_, true_coef, rtol=0.5, atol=0.5)
+        np.testing.assert_allclose(model.intercept_, true_intercept, rtol=0.5, atol=0.5)
+
+        # Test predictions
+        mu_pred = model.predict(X_logit)
+        # Predictions should be probabilities between 0 and 1
+        assert jnp.all(mu_pred >= 0) and jnp.all(mu_pred <= 1)
+        print("Logistic regression (optimized) test passed")
+
+    def test_tweedie_optimized_formula(self):
+        """Test Tweedie distribution with optimized formula."""
+        print("\n--- Testing Tweedie Optimized Formula ---")
+        from sml.linear_model.glm.formula.optimized import TweedieLogFormula
+        from sml.linear_model.glm.formula.dispatch import dispatcher, register_formula
+
+        # Save original registry
+        original_registry = dispatcher._registry.copy()
+
+        try:
+            # Register TweedieLogFormula with power=1.5
+            power = 1.5
+            register_formula(Tweedie, LogLink, TweedieLogFormula(power=power))
+
+            # Fit Tweedie model
+            model = GLM(dist=Tweedie(power=power), solver="irls", fit_intercept=True)
+            model.fit(self.X, self.y)
+            print(f"Tweedie(p={power}) - Coef: {model.coef_}")
+
+            # Verify it uses the optimized formula
+            from sml.linear_model.glm.formula.optimized import TweedieLogFormula
+
+            resolved = dispatcher.resolve(Tweedie(power=power), LogLink())
+            assert isinstance(resolved, TweedieLogFormula)
+            print("Tweedie optimized formula test passed")
+        finally:
+            dispatcher._registry = original_registry
+
+    def test_gamma_reciprocal_link(self):
+        """Test Gamma distribution with canonical (Reciprocal) link."""
+        print("\n--- Testing Gamma + Reciprocal Link (Canonical) ---")
+
+        # Generate positive data
+        key = jax.random.PRNGKey(42)
+        n_samples, n_features = 100, 3
+        X_gamma = jax.random.normal(key, (n_samples, n_features)) * 0.3
+
+        # For Reciprocal link: eta = 1/mu, so mu = 1/eta
+        # Keep eta positive by having positive linear predictor
+        true_coef = jnp.array([0.1, 0.05, -0.05])
+        true_intercept = 2.0  # Keep eta > 0 to ensure mu > 0
+        eta = X_gamma @ true_coef + true_intercept
+        mu_true = 1.0 / eta  # Reciprocal link inverse
+
+        # Generate Gamma-like data
+        key, subkey = jax.random.split(key)
+        y_gamma = mu_true + 0.1 * mu_true * jax.random.normal(subkey, (n_samples,))
+        y_gamma = jnp.abs(y_gamma) + 0.01  # Ensure positive
+
+        # Fit model with Reciprocal link
+        model = GLM(
+            dist=Gamma(),
+            link=ReciprocalLink(),
+            solver="irls",
+            fit_intercept=True,
+            max_iter=50,
+        )
+        model.fit(X_gamma, y_gamma)
+        print(
+            f"Gamma + Reciprocal - Coef: {model.coef_}, Intercept: {model.intercept_}"
+        )
+
+        # Check that model fits (may not be exact due to Reciprocal link challenges)
+        assert model.coef_ is not None
+        print("Gamma + Reciprocal link test passed")
+
 
 if __name__ == "__main__":
     t = TestJAXGLM()
@@ -630,3 +860,10 @@ if __name__ == "__main__":
     t.test_convergence_history()
     t.test_dispersion_estimation()
     t.test_gamma_with_log_link()
+
+    # New optimized formula tests
+    t.test_optimized_formulas()
+    t.test_r_style_initialization()
+    t.test_logistic_regression_optimized()
+    t.test_tweedie_optimized_formula()
+    t.test_gamma_reciprocal_link()

@@ -51,6 +51,13 @@ class IRLSSolver(Solver):
 
     This implementation solves this Weighted Least Squares problem iteratively.
 
+    R-style Initialization:
+    -----------------------
+    Instead of starting with beta=0, we use R-style initialization:
+    1. Compute starting mu from y: mu_init = distribution.starting_mu(y)
+    2. Compute starting eta: eta_init = link(mu_init)
+    3. Use mu_init and eta_init for the first IRLS iteration
+
     NOTE: This implementation uses naive matrix inversion (inv) instead of
     solving linear systems (solve/cholesky) to meet specific backend constraints.
     """
@@ -80,8 +87,26 @@ class IRLSSolver(Solver):
 
         n_samples, n_features = X_train.shape
 
-        # 2. Initialization
-        beta_init = jnp.zeros(n_features, dtype=X.dtype)
+        # 2. R-style Initialization
+        # Instead of beta=0, we use the distribution's starting_mu to initialize.
+        # Step 1: Get starting mu from distribution
+        mu_init = family.distribution.starting_mu(y)
+        # Step 2: Get starting eta from link
+        eta_init = family.link.link(mu_init)
+        # Step 3: Handle offset
+        if offset is not None:
+            eta_init = eta_init - offset
+        # Step 4: Solve for initial beta via least squares: eta_init = X @ beta_init
+        # Using weighted least squares with unit weights for initialization
+        # beta_init = (X^T X)^{-1} X^T eta_init
+        H_init = X_train.T @ X_train
+        if l2 > 0:
+            diag_indices = jnp.diag_indices(n_features)
+            H_init = H_init.at[diag_indices].add(l2)
+            if fit_intercept:
+                H_init = H_init.at[n_features - 1, n_features - 1].add(-l2)
+        H_init_inv = invert_matrix(H_init, eps=1e-9)
+        beta_init = H_init_inv @ (X_train.T @ eta_init)
 
         # State structure: (beta, converged, n_iter, deviance)
         init_val = (beta_init, False, 0, jnp.inf)

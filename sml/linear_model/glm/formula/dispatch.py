@@ -78,6 +78,52 @@ class FormulaDispatcher:
 dispatcher = FormulaDispatcher()
 
 
-def register_formula(dist_type: type[Distribution], link_type: type[Link], formula: Formula):
+def register_formula(
+    dist_type: type[Distribution], link_type: type[Link], formula: Formula
+):
     """Global helper to register a formula."""
     dispatcher.register(dist_type, link_type, formula)
+
+
+# Register built-in optimized formulas
+def _register_builtin_formulas():
+    """Register all built-in optimized formulas."""
+    from sml.linear_model.glm.core.distribution import (
+        Normal,
+        Bernoulli,
+        Poisson,
+        Gamma,
+        Tweedie,
+    )
+    from sml.linear_model.glm.core.link import (
+        IdentityLink,
+        LogLink,
+        LogitLink,
+        ReciprocalLink,
+    )
+    from sml.linear_model.glm.formula.optimized import (
+        NormalIdentityFormula,
+        BernoulliLogitFormula,
+        PoissonLogFormula,
+        GammaReciprocalFormula,
+        GammaLogFormula,
+        TweedieLogFormula,
+    )
+
+    # Normal + Identity (Linear Regression)
+    register_formula(Normal, IdentityLink, NormalIdentityFormula())
+    # Bernoulli + Logit (Logistic Regression)
+    register_formula(Bernoulli, LogitLink, BernoulliLogitFormula())
+    # Poisson + Log
+    register_formula(Poisson, LogLink, PoissonLogFormula())
+    # Gamma + Reciprocal (canonical)
+    register_formula(Gamma, ReciprocalLink, GammaReciprocalFormula())
+    # Gamma + Log (common in practice)
+    register_formula(Gamma, LogLink, GammaLogFormula())
+    # Note: Tweedie + Log is not pre-registered because it requires
+    # the power parameter from the Tweedie distribution instance.
+    # Users can register specific TweedieLogFormula(power=p) if needed.
+
+
+# Auto-register on module load
+_register_builtin_formulas()
