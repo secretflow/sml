@@ -115,6 +115,9 @@ class IRLSSolver(Solver):
 
             # c. Weighted Least Squares: Solve (X'WX + l2*I) beta_new = X'Wz
             # Construct Weighted Matrix Xw = sqrt(W) * X
+            # Note: W here is "Canonical Weight" (W_can), assuming scale factor phi=1.
+            # In standard IRLS, phi cancels out in the update rule:
+            # beta_new = (X' W_can X)^{-1} X' W_can z
             w_sqrt = jnp.sqrt(w)[:, None]
             Xw = X_train * w_sqrt
             zw = z * w_sqrt.flatten()
@@ -122,10 +125,17 @@ class IRLSSolver(Solver):
             # Normal Equations Matrix H = Xw.T @ Xw = X^T * W * X
             H = Xw.T @ Xw
             # Score-like vector = X^T * W * z
+            # Note on L2 Regularization:
+            # The Newton update for L2 penalized objective Q(beta) = L(beta) - 0.5 * lambda * ||beta||^2 is:
+            # beta_new = beta_old + (H_Likelihood - lambda*I)^{-1} (Grad_Likelihood - lambda*beta_old)
+            # Expanding this reveals that the -lambda*beta term cancels with the term from H*beta_old.
+            # Resulting in the WLS form: beta_new = (X^T W X + lambda*I)^{-1} X^T W z
+            # Thus, we DO NOT subtract lambda*beta from the score vector here.
             score = Xw.T @ zw
 
             # Apply L2 Regularization to H
             # H_reg = H + l2 * I (excluding intercept)
+            # Here 'l2' parameter is treated as the effective regularization strength (lambda * phi).
             if l2 > 0:
                 diag_indices = jnp.diag_indices(n_features)
                 H = H.at[diag_indices].add(l2)
@@ -135,7 +145,9 @@ class IRLSSolver(Solver):
 
             # d. Naive Update with Explicit Inversion
             # beta_new = inv(H + eps*I) @ score
-            # We add epsilon jitter inside invert_matrix for stability
+            # We add epsilon jitter inside invert_matrix for stability.
+            # We use naive inversion (inv) instead of solve() to accommodate specific backend 
+            # constraints (e.g., MPC/SPU where triangular solves are expensive or unstable).
             H_inv = invert_matrix(H, eps=1e-9)
             beta_new = H_inv @ score
 

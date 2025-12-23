@@ -64,11 +64,17 @@ class GenericFormula(Formula):
 
         # 4. Compute Working Weights W
         # Fisher Information W = 1 / (V(mu) * (g'(mu))^2)
-        # We add a small eps to denominators to prevent division by zero
+        # Note regarding Scale/Dispersion (phi) and a(phi):
+        # The true Fisher Information weight is W_true = W / a(phi).
+        # Typically a(phi) = phi / sample_weight.
+        # So W_true = W * sample_weight / phi.
+        # In IRLS, the 1/phi factor appears in both the Hessian and Gradient terms and cancels out.
+        # Therefore, we compute 'W' assuming phi=1.
+        # We add a small eps to denominators to prevent division by zero.
         eps = 1e-12
         w = 1.0 / (v_mu * (g_prime**2) + eps)
 
-        # Apply sample weights
+        # Apply sample weights (equivalent to handling the 1/w part of a(phi))
         if sample_weight is not None:
             w = w * sample_weight
 

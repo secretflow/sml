@@ -34,17 +34,12 @@ class Distribution(ABC):
         Compute the unit variance function V(mu).
 
         The variance of the distribution is given by: Var(Y) = phi * V(mu),
-        where phi is the dispersion parameter.
-
-        Parameters
-        ----------
-        mu : jax.Array
-            The mean of the distribution.
-
-        Returns
-        -------
-        v : jax.Array
-            The computed variance function values.
+        where phi is the dispersion parameter (scale).
+        
+        Note on a(phi):
+        In the exponential family form f(y; theta, phi) = exp((y*theta - b(theta))/a(phi) + c),
+        typically a(phi) = phi / sample_weight.
+        This class provides V(mu) = b''(theta).
         """
         pass
 

@@ -60,6 +60,7 @@ class PoissonLogFormula(Formula):
 
         # Optimized components for Poisson + Log
         # W = mu, z_resid = y/mu - 1
+        # Note: Implicitly assumes phi=1 (standard for Poisson) and a(phi) = 1/weight.
         w = mu
         if sample_weight is not None:
             w = w * sample_weight

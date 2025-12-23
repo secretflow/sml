@@ -134,18 +134,21 @@ class SGDSolver(Solver):
             )
 
             # Gradient Calculation
-            # Gradient = X^T * (W * z_resid)
+            # We are performing Gradient Ascent on Log-Likelihood.
+            # Gradient_L = X^T * (W * z_resid) = X^T * (y - mu) / (V * g')
             grad_components = w * z_resid
             grad = X_batch.T @ grad_components
 
             # L2 Regularization
+            # Objective: Maximize L(beta) - 0.5 * lambda * ||beta||^2
+            # Gradient: Grad_L - lambda * beta
             if l2 > 0:
                 l2_grad = l2 * beta
                 if fit_intercept:
                     l2_grad = l2_grad.at[n_features - 1].set(0.0)
                 grad -= l2_grad
 
-            # Update
+            # Update (Ascent)
             beta_new = beta + current_lr * grad
             return (beta_new, epoch)
 
