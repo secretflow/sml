@@ -72,7 +72,6 @@ class SGDSolver(Solver):
         decay_rate: float = 1.0,      # New: LR decay
         decay_steps: int = 100,       # New: LR decay steps
         batch_size: int = 128,
-        random_state: Optional[int] = None, # Used for Shuffle if implemented (future)
         clip_eta: Optional[Tuple[float, float]] = None,
         clip_mu: Optional[Tuple[float, float]] = None,
     ) -> Tuple[jax.Array, jax.Array, Dict[str, Any]]:

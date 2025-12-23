@@ -38,7 +38,6 @@ class Solver(Protocol):
         decay_rate: float = 1.0,      # New: LR decay
         decay_steps: int = 100,       # New: LR decay steps
         batch_size: int = 128,
-        random_state: Optional[int] = None, # New: PRNGKey
         clip_eta: Optional[Tuple[float, float]] = None,
         clip_mu: Optional[Tuple[float, float]] = None,
     ) -> Tuple[jax.Array, jax.Array, Dict[str, Any]]:
@@ -75,8 +74,6 @@ class Solver(Protocol):
             Steps for learning rate decay.
         batch_size : int
             Batch size for gradient-based solvers (SGD).
-        random_state : int, optional
-            Seed for PRNGKey.
         clip_eta : Tuple[float, float], optional
             Bounds for eta clipping.
         clip_mu : Tuple[float, float], optional

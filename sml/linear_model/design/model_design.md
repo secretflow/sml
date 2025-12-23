@@ -53,7 +53,6 @@ class GLM:
         batch_size: int = 128,       
         l2: float = 0.0,
         fit_intercept: bool = True,
-        random_state: int | None = None, # New: JAX PRNGKey seed
         formula=None,
         dispatcher=None,
         clip_eta: tuple | None = None,
@@ -92,7 +91,6 @@ class GLM:
 ## 关键参数处理
 - `offset`: **Moved to fit()**. 这是一个数据依赖的参数，应与 X, y 同生命周期。
 - `decay_rate` / `decay_steps`: 用于 SGD 的学习率调度。
-- `random_state`: 用于初始化 JAX 的随机数生成器（如 SGD 初始化或 Shuffle）。
 
 ## 异常与校验
 - 校验 solver 名称。

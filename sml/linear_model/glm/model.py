@@ -45,24 +45,22 @@ class GLM:
         The solver algorithm to use. Currently supports:
         - 'irls': Iteratively Reweighted Least Squares.
         - 'sgd': Stochastic Gradient Descent.
-    max_iter : int, default=100
+    max_iter : int, default=10
         Maximum number of iterations for the solver (or epochs for SGD).
-    tol : float, default=1e-4
+    tol : float, default=1e-3
         Convergence tolerance for the solver.
-    learning_rate : float, default=1e-2
+    learning_rate : float, default=1e-1
         Learning rate for SGD solver.
     decay_rate : float, default=1.0
         Learning rate decay factor for SGD (1.0 means no decay).
     decay_steps : int, default=100
         Decay steps for SGD learning rate schedule.
-    batch_size : int, default=128
+    batch_size : int, default=1024
         Batch size for SGD solver.
     l2 : float, default=0.0
         L2 regularization strength (Ridge penalty).
     fit_intercept : bool, default=True
         Whether to calculate the intercept for this model.
-    random_state : int, optional, default=None
-        Seed for JAX PRNG (e.g., for SGD initialization or shuffling).
     formula : Formula, optional
         Custom formula implementation. If None, it is resolved via the dispatcher.
     clip_eta : Tuple[float, float], optional
@@ -76,15 +74,14 @@ class GLM:
         dist: Distribution,
         link: Optional[Link] = None,
         solver: str = "irls",
-        max_iter: int = 100,
-        tol: float = 1e-4,
-        learning_rate: float = 1e-2,
+        max_iter: int = 10,
+        tol: float = 1e-3,
+        learning_rate: float = 1e-1,
         decay_rate: float = 1.0,
         decay_steps: int = 100,
-        batch_size: int = 128,
+        batch_size: int = 1024,
         l2: float = 0.0,
         fit_intercept: bool = True,
-        random_state: Optional[int] = None,
         formula: Optional[Formula] = None,
         clip_eta: Optional[Tuple[float, float]] = None,
         clip_mu: Optional[Tuple[float, float]] = None,
@@ -100,7 +97,6 @@ class GLM:
         self.batch_size = batch_size
         self.l2 = l2
         self.fit_intercept = fit_intercept
-        self.random_state = random_state
         self.formula = formula
         self.clip_eta = clip_eta
         self.clip_mu = clip_mu
@@ -175,7 +171,9 @@ class GLM:
 
         # 2. Resolve Formula
         if self.formula is None:
-            formula_impl = dispatcher.resolve(self.family_.distribution, self.family_.link)
+            formula_impl = dispatcher.resolve(
+                self.family_.distribution, self.family_.link
+            )
         else:
             formula_impl = self.formula
 
@@ -185,7 +183,7 @@ class GLM:
         # 4. Apply Scaling
         # We train on y / scale
         y_scaled = y / scale
-        
+
         # 5. Solve
         beta, dispersion, history = solver_impl.solve(
             X=X,
@@ -202,7 +200,6 @@ class GLM:
             decay_rate=self.decay_rate,
             decay_steps=self.decay_steps,
             batch_size=self.batch_size,
-            random_state=self.random_state,
             clip_eta=self.clip_eta,
             clip_mu=self.clip_mu,
         )
@@ -215,10 +212,7 @@ class GLM:
         return self
 
     def predict(
-        self, 
-        X: jax.Array, 
-        offset: Optional[jax.Array] = None,
-        scale: float = 1.0
+        self, X: jax.Array, offset: Optional[jax.Array] = None, scale: float = 1.0
     ) -> jax.Array:
         """
         Predict mean values.
@@ -242,15 +236,17 @@ class GLM:
         """
         eta = self.predict_linear(X, offset)
         if self.family_ is None:
-             raise RuntimeError("Model is not fitted yet.")
-        
+            raise RuntimeError("Model is not fitted yet.")
+
         # Inverse link to get scaled mu (since model was trained on scaled y)
         mu_scaled = self.family_.link.inverse(eta)
-        
+
         # Rescale back to original scale
         return mu_scaled * scale
 
-    def predict_linear(self, X: jax.Array, offset: Optional[jax.Array] = None) -> jax.Array:
+    def predict_linear(
+        self, X: jax.Array, offset: Optional[jax.Array] = None
+    ) -> jax.Array:
         """
         Predict linear predictor values (eta).
 
@@ -279,12 +275,12 @@ class GLM:
         return eta
 
     def score(
-        self, 
-        X: jax.Array, 
-        y: jax.Array, 
-        offset: Optional[jax.Array] = None, 
+        self,
+        X: jax.Array,
+        y: jax.Array,
+        offset: Optional[jax.Array] = None,
         sample_weight: Optional[jax.Array] = None,
-        scale: float = 1.0
+        scale: float = 1.0,
     ) -> jax.Array:
         """
         Compute the deviance score (lower is better).
@@ -300,27 +296,27 @@ class GLM:
             Negative Deviance.
         """
         if self.family_ is None:
-             raise RuntimeError("Model is not fitted yet.")
-        
+            raise RuntimeError("Model is not fitted yet.")
+
         # Predict uses scale to return mu in original space
         mu = self.predict(X, offset=offset, scale=scale)
-        
+
         # Calculate deviance in original space
         deviance = self.family_.distribution.deviance(y, mu, sample_weight)
         return -deviance
-    
+
     def evaluate(
-        self, 
-        X: jax.Array, 
-        y: jax.Array, 
+        self,
+        X: jax.Array,
+        y: jax.Array,
         metrics: Sequence[str] = ("deviance", "aic", "rmse"),
         offset: Optional[jax.Array] = None,
         sample_weight: Optional[jax.Array] = None,
-        scale: float = 1.0
+        scale: float = 1.0,
     ) -> Dict[str, jax.Array]:
         """
         Evaluate the model using multiple metrics.
-        
+
         Parameters
         ----------
         X : jax.Array
@@ -335,34 +331,40 @@ class GLM:
             Weights.
         scale : float, default=1.0
             Scaling factor to denormalize the prediction.
-            
+
         Returns
         -------
         results : Dict[str, jax.Array]
             Dictionary of computed metrics.
         """
         if self.family_ is None or self.coef_ is None:
-             raise RuntimeError("Model is not fitted yet.")
-        
+            raise RuntimeError("Model is not fitted yet.")
+
         # Get predictions in original space
         mu = self.predict(X, offset=offset, scale=scale)
         n_samples = X.shape[0]
         # Rank = features + intercept
         rank = self.coef_.shape[0] + (1 if self.fit_intercept else 0)
-        
+
         results = {}
         for metric in metrics:
             if metric == "deviance":
-                results[metric] = metric_funcs.deviance(y, mu, self.family_, sample_weight)
+                results[metric] = metric_funcs.deviance(
+                    y, mu, self.family_, sample_weight
+                )
             elif metric == "aic":
-                results[metric] = metric_funcs.aic(y, mu, self.family_, rank, sample_weight)
+                results[metric] = metric_funcs.aic(
+                    y, mu, self.family_, rank, sample_weight
+                )
             elif metric == "bic":
-                results[metric] = metric_funcs.bic(y, mu, self.family_, rank, n_samples, sample_weight)
+                results[metric] = metric_funcs.bic(
+                    y, mu, self.family_, rank, n_samples, sample_weight
+                )
             elif metric == "rmse":
                 results[metric] = metric_funcs.rmse(y, mu, sample_weight)
             elif metric == "auc":
                 results[metric] = metric_funcs.auc(y, mu, sample_weight)
             else:
                 raise ValueError(f"Unknown metric: {metric}")
-        
+
         return results
