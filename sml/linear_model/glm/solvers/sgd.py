@@ -72,8 +72,6 @@ class SGDSolver(Solver):
         decay_rate: float = 1.0,      # New: LR decay
         decay_steps: int = 100,       # New: LR decay steps
         batch_size: int = 128,
-        clip_eta: Optional[Tuple[float, float]] = None,
-        clip_mu: Optional[Tuple[float, float]] = None,
     ) -> Tuple[jax.Array, jax.Array, Dict[str, Any]]:
         # 1. Preprocessing
         if fit_intercept:
@@ -128,8 +126,6 @@ class SGDSolver(Solver):
                 offset=off_batch,
                 family=family,
                 sample_weight=sw_batch,
-                clip_eta=clip_eta,
-                clip_mu=clip_mu,
             )
 
             # Gradient Calculation
@@ -169,8 +165,6 @@ class SGDSolver(Solver):
                 offset=offset,
                 family=family,
                 sample_weight=sample_weight,
-                clip_eta=clip_eta,
-                clip_mu=clip_mu,
             )
 
             beta_diff = jnp.linalg.norm(beta_next - beta)

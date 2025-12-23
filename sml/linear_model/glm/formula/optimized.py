@@ -42,21 +42,13 @@ class PoissonLogFormula(Formula):
         offset: jax.Array | None,
         family: Family,
         sample_weight: jax.Array | None = None,
-        clip_eta: tuple[float, float] | None = None,
-        clip_mu: tuple[float, float] | None = None,
     ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array, dict[str, Any]]:
         eta = X @ beta
         if offset is not None:
             eta += offset
 
-        if clip_eta is not None:
-            eta = jnp.clip(eta, clip_eta[0], clip_eta[1])
-
         # Optimized: mu calculation
         mu = jnp.exp(eta)
-
-        if clip_mu is not None:
-            mu = jnp.clip(mu, clip_mu[0], clip_mu[1])
 
         # Optimized components for Poisson + Log
         # W = mu, z_resid = y/mu - 1

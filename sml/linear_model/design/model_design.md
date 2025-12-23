@@ -55,8 +55,6 @@ class GLM:
         fit_intercept: bool = True,
         formula=None,
         dispatcher=None,
-        clip_eta: tuple | None = None,
-        clip_mu: tuple | None = None,
     ):
         ...
 

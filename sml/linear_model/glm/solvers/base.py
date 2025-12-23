@@ -38,8 +38,6 @@ class Solver(Protocol):
         decay_rate: float = 1.0,      # New: LR decay
         decay_steps: int = 100,       # New: LR decay steps
         batch_size: int = 128,
-        clip_eta: Optional[Tuple[float, float]] = None,
-        clip_mu: Optional[Tuple[float, float]] = None,
     ) -> Tuple[jax.Array, jax.Array, Dict[str, Any]]:
         """
         Solve the GLM optimization problem.
@@ -74,10 +72,6 @@ class Solver(Protocol):
             Steps for learning rate decay.
         batch_size : int
             Batch size for gradient-based solvers (SGD).
-        clip_eta : Tuple[float, float], optional
-            Bounds for eta clipping.
-        clip_mu : Tuple[float, float], optional
-            Bounds for mu clipping.
 
         Returns
         -------

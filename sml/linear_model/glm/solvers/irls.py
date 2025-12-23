@@ -70,8 +70,6 @@ class IRLSSolver(Solver):
         decay_rate: float = 1.0,      # Unused in IRLS
         decay_steps: int = 100,       # Unused in IRLS
         batch_size: int = 128,        # Unused in IRLS
-        clip_eta: Optional[Tuple[float, float]] = None,
-        clip_mu: Optional[Tuple[float, float]] = None,
     ) -> Tuple[jax.Array, jax.Array, Dict[str, Any]]:
         # 1. Preprocessing
         if fit_intercept:
@@ -100,8 +98,6 @@ class IRLSSolver(Solver):
                 offset=offset,
                 family=family,
                 sample_weight=sample_weight,
-                clip_eta=clip_eta,
-                clip_mu=clip_mu,
             )
 
             # b. Construct Working Response z

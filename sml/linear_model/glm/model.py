@@ -63,10 +63,6 @@ class GLM:
         Whether to calculate the intercept for this model.
     formula : Formula, optional
         Custom formula implementation. If None, it is resolved via the dispatcher.
-    clip_eta : Tuple[float, float], optional
-        Bounds to clip the linear predictor eta for numerical stability.
-    clip_mu : Tuple[float, float], optional
-        Bounds to clip the mean prediction mu for numerical stability.
     """
 
     def __init__(
@@ -83,8 +79,6 @@ class GLM:
         l2: float = 0.0,
         fit_intercept: bool = True,
         formula: Optional[Formula] = None,
-        clip_eta: Optional[Tuple[float, float]] = None,
-        clip_mu: Optional[Tuple[float, float]] = None,
     ):
         self.dist = dist
         self.link = link
@@ -98,8 +92,6 @@ class GLM:
         self.l2 = l2
         self.fit_intercept = fit_intercept
         self.formula = formula
-        self.clip_eta = clip_eta
-        self.clip_mu = clip_mu
 
         # Fitted attributes
         self.family_: Optional[Family] = None
@@ -200,8 +192,6 @@ class GLM:
             decay_rate=self.decay_rate,
             decay_steps=self.decay_steps,
             batch_size=self.batch_size,
-            clip_eta=self.clip_eta,
-            clip_mu=self.clip_mu,
         )
 
         # 6. Store results

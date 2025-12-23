@@ -39,24 +39,14 @@ class GenericFormula(Formula):
         offset: jax.Array | None,
         family: Family,
         sample_weight: jax.Array | None = None,
-        clip_eta: tuple[float, float] | None = None,
-        clip_mu: tuple[float, float] | None = None,
     ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array, dict[str, Any]]:
         # 1. Compute linear predictor eta
         eta = X @ beta
         if offset is not None:
             eta += offset
 
-        # Numerical stability: Clip eta
-        if clip_eta is not None:
-            eta = jnp.clip(eta, clip_eta[0], clip_eta[1])
-
         # 2. Compute mean mu via inverse link
         mu = family.link.inverse(eta)
-
-        # Numerical stability: Clip mu
-        if clip_mu is not None:
-            mu = jnp.clip(mu, clip_mu[0], clip_mu[1])
 
         # 3. Compute atomic math components
         v_mu = family.distribution.unit_variance(mu)

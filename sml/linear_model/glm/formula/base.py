@@ -52,8 +52,6 @@ class Formula(Protocol):
         offset: Optional[jax.Array],
         family: Family,
         sample_weight: Optional[jax.Array] = None,
-        clip_eta: Optional[Tuple[float, float]] = None,
-        clip_mu: Optional[Tuple[float, float]] = None,
     ) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array, Dict[str, Any]]:
         """
         Compute the components for a single solver iteration.
@@ -72,10 +70,6 @@ class Formula(Protocol):
             The GLM family (distribution + link).
         sample_weight : jax.Array, optional
             External weights per sample.
-        clip_eta : Tuple[float, float], optional
-            Bounds for clipping the linear predictor eta.
-        clip_mu : Tuple[float, float], optional
-            Bounds for clipping the mean mu.
 
         Returns
         -------

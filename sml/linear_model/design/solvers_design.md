@@ -118,10 +118,9 @@ class Solver(Protocol):
         l2: float = 0.0,
         max_iter: int = 100,
         tol: float = 1e-4,
-        learning_rate: float = 1e-2,  # SGD specific
+        decay_rate: float = 1.0,      # New: SGD LR decay
+        decay_steps: int = 100,       # New: SGD decay steps
         batch_size: int = 128,        # SGD specific
-        clip_eta=None,
-        clip_mu=None,
     ) -> tuple[beta, dispersion, history]:
         ...
 ```
