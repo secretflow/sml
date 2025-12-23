@@ -131,12 +131,23 @@ class GLM:
         """
         Fit the GLM model.
 
-        Note on MPC Stability:
-        ----------------------
+        Note on MPC Stability and Scaling:
+        ----------------------------------
         In MPC (Secure Multi-Party Computation) environments, such as SecretFlow SPU,
         fixed-point arithmetic can lead to overflows if 'y' has a large range.
         It is HIGHLY RECOMMENDED to normalize 'y' manually (e.g., y_scaled = y / scale)
         so that values are within a small range (e.g., [0, 1] or mean approx 1).
+
+        Impact of Scaling (y_new = y / scale) on Coefficients:
+        1. Log Link (Tweedie, Gamma, Poisson):
+           - Slopes (beta_i, i>0): INVARIANT. They remain exactly the same as training on raw y.
+           - Intercept (beta_0): Shifts by -log(scale).
+           - Regularization: Usually no need to adjust `l2`.
+        2. Identity Link (Gaussian):
+           - All Coefficients: Scaled by 1/scale.
+           - Regularization: `l2` should be scaled down approx by 1/scale^2 to avoid underfitting.
+        3. Logit Link:
+           - NOT RECOMMENDED. Keep y in {0, 1}.
 
         Parameters
         ----------
