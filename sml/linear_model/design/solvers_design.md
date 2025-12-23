@@ -71,7 +71,12 @@ $$ (X^T W X) \beta_{new} = X^T W z $$
 1.  计算 $W$ 和 $z_{resid}$。
 2.  计算 $z = \eta + z_{resid}$。
 3.  构建加权矩阵 $H = X^T W X$ 和加权向量 $score = X^T W z$。
-4.  Naive Update: $\beta_{new} = (H + \epsilon I)^{-1} score$。
+4.  **L2 正则化处理**:
+    - 若存在 L2 正则 (强度 $\lambda$)，则更新 $H \leftarrow H + \lambda I$。
+    - 注意：Intercept 对应的对角线元素通常不加正则。
+5.  Naive Update: $\beta_{new} = (H + \epsilon I)^{-1} score$。
+    - 这里 $\epsilon$ 是数值稳定性抖动 (Jitter)。
+    - 注意：Score 向量 $X^T W z$ **不需要** 减去 $\lambda \beta$，因为梯度中的 $-\lambda \beta$ 已在 Newton 迭代推导中抵消（详见 `api_design.md`）。
 
 ---
 

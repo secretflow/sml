@@ -126,9 +126,17 @@ class GLM:
         y: jax.Array,
         offset: Optional[jax.Array] = None,
         sample_weight: Optional[jax.Array] = None,
+        scale: float = 1.0,
     ) -> "GLM":
         """
         Fit the GLM model.
+
+        Note on MPC Stability:
+        ----------------------
+        In MPC (Secure Multi-Party Computation) environments, such as SecretFlow SPU,
+        fixed-point arithmetic can lead to overflows if 'y' has a large range.
+        It is HIGHLY RECOMMENDED to normalize 'y' manually (e.g., y_scaled = y / scale)
+        so that values are within a small range (e.g., [0, 1] or mean approx 1).
 
         Parameters
         ----------
@@ -141,6 +149,10 @@ class GLM:
             Shape must be broadcastable to (n_samples,).
         sample_weight : jax.Array, optional
             Individual weights for each sample.
+        scale : float, default=1.0
+            Scaling factor for 'y' (target variable).
+            The model will be trained on `y / scale`.
+            Predictions will be automatically rescaled by `mu * scale`.
 
         Returns
         -------
@@ -159,10 +171,14 @@ class GLM:
         # 3. Get Solver
         solver_impl = self._get_solver()
 
-        # 4. Solve
+        # 4. Apply Scaling
+        # We train on y / scale
+        y_scaled = y / scale
+        
+        # 5. Solve
         beta, dispersion, history = solver_impl.solve(
             X=X,
-            y=y,
+            y=y_scaled,
             family=self.family_,
             formula=formula_impl,
             fit_intercept=self.fit_intercept,
@@ -180,18 +196,23 @@ class GLM:
             clip_mu=self.clip_mu,
         )
 
-        # 5. Store results
+        # 6. Store results
         self.coef_, self.intercept_ = split_coef(beta, self.fit_intercept)
         self.dispersion_ = dispersion
         self.history_ = history
 
         return self
 
-    def predict(self, X: jax.Array, offset: Optional[jax.Array] = None) -> jax.Array:
+    def predict(
+        self, 
+        X: jax.Array, 
+        offset: Optional[jax.Array] = None,
+        scale: float = 1.0
+    ) -> jax.Array:
         """
         Predict mean values.
 
-        mu = link.inverse(X @ coef + intercept + offset)
+        mu = link.inverse(X @ coef + intercept + offset) * scale
 
         Parameters
         ----------
@@ -199,6 +220,9 @@ class GLM:
             Samples to predict.
         offset : jax.Array, optional
             Offset to add to the linear predictor.
+        scale : float, default=1.0
+            Scaling factor to denormalize the prediction.
+            Should match the scale used in `fit`.
 
         Returns
         -------
@@ -208,7 +232,12 @@ class GLM:
         eta = self.predict_linear(X, offset)
         if self.family_ is None:
              raise RuntimeError("Model is not fitted yet.")
-        return self.family_.link.inverse(eta)
+        
+        # Inverse link to get scaled mu (since model was trained on scaled y)
+        mu_scaled = self.family_.link.inverse(eta)
+        
+        # Rescale back to original scale
+        return mu_scaled * scale
 
     def predict_linear(self, X: jax.Array, offset: Optional[jax.Array] = None) -> jax.Array:
         """
@@ -238,9 +267,21 @@ class GLM:
 
         return eta
 
-    def score(self, X: jax.Array, y: jax.Array, offset: Optional[jax.Array] = None, sample_weight: Optional[jax.Array] = None) -> jax.Array:
+    def score(
+        self, 
+        X: jax.Array, 
+        y: jax.Array, 
+        offset: Optional[jax.Array] = None, 
+        sample_weight: Optional[jax.Array] = None,
+        scale: float = 1.0
+    ) -> jax.Array:
         """
         Compute the deviance score (lower is better).
+
+        Parameters
+        ----------
+        scale : float, default=1.0
+            Scale used for prediction denormalization.
 
         Returns
         -------
@@ -249,7 +290,11 @@ class GLM:
         """
         if self.family_ is None:
              raise RuntimeError("Model is not fitted yet.")
-        mu = self.predict(X, offset=offset)
+        
+        # Predict uses scale to return mu in original space
+        mu = self.predict(X, offset=offset, scale=scale)
+        
+        # Calculate deviance in original space
         deviance = self.family_.distribution.deviance(y, mu, sample_weight)
         return -deviance
     
@@ -259,7 +304,8 @@ class GLM:
         y: jax.Array, 
         metrics: Sequence[str] = ("deviance", "aic", "rmse"),
         offset: Optional[jax.Array] = None,
-        sample_weight: Optional[jax.Array] = None
+        sample_weight: Optional[jax.Array] = None,
+        scale: float = 1.0
     ) -> Dict[str, jax.Array]:
         """
         Evaluate the model using multiple metrics.
@@ -276,6 +322,8 @@ class GLM:
             Offset.
         sample_weight : jax.Array, optional
             Weights.
+        scale : float, default=1.0
+            Scaling factor to denormalize the prediction.
             
         Returns
         -------
@@ -285,7 +333,8 @@ class GLM:
         if self.family_ is None or self.coef_ is None:
              raise RuntimeError("Model is not fitted yet.")
         
-        mu = self.predict(X, offset=offset)
+        # Get predictions in original space
+        mu = self.predict(X, offset=offset, scale=scale)
         n_samples = X.shape[0]
         # Rank = features + intercept
         rank = self.coef_.shape[0] + (1 if self.fit_intercept else 0)

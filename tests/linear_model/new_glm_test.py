@@ -164,6 +164,51 @@ class TestJAXGLM:
             model.fit(self.X, self.y)
             assert model.coef_ is not None
 
+    def test_y_scaling(self):
+        """Test manual y scaling for numerical stability."""
+        print("\n--- Testing Y Scaling ---")
+        
+        # Calculate scale
+        y_max = float(jnp.max(self.y))
+        y_scale = y_max / 2.0
+        if y_scale < 1.0:
+            y_scale = 1.0
+            
+        print(f"Using y_scale: {y_scale}")
+        
+        # Fit with scale
+        model = GLM(dist=Poisson(), solver='irls', fit_intercept=True)
+        model.fit(self.X, self.y, scale=y_scale)
+        
+        # The intercept should change because y is scaled. 
+        # For Log link: log(y/scale) = log(y) - log(scale)
+        # So intercept should be reduced by log(scale)
+        expected_intercept_shift = jnp.log(y_scale)
+        print(f"Learned Intercept: {model.intercept_}, Expected Shift: -{expected_intercept_shift}")
+        
+        # Compare with unscaled model
+        model_unscaled = GLM(dist=Poisson(), solver='irls')
+        model_unscaled.fit(self.X, self.y)
+        
+        print(f"Unscaled Intercept: {model_unscaled.intercept_}")
+        
+        # intercept_scaled ~ intercept_unscaled - log(scale)
+        np.testing.assert_allclose(
+            model.intercept_, 
+            model_unscaled.intercept_ - expected_intercept_shift, 
+            atol=0.2
+        )
+        
+        # Coefficients should be identical (scale only affects intercept in Log link)
+        np.testing.assert_allclose(model.coef_, model_unscaled.coef_, atol=1e-4)
+        
+        # Prediction with scale should match original y
+        mu_pred = model.predict(self.X, scale=y_scale)
+        mu_unscaled = model_unscaled.predict(self.X)
+        
+        np.testing.assert_allclose(mu_pred, mu_unscaled, rtol=1e-4)
+        print("Scaling test passed: predictions match unscaled model.")
+
 if __name__ == "__main__":
     t = TestJAXGLM()
     t.setup_method()
@@ -172,3 +217,4 @@ if __name__ == "__main__":
     t.test_offset_handling()
     t.test_metrics()
     t.test_sgd_batching()
+    t.test_y_scaling()

@@ -83,3 +83,37 @@ SS-GLM 的 `core` 模块实现了一组标准的 GLM 组件。
 
 ## 4. 结论
 `secretflow/secretflow/ml/linear/ss_glm` 的实现逻辑严谨，数学推导正确，与 `sml/linear_model` 的新设计在理论层面完全一致。其处理 MPC 场景下的特有技巧（如 Hessian Reveal、数据分片缓存）对于未来 SML 库在 MPC 后端的落地具有重要的参考价值。
+
+## 5. L2 正则化实现的正确性分析
+
+经过对 SS-GLM 代码 (`model.py`) 的分析，发现其 IRLS 求解器在处理 L2 正则化时存在实现偏差。
+
+### 5.1 问题描述
+SS-GLM 的更新逻辑如下：
+1. 计算 Hessian $J = X^T W X$ 和 Score-like $v = X^T W z$ (其中 $z = \eta + z_{resid}$)。
+2. 对 Hessian 加正则：$J_{reg} = J + \lambda I$。
+3. 更新系数：
+   ```python
+   model = inv(J_reg) @ (v - lambda * model_old)
+   ```
+   即：
+   $$ \beta_{new} = (X^T W X + \lambda I)^{-1} (X^T W z - \lambda \beta_{old}) $$
+
+### 5.2 理论偏差
+标准带 L2 正则的 IRLS 更新公式应为：
+$$ \beta_{new} = (X^T W X + \lambda I)^{-1} X^T W z $$
+
+推导如下：
+$$ \nabla Q = X^T W z_{resid} - \lambda \beta $$
+$$ H_Q = -(X^T W X + \lambda I) $$
+Newton Update:
+$$ \beta_{new} = \beta - H_Q^{-1} \nabla Q = \beta + (X^T W X + \lambda I)^{-1} (X^T W z_{resid} - \lambda \beta) $$
+$$ \beta_{new} = (X^T W X + \lambda I)^{-1} [ (X^T W X + \lambda I)\beta + X^T W z_{resid} - \lambda \beta ] $$
+$$ \beta_{new} = (X^T W X + \lambda I)^{-1} [ X^T W X \beta + X^T W z_{resid} ] $$
+$$ \beta_{new} = (X^T W X + \lambda I)^{-1} X^T W (X\beta + z_{resid}) = (X^T W X + \lambda I)^{-1} X^T W z $$
+
+### 5.3 结论
+SS-GLM 在分子中错误地减去了 $\lambda \beta_{old}$。由于 $(X^T W X + \lambda I)\beta_{old}$ 展开后包含 $+\lambda \beta_{old}$，这一项本应与梯度中的 $-\lambda \beta_{old}$ 抵消。
+SS-GLM 的实现相当于在梯度步中引入了 $2\lambda$ 的惩罚，或者说在 RHS 目标向量中减去了 $\lambda \beta$，这是不正确的。这会导致 L2 正则化的效果偏大或收敛行为异常。
+
+**建议**: 在未来的 SML MPC 实现中，应修正此逻辑，采用标准的 $\beta_{new} = (X^T W X + \lambda I)^{-1} X^T W z$。
