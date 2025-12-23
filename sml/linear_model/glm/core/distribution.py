@@ -152,8 +152,8 @@ class Normal(Distribution):
         return jnp.sum(ll * weights) if weights is not None else jnp.sum(ll)
 
     def starting_mu(self, y: jax.Array) -> jax.Array:
-        # Start with the global mean
-        return jnp.full_like(y, jnp.mean(y))
+        # R-style initialization: (y + mean(y)) / 2
+        return (y + jnp.mean(y)) / 2.0
 
     def get_canonical_link(self) -> Link:
         return IdentityLink()
@@ -232,8 +232,55 @@ class Poisson(Distribution):
         return jnp.sum(ll * weights) if weights is not None else jnp.sum(ll)
 
     def starting_mu(self, y: jax.Array) -> jax.Array:
-        # Start with weighted mean of y
+        # R-style initialization: (y + mean(y)) / 2
         return (y + jnp.mean(y)) / 2.0
 
     def get_canonical_link(self) -> Link:
         return LogLink()
+
+
+class Gamma(Distribution):
+    """
+    Gamma distribution (for continuous positive data).
+    Canonical link: Inverse (often Log is used in practice).
+    """
+
+    def unit_variance(self, mu: jax.Array) -> jax.Array:
+        # V(mu) = mu^2
+        return mu**2
+
+    def deviance(
+        self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
+    ) -> jax.Array:
+        # Deviance = 2 * sum( -log(y/mu) + (y - mu)/mu )
+        #          = 2 * sum( (y - mu)/mu - log(y/mu) )
+        mu = jnp.clip(mu, 1e-7, 1e14)
+        eps = 1e-10
+        dev = 2.0 * ((y - mu) / mu - jnp.log(y / mu + eps))
+        return jnp.sum(dev * weights) if weights is not None else jnp.sum(dev)
+
+    def log_likelihood(
+        self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
+    ) -> jax.Array:
+        # LL depends on dispersion phi (which we often don't know exactly during training).
+        # Standard form: LL(mu; y, phi) = -1/phi * (y/mu + log(mu)) + ...
+        # For simplified LL maximization/comparison, we can use the main term:
+        # - (y/mu + log(mu))
+        mu = jnp.clip(mu, 1e-7, 1e14)
+        ll = -1.0 * (y / mu + jnp.log(mu))
+        return jnp.sum(ll * weights) if weights is not None else jnp.sum(ll)
+
+    def starting_mu(self, y: jax.Array) -> jax.Array:
+        # R-style initialization: (y + mean(y)) / 2
+        mu_start = (y + jnp.mean(y)) / 2.0
+        # Gamma requires positive values
+        return jnp.maximum(mu_start, 1e-7)
+
+    def get_canonical_link(self) -> Link:
+        # The canonical link is Inverse, but inverse is numerically unstable.
+        # Log link is often preferred. However, adhering to "Canonical" definition:
+        # We need InverseLink implemented first? 
+        # For now, let's use LogLink as a safe default if Inverse is not available,
+        # or implement InverseLink. Assuming InverseLink will be added or use Log as pragmatic canonical.
+        # R uses Inverse. Let's return LogLink for stability until InverseLink is robust.
+        return LogLink()  # TODO: Switch to InverseLink when available and robust

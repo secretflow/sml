@@ -68,9 +68,9 @@ class IRLSSolver(Solver):
         max_iter: int = 100,
         tol: float = 1e-4,
         learning_rate: float = 1e-2,  # Unused in IRLS
-        decay_rate: float = 1.0,      # Unused in IRLS
-        decay_steps: int = 100,       # Unused in IRLS
-        batch_size: int = 128,        # Unused in IRLS
+        decay_rate: float = 1.0,  # Unused in IRLS
+        decay_steps: int = 100,  # Unused in IRLS
+        batch_size: int = 128,  # Unused in IRLS
     ) -> tuple[jax.Array, jax.Array, dict[str, Any]]:
         # 1. Preprocessing
         if fit_intercept:
@@ -104,7 +104,7 @@ class IRLSSolver(Solver):
             # b. Construct Working Response z
             # z = eta + (y - mu) * g'(mu)
             z = eta + z_resid
-            
+
             # If offset is present, we are solving for X @ beta ~ z - offset
             if offset is not None:
                 z = z - offset
