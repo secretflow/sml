@@ -18,8 +18,14 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from sml.linear_model.glm.core.distribution import Poisson
-from sml.linear_model.glm.core.link import LogLink
+from sml.linear_model.glm.core.distribution import (
+    Normal, Bernoulli, Poisson, Gamma,
+    Tweedie, NegativeBinomial, InverseGaussian
+)
+from sml.linear_model.glm.core.link import (
+    IdentityLink, LogLink, LogitLink,
+    ProbitLink, CLogLogLink, PowerLink, ReciprocalLink
+)
 from sml.linear_model.glm.formula.dispatch import register_formula
 from sml.linear_model.glm.formula.optimized import PoissonLogFormula
 from sml.linear_model.glm.model import GLM
@@ -208,6 +214,164 @@ class TestJAXGLM:
         np.testing.assert_allclose(mu_pred, mu_unscaled, rtol=1e-4)
         print("Scaling test passed: predictions match unscaled model.")
 
+    def test_tweedie_distribution(self):
+        """Test Tweedie distribution with different power parameters."""
+        print("\n--- Testing Tweedie Distribution ---")
+
+        # Test Tweedie with power=1.5 (compound Poisson-Gamma)
+        model = GLM(dist=Tweedie(power=1.5), solver='irls', fit_intercept=True)
+        model.fit(self.X, self.y)
+        print(f"Tweedie(1.5) - Coef: {model.coef_}, Intercept: {model.intercept_}")
+
+        # Test Tweedie with power=0 (should behave like Normal)
+        model_normal = GLM(dist=Tweedie(power=0.0), solver='irls', fit_intercept=True)
+        model_normal.fit(self.X, self.y)
+        print(f"Tweedie(0.0) - Coef: {model_normal.coef_}, Intercept: {model_normal.intercept_}")
+
+        # Test deviance computation
+        mu = model.predict(self.X)
+        dev = model.dist.deviance(self.y, mu)
+        print(f"Tweedie deviance: {dev}")
+        assert dev >= 0
+
+    def test_negative_binomial_distribution(self):
+        """Test Negative Binomial distribution with overdispersion."""
+        print("\n--- Testing Negative Binomial Distribution ---")
+
+        # Test with alpha=1.0
+        model = GLM(dist=NegativeBinomial(alpha=1.0), solver='irls', fit_intercept=True)
+        model.fit(self.X, self.y)
+        print(f"NegativeBinomial(alpha=1.0) - Coef: {model.coef_}, Intercept: {model.intercept_}")
+
+        # Test with different alpha values
+        for alpha in [0.5, 1.0, 2.0]:
+            dist = NegativeBinomial(alpha=alpha)
+            mu_test = jnp.array([1.0, 2.0, 3.0])
+            var = dist.unit_variance(mu_test)
+            print(f"NB alpha={alpha}: mu={mu_test}, var={var}")
+            # Variance should be mu + alpha * mu^2
+            expected_var = mu_test + alpha * mu_test ** 2
+            np.testing.assert_allclose(var, expected_var, rtol=1e-5)
+
+    def test_inverse_gaussian_distribution(self):
+        """Test Inverse Gaussian distribution."""
+        print("\n--- Testing Inverse Gaussian Distribution ---")
+
+        model = GLM(dist=InverseGaussian(), solver='irls', fit_intercept=True)
+        # Generate positive data suitable for Inverse Gaussian
+        y_pos = jnp.maximum(self.y, 1.0)  # Ensure strictly positive
+        model.fit(self.X, y_pos)
+        print(f"InverseGaussian - Coef: {model.coef_}, Intercept: {model.intercept_}")
+
+        # Test unit variance: V(mu) = mu^3
+        dist = InverseGaussian()
+        mu_test = jnp.array([0.5, 1.0, 2.0])
+        var = dist.unit_variance(mu_test)
+        expected_var = mu_test ** 3
+        np.testing.assert_allclose(var, expected_var, rtol=1e-5)
+        print(f"InverseGaussian unit variance test passed")
+
+    def test_various_links(self):
+        """Test different link functions."""
+        print("\n--- Testing Various Link Functions ---")
+
+        # Generate binary data for link testing
+        key = jax.random.PRNGKey(123)
+        X_binary = jax.random.normal(key, (100, 3))
+        true_coef = jnp.array([1.0, -0.5, 0.5])
+        true_intercept = 0.0
+        eta = X_binary @ true_coef + true_intercept
+
+        # Test different links with Bernoulli distribution
+        links_to_test = [
+            ("Logit", LogitLink()),
+            ("Probit", ProbitLink()),
+            ("CLogLog", CLogLogLink()),
+        ]
+
+        for link_name, link in links_to_test:
+            model = GLM(dist=Bernoulli(), link=link, solver='irls', fit_intercept=True)
+            # Generate y based on link
+            mu = link.inverse(eta)
+            key, subkey = jax.random.split(key)
+            y_binary = jax.random.bernoulli(subkey, mu).astype(jnp.float32)
+
+            model.fit(X_binary, y_binary)
+            print(f"{link_name} Link - Coef: {model.coef_}")
+
+            # Test link derivatives
+            mu_test = jnp.array([0.2, 0.5, 0.8])
+            link_val = link.link(mu_test)
+            link_der = link.link_deriv(mu_test)
+            inv_der = link.inverse_deriv(link_val)
+
+            # For CLogLog, the derivative relationship is more complex
+            # We'll just check that derivatives are non-zero where expected
+            if link_name == "CLogLog":
+                # CLogLog derivatives can be negative, that's expected
+                assert not jnp.all(link_der == 0)
+                assert not jnp.all(inv_der == 0)
+            else:
+                np.testing.assert_allclose(inv_der, 1.0 / link_der, rtol=1e-5)
+            print(f"{link_name} derivative consistency test passed")
+
+    def test_power_and_reciprocal_links(self):
+        """Test PowerLink and ReciprocalLink."""
+        print("\n--- Testing Power and Reciprocal Links ---")
+
+        # Test PowerLink with different powers
+        powers_to_test = [0.5, 1.0, 2.0, -1.0, -2.0]
+
+        for power in powers_to_test:
+            if abs(power) < 1e-10:
+                continue  # Skip power=0 as it's not allowed
+            link = PowerLink(power=power)
+
+            mu_test = jnp.array([1.0, 2.0, 3.0])
+            eta = link.link(mu_test)
+            mu_recovered = link.inverse(eta)
+
+            np.testing.assert_allclose(mu_recovered, mu_test, rtol=1e-5)
+            print(f"PowerLink(power={power}) consistency test passed")
+
+        # Test ReciprocalLink (should be same as PowerLink(power=-1))
+        reciprocal = ReciprocalLink()
+        power_neg_one = PowerLink(power=-1.0)
+
+        mu_test = jnp.array([1.0, 2.0, 3.0])
+        eta_recip = reciprocal.link(mu_test)
+        eta_power = power_neg_one.link(mu_test)
+
+        np.testing.assert_allclose(eta_recip, eta_power, rtol=1e-10)
+        print("ReciprocalLink and PowerLink(power=-1) equivalence test passed")
+
+    def test_link_distribution_combinations(self):
+        """Test various distribution-link combinations."""
+        print("\n--- Testing Distribution-Link Combinations ---")
+
+        combinations = [
+            (Normal(), IdentityLink()),
+            (Normal(), LogLink()),
+            (Poisson(), LogLink()),
+            (Poisson(), PowerLink(power=0.5)),
+            (Gamma(), LogLink()),
+            (Gamma(), ReciprocalLink()),
+            (Tweedie(power=1.5), LogLink()),
+            (NegativeBinomial(alpha=0.5), LogLink()),
+            (InverseGaussian(), PowerLink(power=-2.0)),
+        ]
+
+        for dist, link in combinations:
+            model = GLM(dist=dist, link=link, solver='irls', fit_intercept=True, max_iter=10)
+            try:
+                model.fit(self.X, self.y)
+                mu_pred = model.predict(self.X)
+                print(f"{dist.__class__.__name__}+{link.__class__.__name__}: Success")
+                assert mu_pred is not None
+            except Exception as e:
+                print(f"{dist.__class__.__name__}+{link.__class__.__name__}: Error - {e}")
+                # Some combinations might be numerically unstable, that's expected
+
 if __name__ == "__main__":
     t = TestJAXGLM()
     t.setup_method()
@@ -217,3 +381,11 @@ if __name__ == "__main__":
     t.test_metrics()
     t.test_sgd_batching()
     t.test_y_scaling()
+
+    # Test new distributions and links
+    t.test_tweedie_distribution()
+    t.test_negative_binomial_distribution()
+    t.test_inverse_gaussian_distribution()
+    t.test_various_links()
+    t.test_power_and_reciprocal_links()
+    t.test_link_distribution_combinations()

@@ -186,3 +186,165 @@ class LogitLink(Link):
         # Or equivalently: exp(eta) / (1 + exp(eta))^2
         exp_eta = jnp.exp(eta)
         return exp_eta / (1.0 + exp_eta) ** 2
+
+
+class ProbitLink(Link):
+    """
+    The probit link function: g(mu) = Phi^(-1)(mu).
+    Inverse of the standard normal CDF.
+
+    Canonical link for approximated binary responses when using normal latent variables.
+    """
+
+    def __init__(self, clip_mu: tuple[float, float] = (1e-7, 1 - 1e-7)):
+        self.clip_mu = clip_mu
+
+    def link(self, mu: jax.Array) -> jax.Array:
+        # Probit link: inverse of standard normal CDF
+        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
+        # Use jax.lax.erf_inv for numerical stability
+        # Phi^(-1)(p) = sqrt(2) * erf^(-1)(2p - 1)
+        return jnp.sqrt(2.0) * jax.lax.erf_inv(2.0 * mu - 1.0)
+
+    def inverse(self, eta: jax.Array) -> jax.Array:
+        # Standard normal CDF: Phi(eta) = 0.5 * (1 + erf(eta/sqrt(2)))
+        return 0.5 * (1.0 + jax.lax.erf(eta / jnp.sqrt(2.0)))
+
+    def link_deriv(self, mu: jax.Array) -> jax.Array:
+        # Derivative of probit link: 1 / phi(g(mu))
+        # where phi is the standard normal PDF
+        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
+        eta = self.link(mu)
+        # Standard normal PDF: phi(eta) = exp(-eta^2/2) / sqrt(2*pi)
+        phi_eta = jnp.exp(-0.5 * eta ** 2) / jnp.sqrt(2.0 * jnp.pi)
+        return 1.0 / phi_eta
+
+    def inverse_deriv(self, eta: jax.Array) -> jax.Array:
+        # Derivative of standard normal CDF
+        phi_eta = jnp.exp(-0.5 * eta ** 2) / jnp.sqrt(2.0 * jnp.pi)
+        return phi_eta
+
+
+class CLogLogLink(Link):
+    """
+    The complementary log-log link function: g(mu) = log(-log(1 - mu)).
+
+    Used for binary outcomes with asymmetric effects, particularly when
+    the upper asymptote is approached more slowly than the lower one.
+    """
+
+    def __init__(self, clip_mu: tuple[float, float] = (1e-7, 1 - 1e-7)):
+        self.clip_mu = clip_mu
+
+    def link(self, mu: jax.Array) -> jax.Array:
+        # CLogLog link: log(-log(1 - mu))
+        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
+        return jnp.log(-jnp.log(1.0 - mu))
+
+    def inverse(self, eta: jax.Array) -> jax.Array:
+        # Inverse of CLogLog: 1 - exp(-exp(eta))
+        return 1.0 - jnp.exp(-jnp.exp(eta))
+
+    def link_deriv(self, mu: jax.Array) -> jax.Array:
+        # Derivative of CLogLog: 1 / ((1 - mu) * log(1 - mu))
+        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
+        eps = 1e-10
+        return 1.0 / ((1.0 - mu) * jnp.log(1.0 - mu + eps))
+
+    def inverse_deriv(self, eta: jax.Array) -> jax.Array:
+        # Derivative of inverse CLogLog: exp(eta - exp(eta))
+        exp_eta = jnp.exp(eta)
+        return exp_eta * jnp.exp(-exp_eta)
+
+
+class PowerLink(Link):
+    """
+    The power link function: g(mu) = mu^power for power != 0.
+
+    Special cases:
+    - power = 1: Identity link
+    - power = 0: Log link (limit as power -> 0)
+    - power = -1: Reciprocal link
+    - power = 2: Square link
+    - power = -2: Reciprocal squared link (canonical for Inverse Gaussian)
+
+    Parameters
+    ----------
+    power : float
+        The power parameter. Must not be 0 for direct use (use LogLink for power=0).
+    clip_mu : Tuple[float, float], optional
+        The lower and upper bounds to clip mu for numerical stability.
+    """
+
+    def __init__(self, power: float = 1.0, clip_mu: tuple[float, float] = (1e-7, 1e14)):
+        self.power = power
+        self.clip_mu = clip_mu
+        if abs(power) < 1e-10:
+            raise ValueError(f"PowerLink power cannot be 0. Use LogLink instead. Got {power}")
+
+    def link(self, mu: jax.Array) -> jax.Array:
+        # Power link: mu^power
+        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
+        return jnp.power(mu, self.power)
+
+    def inverse(self, eta: jax.Array) -> jax.Array:
+        # Inverse power link: eta^(1/power)
+        # Handle negative eta for odd powers
+        if abs(self.power - int(self.power)) < 1e-10:
+            # Integer power
+            sign = jnp.sign(eta)
+            return sign * jnp.power(jnp.abs(eta), 1.0 / self.power)
+        else:
+            # Non-integer power - ensure eta is non-negative for real roots
+            eta = jnp.maximum(eta, 0)
+            return jnp.power(eta, 1.0 / self.power)
+
+    def link_deriv(self, mu: jax.Array) -> jax.Array:
+        # Derivative of power link: power * mu^(power-1)
+        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
+        return self.power * jnp.power(mu, self.power - 1.0)
+
+    def inverse_deriv(self, eta: jax.Array) -> jax.Array:
+        # Derivative of inverse: (1/power) * eta^(1/power - 1)
+        if abs(self.power - int(self.power)) < 1e-10:
+            # Integer power
+            sign = jnp.sign(eta)
+            abs_eta = jnp.abs(eta)
+            return (1.0 / self.power) * sign * jnp.power(abs_eta, 1.0 / self.power - 1.0)
+        else:
+            # Non-integer power
+            eta = jnp.maximum(eta, 0)
+            return (1.0 / self.power) * jnp.power(eta, 1.0 / self.power - 1.0)
+
+
+class ReciprocalLink(Link):
+    """
+    The reciprocal link function: g(mu) = 1/mu.
+    Special case of PowerLink with power = -1.
+    Canonical link for Gamma distribution.
+    """
+
+    def __init__(self, clip_mu: tuple[float, float] = (1e-7, 1e14)):
+        self.clip_mu = clip_mu
+
+    def link(self, mu: jax.Array) -> jax.Array:
+        # Reciprocal link: 1/mu
+        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
+        return 1.0 / mu
+
+    def inverse(self, eta: jax.Array) -> jax.Array:
+        # Inverse reciprocal: 1/eta
+        # Avoid division by zero
+        eta = jnp.where(jnp.abs(eta) < 1e-10, jnp.sign(eta) * 1e-10, eta)
+        return 1.0 / eta
+
+    def link_deriv(self, mu: jax.Array) -> jax.Array:
+        # Derivative of reciprocal: -1/mu^2
+        mu = jnp.clip(mu, self.clip_mu[0], self.clip_mu[1])
+        return -1.0 / (mu ** 2)
+
+    def inverse_deriv(self, eta: jax.Array) -> jax.Array:
+        # Derivative of inverse reciprocal: -1/eta^2
+        # Avoid division by zero
+        eta = jnp.where(jnp.abs(eta) < 1e-10, jnp.sign(eta) * 1e-10, eta)
+        return -1.0 / (eta ** 2)
