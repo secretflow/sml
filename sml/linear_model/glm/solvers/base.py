@@ -36,8 +36,8 @@ class Solver(Protocol):
         max_iter: int = 100,
         tol: float = 1e-4,
         learning_rate: float = 1e-2,
-        decay_rate: float = 1.0,      # New: LR decay
-        decay_steps: int = 100,       # New: LR decay steps
+        decay_rate: float = 1.0,
+        decay_steps: int = 100,
         batch_size: int = 128,
     ) -> tuple[jax.Array, jax.Array, dict[str, Any]]:
         """

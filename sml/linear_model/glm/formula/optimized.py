@@ -36,6 +36,29 @@ class NormalIdentityFormula(Formula):
     This is standard linear regression via WLS (OLS with constant weights).
     """
 
+    def _compute_from_mu(
+        self,
+        y: jax.Array,
+        mu: jax.Array,
+        family: Family,
+        sample_weight: jax.Array | None = None,
+    ) -> tuple[jax.Array, jax.Array, jax.Array, dict[str, Any]]:
+        """Core computation given mu."""
+        n_samples = y.shape[0]
+        w = jnp.ones(n_samples, dtype=y.dtype)
+        if sample_weight is not None:
+            w = w * sample_weight
+
+        z_resid = y - mu
+        # Identity link: eta = mu
+        eta = mu
+
+        deviance = family.distribution.deviance(y, mu, sample_weight)
+        extras = {
+            "log_likelihood": family.distribution.log_likelihood(y, mu, sample_weight)
+        }
+        return w, z_resid, eta, deviance, extras
+
     def compute_components(
         self,
         X: jax.Array,
@@ -48,26 +71,20 @@ class NormalIdentityFormula(Formula):
         eta = X @ beta
         if offset is not None:
             eta += offset
-
-        # Identity link: mu = eta
-        mu = eta
-
-        # For Normal + Identity:
-        # W = 1 (constant weights)
-        # z_resid = y - mu
-        n_samples = X.shape[0]
-        w = jnp.ones(n_samples, dtype=X.dtype)
-        if sample_weight is not None:
-            w = w * sample_weight
-
-        z_resid = y - mu
-
-        deviance = family.distribution.deviance(y, mu, sample_weight)
-        extras = {
-            "log_likelihood": family.distribution.log_likelihood(y, mu, sample_weight)
-        }
-
+        mu = eta  # Identity link
+        w, z_resid, _, deviance, extras = self._compute_from_mu(
+            y, mu, family, sample_weight
+        )
         return w, z_resid, mu, eta, deviance, extras
+
+    def compute_components_from_mu(
+        self,
+        y: jax.Array,
+        mu: jax.Array,
+        family: Family,
+        sample_weight: jax.Array | None = None,
+    ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, dict[str, Any]]:
+        return self._compute_from_mu(y, mu, family, sample_weight)
 
 
 class BernoulliLogitFormula(Formula):
@@ -84,6 +101,31 @@ class BernoulliLogitFormula(Formula):
     This is logistic regression.
     """
 
+    def _compute_from_mu(
+        self,
+        y: jax.Array,
+        mu: jax.Array,
+        family: Family,
+        sample_weight: jax.Array | None = None,
+    ) -> tuple[jax.Array, jax.Array, jax.Array, dict[str, Any]]:
+        """Core computation given mu."""
+        eps = 1e-12
+        variance = mu * (1.0 - mu) + eps
+
+        w = variance
+        if sample_weight is not None:
+            w = w * sample_weight
+
+        z_resid = (y - mu) / variance
+        # Logit link: eta = log(mu / (1 - mu))
+        eta = jnp.log((mu + eps) / (1.0 - mu + eps))
+
+        deviance = family.distribution.deviance(y, mu, sample_weight)
+        extras = {
+            "log_likelihood": family.distribution.log_likelihood(y, mu, sample_weight)
+        }
+        return w, z_resid, eta, deviance, extras
+
     def compute_components(
         self,
         X: jax.Array,
@@ -96,28 +138,20 @@ class BernoulliLogitFormula(Formula):
         eta = X @ beta
         if offset is not None:
             eta += offset
-
-        # Logit link inverse: mu = sigmoid(eta)
         mu = jax.nn.sigmoid(eta)
-
-        # For Bernoulli + Logit (canonical):
-        # W = mu * (1 - mu)
-        # z_resid = (y - mu) / (mu * (1 - mu))
-        eps = 1e-12
-        variance = mu * (1.0 - mu) + eps
-
-        w = variance
-        if sample_weight is not None:
-            w = w * sample_weight
-
-        z_resid = (y - mu) / variance
-
-        deviance = family.distribution.deviance(y, mu, sample_weight)
-        extras = {
-            "log_likelihood": family.distribution.log_likelihood(y, mu, sample_weight)
-        }
-
+        w, z_resid, _, deviance, extras = self._compute_from_mu(
+            y, mu, family, sample_weight
+        )
         return w, z_resid, mu, eta, deviance, extras
+
+    def compute_components_from_mu(
+        self,
+        y: jax.Array,
+        mu: jax.Array,
+        family: Family,
+        sample_weight: jax.Array | None = None,
+    ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, dict[str, Any]]:
+        return self._compute_from_mu(y, mu, family, sample_weight)
 
 
 class PoissonLogFormula(Formula):
@@ -132,6 +166,29 @@ class PoissonLogFormula(Formula):
     - z_resid = (y - mu) * (1/mu) = y/mu - 1
     """
 
+    def _compute_from_mu(
+        self,
+        y: jax.Array,
+        mu: jax.Array,
+        family: Family,
+        sample_weight: jax.Array | None = None,
+    ) -> tuple[jax.Array, jax.Array, jax.Array, dict[str, Any]]:
+        """Core computation given mu."""
+        eps = 1e-12
+        w = mu
+        if sample_weight is not None:
+            w = w * sample_weight
+
+        z_resid = (y - mu) / (mu + eps)
+        # Log link: eta = log(mu)
+        eta = jnp.log(mu + eps)
+
+        deviance = family.distribution.deviance(y, mu, sample_weight)
+        extras = {
+            "log_likelihood": family.distribution.log_likelihood(y, mu, sample_weight)
+        }
+        return w, z_resid, eta, deviance, extras
+
     def compute_components(
         self,
         X: jax.Array,
@@ -144,25 +201,20 @@ class PoissonLogFormula(Formula):
         eta = X @ beta
         if offset is not None:
             eta += offset
-
-        # Optimized: mu calculation
         mu = jnp.exp(eta)
-
-        # Optimized components for Poisson + Log
-        # W = mu, z_resid = y/mu - 1
-        eps = 1e-12
-        w = mu
-        if sample_weight is not None:
-            w = w * sample_weight
-
-        z_resid = (y - mu) / (mu + eps)
-
-        deviance = family.distribution.deviance(y, mu, sample_weight)
-        extras = {
-            "log_likelihood": family.distribution.log_likelihood(y, mu, sample_weight)
-        }
-
+        w, z_resid, _, deviance, extras = self._compute_from_mu(
+            y, mu, family, sample_weight
+        )
         return w, z_resid, mu, eta, deviance, extras
+
+    def compute_components_from_mu(
+        self,
+        y: jax.Array,
+        mu: jax.Array,
+        family: Family,
+        sample_weight: jax.Array | None = None,
+    ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, dict[str, Any]]:
+        return self._compute_from_mu(y, mu, family, sample_weight)
 
 
 class GammaReciprocalFormula(Formula):
@@ -179,6 +231,29 @@ class GammaReciprocalFormula(Formula):
     Note: Reciprocal link can be numerically tricky. Prefer Log link for business use.
     """
 
+    def _compute_from_mu(
+        self,
+        y: jax.Array,
+        mu: jax.Array,
+        family: Family,
+        sample_weight: jax.Array | None = None,
+    ) -> tuple[jax.Array, jax.Array, jax.Array, dict[str, Any]]:
+        """Core computation given mu."""
+        eps = 1e-12
+        w = mu**2
+        if sample_weight is not None:
+            w = w * sample_weight
+
+        z_resid = -(y - mu) / (mu**2 + eps)
+        # Reciprocal link: eta = 1/mu
+        eta = 1.0 / (mu + eps)
+
+        deviance = family.distribution.deviance(y, mu, sample_weight)
+        extras = {
+            "log_likelihood": family.distribution.log_likelihood(y, mu, sample_weight)
+        }
+        return w, z_resid, eta, deviance, extras
+
     def compute_components(
         self,
         X: jax.Array,
@@ -191,27 +266,21 @@ class GammaReciprocalFormula(Formula):
         eta = X @ beta
         if offset is not None:
             eta += offset
-
-        # Reciprocal link inverse: mu = 1/eta
         eps = 1e-12
         mu = 1.0 / (eta + eps)
-
-        # For Gamma + Reciprocal (canonical):
-        # V(mu) = mu^2, g'(mu) = -1/mu^2
-        # W = mu^2 (magnitude; sign handled by z_resid)
-        w = mu**2
-        if sample_weight is not None:
-            w = w * sample_weight
-
-        # z_resid = (y - mu) * (-1/mu^2)
-        z_resid = -(y - mu) / (mu**2 + eps)
-
-        deviance = family.distribution.deviance(y, mu, sample_weight)
-        extras = {
-            "log_likelihood": family.distribution.log_likelihood(y, mu, sample_weight)
-        }
-
+        w, z_resid, _, deviance, extras = self._compute_from_mu(
+            y, mu, family, sample_weight
+        )
         return w, z_resid, mu, eta, deviance, extras
+
+    def compute_components_from_mu(
+        self,
+        y: jax.Array,
+        mu: jax.Array,
+        family: Family,
+        sample_weight: jax.Array | None = None,
+    ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, dict[str, Any]]:
+        return self._compute_from_mu(y, mu, family, sample_weight)
 
 
 class GammaLogFormula(Formula):
@@ -228,6 +297,30 @@ class GammaLogFormula(Formula):
     This combination is numerically stable and commonly used in practice.
     """
 
+    def _compute_from_mu(
+        self,
+        y: jax.Array,
+        mu: jax.Array,
+        family: Family,
+        sample_weight: jax.Array | None = None,
+    ) -> tuple[jax.Array, jax.Array, jax.Array, dict[str, Any]]:
+        """Core computation given mu."""
+        n_samples = y.shape[0]
+        w = jnp.ones(n_samples, dtype=y.dtype)
+        if sample_weight is not None:
+            w = w * sample_weight
+
+        eps = 1e-12
+        z_resid = (y - mu) / (mu + eps)
+        # Log link: eta = log(mu)
+        eta = jnp.log(mu + eps)
+
+        deviance = family.distribution.deviance(y, mu, sample_weight)
+        extras = {
+            "log_likelihood": family.distribution.log_likelihood(y, mu, sample_weight)
+        }
+        return w, z_resid, eta, deviance, extras
+
     def compute_components(
         self,
         X: jax.Array,
@@ -240,27 +333,20 @@ class GammaLogFormula(Formula):
         eta = X @ beta
         if offset is not None:
             eta += offset
-
-        # Log link inverse: mu = exp(eta)
         mu = jnp.exp(eta)
-
-        # For Gamma + Log:
-        # W = 1 (constant!)
-        # z_resid = (y - mu) / mu = y/mu - 1
-        n_samples = X.shape[0]
-        w = jnp.ones(n_samples, dtype=X.dtype)
-        if sample_weight is not None:
-            w = w * sample_weight
-
-        eps = 1e-12
-        z_resid = (y - mu) / (mu + eps)
-
-        deviance = family.distribution.deviance(y, mu, sample_weight)
-        extras = {
-            "log_likelihood": family.distribution.log_likelihood(y, mu, sample_weight)
-        }
-
+        w, z_resid, _, deviance, extras = self._compute_from_mu(
+            y, mu, family, sample_weight
+        )
         return w, z_resid, mu, eta, deviance, extras
+
+    def compute_components_from_mu(
+        self,
+        y: jax.Array,
+        mu: jax.Array,
+        family: Family,
+        sample_weight: jax.Array | None = None,
+    ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, dict[str, Any]]:
+        return self._compute_from_mu(y, mu, family, sample_weight)
 
 
 class TweedieLogFormula(Formula):
@@ -293,6 +379,31 @@ class TweedieLogFormula(Formula):
         """
         self.power = power
 
+    def _compute_from_mu(
+        self,
+        y: jax.Array,
+        mu: jax.Array,
+        family: Family,
+        sample_weight: jax.Array | None = None,
+    ) -> tuple[jax.Array, jax.Array, jax.Array, dict[str, Any]]:
+        """Core computation given mu."""
+        p = self.power
+        eps = 1e-12
+
+        w = jnp.power(mu + eps, 2.0 - p)
+        if sample_weight is not None:
+            w = w * sample_weight
+
+        z_resid = (y - mu) / (mu + eps)
+        # Log link: eta = log(mu)
+        eta = jnp.log(mu + eps)
+
+        deviance = family.distribution.deviance(y, mu, sample_weight)
+        extras = {
+            "log_likelihood": family.distribution.log_likelihood(y, mu, sample_weight)
+        }
+        return w, z_resid, eta, deviance, extras
+
     def compute_components(
         self,
         X: jax.Array,
@@ -305,25 +416,17 @@ class TweedieLogFormula(Formula):
         eta = X @ beta
         if offset is not None:
             eta += offset
-
-        # Log link inverse: mu = exp(eta)
         mu = jnp.exp(eta)
-
-        # For Tweedie + Log:
-        # W = mu^(2-p)
-        # z_resid = (y - mu) / mu
-        p = self.power
-        eps = 1e-12
-
-        w = jnp.power(mu + eps, 2.0 - p)
-        if sample_weight is not None:
-            w = w * sample_weight
-
-        z_resid = (y - mu) / (mu + eps)
-
-        deviance = family.distribution.deviance(y, mu, sample_weight)
-        extras = {
-            "log_likelihood": family.distribution.log_likelihood(y, mu, sample_weight)
-        }
-
+        w, z_resid, _, deviance, extras = self._compute_from_mu(
+            y, mu, family, sample_weight
+        )
         return w, z_resid, mu, eta, deviance, extras
+
+    def compute_components_from_mu(
+        self,
+        y: jax.Array,
+        mu: jax.Array,
+        family: Family,
+        sample_weight: jax.Array | None = None,
+    ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, dict[str, Any]]:
+        return self._compute_from_mu(y, mu, family, sample_weight)

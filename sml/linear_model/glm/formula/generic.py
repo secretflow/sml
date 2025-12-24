@@ -30,6 +30,46 @@ class GenericFormula(Formula):
     - z_resid = (y - mu) * g'(mu)
     """
 
+    def _compute_w_and_z_resid(
+        self,
+        y: jax.Array,
+        mu: jax.Array,
+        family: Family,
+        sample_weight: jax.Array | None = None,
+    ) -> tuple[jax.Array, jax.Array, jax.Array, dict[str, Any]]:
+        """
+        Internal helper to compute W, z_resid, deviance, and extras from mu.
+
+        This is the core computation shared by both compute_components and
+        compute_components_from_mu.
+        """
+        # 1. Compute atomic math components
+        v_mu = family.distribution.unit_variance(mu)
+        g_prime = family.link.link_deriv(mu)
+
+        # 2. Compute Working Weights W
+        # Fisher Information W = 1 / (V(mu) * (g'(mu))^2)
+        eps = 1e-12
+        w = 1.0 / (v_mu * (g_prime**2) + eps)
+
+        # Apply sample weights
+        if sample_weight is not None:
+            w = w * sample_weight
+
+        # 3. Compute Working Residuals z_resid
+        # z_resid = (y - mu) * g'(mu)
+        z_resid = (y - mu) * g_prime
+
+        # 4. Compute Deviance for monitoring/line search
+        deviance = family.distribution.deviance(y, mu, sample_weight)
+
+        # 5. Collect extras (like log-likelihood)
+        extras = {
+            "log_likelihood": family.distribution.log_likelihood(y, mu, sample_weight)
+        }
+
+        return w, z_resid, deviance, extras
+
     def compute_components(
         self,
         X: jax.Array,
@@ -47,36 +87,26 @@ class GenericFormula(Formula):
         # 2. Compute mean mu via inverse link
         mu = family.link.inverse(eta)
 
-        # 3. Compute atomic math components
-        v_mu = family.distribution.unit_variance(mu)
-        g_prime = family.link.link_deriv(mu)
-
-        # 4. Compute Working Weights W
-        # Fisher Information W = 1 / (V(mu) * (g'(mu))^2)
-        # Note regarding Scale/Dispersion (phi) and a(phi):
-        # The true Fisher Information weight is W_true = W / a(phi).
-        # Typically a(phi) = phi / sample_weight.
-        # So W_true = W * sample_weight / phi.
-        # In IRLS, the 1/phi factor appears in both the Hessian and Gradient terms and cancels out.
-        # Therefore, we compute 'W' assuming phi=1.
-        # We add a small eps to denominators to prevent division by zero.
-        eps = 1e-12
-        w = 1.0 / (v_mu * (g_prime**2) + eps)
-
-        # Apply sample weights (equivalent to handling the 1/w part of a(phi))
-        if sample_weight is not None:
-            w = w * sample_weight
-
-        # 5. Compute Working Residuals z_resid
-        # z_resid = (y - mu) * g'(mu)
-        z_resid = (y - mu) * g_prime
-
-        # 6. Compute Deviance for monitoring/line search
-        deviance = family.distribution.deviance(y, mu, sample_weight)
-
-        # 7. Collect extras (like log-likelihood)
-        extras = {
-            "log_likelihood": family.distribution.log_likelihood(y, mu, sample_weight)
-        }
+        # 3. Compute W, z_resid, deviance, extras
+        w, z_resid, deviance, extras = self._compute_w_and_z_resid(
+            y, mu, family, sample_weight
+        )
 
         return w, z_resid, mu, eta, deviance, extras
+
+    def compute_components_from_mu(
+        self,
+        y: jax.Array,
+        mu: jax.Array,
+        family: Family,
+        sample_weight: jax.Array | None = None,
+    ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, dict[str, Any]]:
+        # 1. Compute eta from mu via link function
+        eta = family.link.link(mu)
+
+        # 2. Compute W, z_resid, deviance, extras
+        w, z_resid, deviance, extras = self._compute_w_and_z_resid(
+            y, mu, family, sample_weight
+        )
+
+        return w, z_resid, eta, deviance, extras
