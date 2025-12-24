@@ -16,6 +16,8 @@
 import jax
 import jax.numpy as jnp
 
+from sml.utils import sml_reveal
+
 
 def add_intercept(X: jax.Array) -> jax.Array:
     """
@@ -43,42 +45,87 @@ def split_coef(beta: jax.Array, fit_intercept: bool) -> tuple[jax.Array, jax.Arr
     Parameters
     ----------
     beta : jax.Array
-        The full coefficient vector.
+        The full coefficient vector, shape (n_features,) or (n_features, 1).
     fit_intercept : bool
         Whether the model was fitted with an intercept.
 
     Returns
     -------
     coef : jax.Array
-        The feature weights.
+        The feature weights, shape (n_features,).
     intercept : jax.Array
-        The intercept term (0.0 if fit_intercept is False).
+        The intercept term (scalar, 0.0 if fit_intercept is False).
     """
+    # Squeeze beta to 1D if it's 2D with shape (n, 1)
+    beta = jnp.squeeze(beta)
     if fit_intercept:
         return beta[:-1], beta[-1]
     return beta, jnp.array(0.0, dtype=beta.dtype)
 
 
-def invert_matrix(A: jax.Array, eps: float = 1e-9) -> jax.Array:
+def invert_matrix(
+    x: jax.Array, iter_round: int = 20, enable_spu_reveal: bool = False
+) -> jax.Array:
     """
-    Invert a square matrix using naive inversion with jitter for stability.
-
-    This function is used instead of jnp.linalg.solve or cholesky decomposition
-    to accommodate specific backend constraints (e.g., MPC).
+    computing the inverse of a matrix by newton iteration.
+    https://aalexan3.math.ncsu.edu/articles/mat-inv-rep.pdf
 
     Parameters
     ----------
-    A : jax.Array
-        Square matrix to invert.
-    eps : float
-        Small value added to the diagonal for numerical stability.
+    x : jax.Array
+        The input matrix to be inverted.
+    iter_round : int
+        The number of iteration rounds.
+    enable_spu_reveal : bool
+        Whether to reveal intermediate results in SPU for higher performance.
 
     Returns
     -------
-    A_inv : jax.Array
-        The inverse of the matrix.
+    x_inv : jax.Array
+        The inverted matrix.
     """
-    diag_indices = jnp.diag_indices_from(A)
-    # Add jitter to diagonal
-    A_stable = A.at[diag_indices].add(eps)
-    return jnp.linalg.inv(A_stable)
+    assert x.shape[0] == x.shape[1], "x need be a (n x n) matrix"
+
+    if enable_spu_reveal:
+        x = sml_reveal(x)  # type: ignore
+        return jnp.linalg.inv(x)
+
+    E = jnp.identity(x.shape[0])
+    a = (1 / jnp.trace(x)) * E
+    for _ in range(iter_round):
+        a = jnp.matmul(a, (2 * E - jnp.matmul(x, a)))
+    return a
+
+
+def check_convergence(
+    beta_new: jax.Array,
+    beta_old: jax.Array,
+    stopping_rule: str,
+    tol: float,
+) -> jax.Array:
+    """
+    Check convergence based on the specified stopping rule.
+
+    Parameters
+    ----------
+    beta_new : jax.Array
+        New coefficient estimates.
+    beta_old : jax.Array
+        Previous coefficient estimates.
+    stopping_rule : str
+        Stopping rule to use. Currently supports "beta".
+    tol : float
+        Tolerance for convergence.
+
+    Returns
+    -------
+    converged : jax.Array
+        Boolean indicating whether convergence is achieved.
+    """
+    if stopping_rule == "beta":
+        beta_max_delta = jnp.max(jnp.abs(beta_new - beta_old))
+        beta_max = jnp.max(jnp.abs(beta_old))
+        rel_change = beta_max_delta / beta_max
+        return rel_change < tol
+    else:
+        raise NotImplementedError(f"Stopping rule {stopping_rule} not implemented.")

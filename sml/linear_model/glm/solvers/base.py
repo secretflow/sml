@@ -17,7 +17,6 @@ from typing import Any, Protocol
 import jax
 
 from sml.linear_model.glm.core.family import Family
-from sml.linear_model.glm.formula.base import Formula
 
 
 class Solver(Protocol):
@@ -28,18 +27,20 @@ class Solver(Protocol):
         X: jax.Array,
         y: jax.Array,
         family: Family,
-        formula: Formula,
         fit_intercept: bool = True,
         offset: jax.Array | None = None,
         sample_weight: jax.Array | None = None,
         l2: float = 0.0,
         max_iter: int = 100,
         tol: float = 1e-4,
+        stopping_rule: str = "beta",
         learning_rate: float = 1e-2,
         decay_rate: float = 1.0,
-        decay_steps: int = 100,
+        decay_steps: int = 1,
         batch_size: int = 128,
-    ) -> tuple[jax.Array, jax.Array, dict[str, Any]]:
+        enable_spu_cache: bool = False,
+        enable_spu_reveal: bool = False,
+    ) -> tuple[jax.Array, jax.Array | None, dict[str, Any] | None]:
         """
         Solve the GLM optimization problem.
 
@@ -65,14 +66,21 @@ class Solver(Protocol):
             Maximum number of iterations (or epochs for SGD).
         tol : float
             Convergence tolerance.
+        stopping_rule : str
+            The stopping rule to use for convergence. Options:
+            - 'beta': based on coefficient change.
         learning_rate : float
             Learning rate for gradient-based solvers (SGD).
         decay_rate : float
             Learning rate decay factor.
         decay_steps : int
-            Steps for learning rate decay.
+            Steps for learning rate decay, counted by epochs.
         batch_size : int
             Batch size for gradient-based solvers (SGD).
+        enable_spu_cache : bool
+            Whether to enable SPU cache for secure computation.
+        enable_spu_reveal : bool
+            Whether to reveal intermediate results in SPU for higher performance.
 
         Returns
         -------

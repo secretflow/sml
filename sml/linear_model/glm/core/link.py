@@ -131,8 +131,6 @@ class LogLink(Link):
         return jnp.log(mu)
 
     def inverse(self, eta: jax.Array) -> jax.Array:
-        # We don't clip eta here by default; upper layers (like solver or formula)
-        # can handle eta clipping if necessary to prevent exp() overflow.
         return jnp.exp(eta)
 
     def link_deriv(self, mu: jax.Array) -> jax.Array:

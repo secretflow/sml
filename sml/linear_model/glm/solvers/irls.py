@@ -17,12 +17,133 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
-from sml.utils import sml_make_cached_var
 from sml.linear_model.glm.core.family import Family
-from sml.linear_model.glm.formula.base import Formula
+from sml.utils import sml_drop_cached_var, sml_make_cached_var, sml_reveal
 
 from .base import Solver
-from .utils import add_intercept, invert_matrix
+from .utils import add_intercept, check_convergence, invert_matrix
+
+
+def compute_irls_components(
+    y: jax.Array,
+    mu: jax.Array,
+    eta: jax.Array,
+    family: Family,
+    sample_weight: jax.Array | None = None,
+    enable_spu_cache: bool = False,
+) -> tuple[jax.Array, jax.Array]:
+    """
+    Compute IRLS working weights (W) and working response (z).
+
+    The IRLS algorithm transforms GLM fitting into iterative weighted least squares:
+    - Working weights: W = 1 / (V(mu) * (g'(mu))^2)
+    - Working response: z = eta + (y - mu) * g'(mu)
+
+    Parameters
+    ----------
+    y : jax.Array
+        Response variable.
+    mu : jax.Array
+        Current mean estimate.
+    eta : jax.Array
+        Current linear predictor.
+    family : Family
+        GLM family containing distribution and link function.
+    sample_weight : jax.Array | None
+        Optional sample weights.
+    enable_spu_cache : bool
+        Whether to enable SPU caching for intermediate variables.
+
+    Returns
+    -------
+    w : jax.Array
+        Working weights.
+    z : jax.Array
+        Working response (adjusted dependent variable).
+    """
+    # Compute atomic math components
+    v_mu = family.distribution.unit_variance(mu)
+    g_prime = family.link.link_deriv(mu)
+
+    if enable_spu_cache:
+        g_prime = sml_make_cached_var(g_prime)
+
+    # Compute Working Weights W = 1 / (V(mu) * (g'(mu))^2)
+    _g2 = g_prime * g_prime
+    w = 1.0 / (v_mu * _g2)
+    if sample_weight is not None:
+        w = w * sample_weight
+
+    # Compute Working Residuals and Working Response
+    # z_resid = (y - mu) * g'(mu), z = eta + z_resid
+    z_resid = (y - mu) * g_prime
+    z = eta + z_resid
+
+    if enable_spu_cache:
+        g_prime = sml_drop_cached_var(g_prime)
+
+    return w, z
+
+
+def solve_weighted_least_squares(
+    X: jax.Array,
+    z: jax.Array,
+    w: jax.Array,
+    n_features: int,
+    l2: float = 0.0,
+    fit_intercept: bool = True,
+    enable_spu_cache: bool = False,
+    enable_spu_reveal: bool = False,
+) -> jax.Array:
+    """
+    Solve weighted least squares: beta = (X'WX + l2*I)^{-1} X'Wz
+
+    Parameters
+    ----------
+    X : jax.Array
+        Design matrix (with intercept if fit_intercept=True).
+    z : jax.Array
+        Working response.
+    w : jax.Array
+        Working weights.
+    n_features : int
+        Number of features (including intercept if applicable).
+    l2 : float
+        L2 regularization strength.
+    fit_intercept : bool
+        Whether intercept is included (last column).
+    enable_spu_cache : bool
+        Whether to enable SPU caching.
+    enable_spu_reveal : bool
+        Whether to reveal intermediate results in SPU.
+
+    Returns
+    -------
+    beta : jax.Array
+        Coefficient estimates.
+    """
+    # Compute X'W
+    xtw = jnp.transpose(X * w.reshape((-1, 1)))
+    if enable_spu_cache:
+        xtw = sml_make_cached_var(xtw)
+
+    # Compute Hessian H = X'WX and score = X'Wz
+    H = jnp.matmul(xtw, X)
+    score = jnp.matmul(xtw, z)
+
+    if enable_spu_cache:
+        xtw = sml_drop_cached_var(xtw)
+
+    # Apply L2 regularization (not on intercept)
+    if l2 > 0:
+        diag_indices = jnp.diag_indices(n_features)
+        H = H.at[diag_indices].add(l2)
+        if fit_intercept:
+            H = H.at[n_features - 1, n_features - 1].add(-l2)
+
+    # Solve for beta
+    H_inv = invert_matrix(H, iter_round=20, enable_spu_reveal=enable_spu_reveal)
+    return jnp.matmul(H_inv, score)
 
 
 class IRLSSolver(Solver):
@@ -71,128 +192,138 @@ class IRLSSolver(Solver):
         X: jax.Array,
         y: jax.Array,
         family: Family,
-        formula: Formula,
         fit_intercept: bool = True,
         offset: jax.Array | None = None,
         sample_weight: jax.Array | None = None,
         l2: float = 0.0,
         max_iter: int = 100,
         tol: float = 1e-4,
+        stopping_rule: str = "beta",
         learning_rate: float = 1e-2,  # Unused in IRLS
         decay_rate: float = 1.0,  # Unused in IRLS
-        decay_steps: int = 100,  # Unused in IRLS
+        decay_steps: int = 1,  # Unused in IRLS
         batch_size: int = 128,  # Unused in IRLS
-    ) -> tuple[jax.Array, jax.Array, dict[str, Any]]:
+        enable_spu_cache: bool = False,
+        enable_spu_reveal: bool = False,
+    ) -> tuple[jax.Array, jax.Array | None, dict[str, Any] | None]:
+
+        is_early_stop_enabled = tol > 0.0
+
         # 1. Preprocessing
         if fit_intercept:
             X_train = add_intercept(X)
         else:
             X_train = X
 
-        n_samples, n_features = X_train.shape
+        _, n_features = X_train.shape
+        if enable_spu_cache:
+            X_train = sml_make_cached_var(X_train)
 
         # 2. R-style Initialization (Iteration 0)
         # Use starting_mu(y) to get initial mu, then perform one IRLS update
-        mu_init = family.distribution.starting_mu(y)
-
-        # Compute components from mu (not from beta)
-        w_init, z_resid_init, eta_init, dev_init, _ = (
-            formula.compute_components_from_mu(
-                y=y, mu=mu_init, family=family, sample_weight=sample_weight
-            )
-        )
-
-        # Construct working response z = eta + z_resid
-        z_init = eta_init + z_resid_init
-
-        # Handle offset
+        mu = family.distribution.starting_mu(y)
+        eta = family.link.link(mu)
         if offset is not None:
-            z_init = z_init - offset
+            eta = eta - offset
 
-        # Perform WLS to get initial beta: beta = (X'WX + l2*I)^{-1} X'Wz
-        w_sqrt_init = jnp.sqrt(w_init)[:, None]
-        Xw_init = X_train * w_sqrt_init
-        zw_init = z_init * w_sqrt_init.flatten()
-
-        H_init = Xw_init.T @ Xw_init
-        score_init = Xw_init.T @ zw_init
-
-        if l2 > 0:
-            diag_indices = jnp.diag_indices(n_features)
-            H_init = H_init.at[diag_indices].add(l2)
-            if fit_intercept:
-                H_init = H_init.at[n_features - 1, n_features - 1].add(-l2)
-
-        H_init_inv = invert_matrix(H_init, eps=1e-9)
-        beta_init = H_init_inv @ score_init
-
-        # State structure: (beta, converged, n_iter, deviance)
-        # Start from iter_num=1 since we already did iteration 0
-        init_val = (beta_init, False, 1, dev_init)
-
-        # 3. Define loop body (iterations 1, 2, ...)
-        def body_fun(val):
-            beta, _, iter_num, _ = val
-
-            # a. Compute components from current beta
-            w, z_resid, mu, eta, dev, _ = formula.compute_components(
-                X=X_train,
-                y=y,
-                beta=beta,
-                offset=offset,
-                family=family,
-                sample_weight=sample_weight,
-            )
-
-            # b. Construct Working Response z
-            z = eta + z_resid
-
-            # Handle offset
-            if offset is not None:
-                z = z - offset
-
-            # c. Weighted Least Squares: Solve (X'WX + l2*I) beta_new = X'Wz
-            w_sqrt = jnp.sqrt(w)[:, None]
-            Xw = X_train * w_sqrt
-            zw = z * w_sqrt.flatten()
-
-            H = Xw.T @ Xw
-            score = Xw.T @ zw
-
-            if l2 > 0:
-                diag_indices = jnp.diag_indices(n_features)
-                H = H.at[diag_indices].add(l2)
-                if fit_intercept:
-                    H = H.at[n_features - 1, n_features - 1].add(-l2)
-
-            H_inv = invert_matrix(H, eps=1e-9)
-            beta_new = H_inv @ score
-
-            # d. Convergence check
-            beta_diff = jnp.linalg.norm(beta_new - beta)
-            beta_norm = jnp.linalg.norm(beta)
-            rel_change = beta_diff / (beta_norm + 1e-12)
-            converged = rel_change < tol
-
-            return beta_new, converged, iter_num + 1, dev
-
-        # 4. Loop condition
-        def cond_fun(val):
-            _, converged, iter_num, _ = val
-            return jnp.logical_and(iter_num < max_iter, jnp.logical_not(converged))
-
-        # 5. Run optimization
-        beta_final, converged, n_iter, dev_final = jax.lax.while_loop(
-            cond_fun, body_fun, init_val
+        # Compute IRLS components and solve WLS for initial beta
+        w, z = compute_irls_components(
+            y, mu, eta, family, sample_weight, enable_spu_cache
+        )
+        beta = solve_weighted_least_squares(
+            X_train,
+            z,
+            w,
+            n_features,
+            l2,
+            fit_intercept,
+            enable_spu_cache,
+            enable_spu_reveal,
         )
 
-        # 6. Estimate Dispersion
-        dispersion = dev_final / (n_samples - n_features)
+        # 3. Main optimization loop (only if early stopping is enabled)
+        if is_early_stop_enabled:
+            # State structure: (beta, converged, n_iter)
+            init_val = (beta, False, 1)
 
+            def cond_fun(val):
+                _, converged, iter_num = val
+                return jnp.logical_and(iter_num < max_iter, jnp.logical_not(converged))
+
+            def body_fun(val):
+                beta, _, iter_num = val
+
+                # Compute eta from current beta
+                eta = jnp.matmul(X_train, beta)
+                if offset is not None:
+                    eta = eta + offset
+
+                # Compute mu from eta
+                mu = family.link.inverse(eta)
+
+                # Compute IRLS components and solve WLS
+                w, z = compute_irls_components(
+                    y, mu, eta, family, sample_weight, enable_spu_cache
+                )
+                beta_new = solve_weighted_least_squares(
+                    X_train,
+                    z,
+                    w,
+                    n_features,
+                    l2,
+                    fit_intercept,
+                    enable_spu_cache,
+                    enable_spu_reveal,
+                )
+
+                # Check convergence
+                converged = check_convergence(beta_new, beta, stopping_rule, tol)
+                converged = sml_reveal(converged)  # type: ignore
+
+                return beta_new, converged, iter_num + 1
+
+            beta_final, converged, n_iter = jax.lax.while_loop(
+                cond_fun, body_fun, init_val
+            )
+        else:
+            # No early stopping: run fixed max_iter iterations using fori_loop
+            def fixed_iter_body(_, beta):
+                # Compute eta from current beta
+                eta = jnp.matmul(X_train, beta)
+                if offset is not None:
+                    eta = eta + offset
+
+                # Compute mu from eta
+                mu = family.link.inverse(eta)
+
+                # Compute IRLS components and solve WLS
+                w, z = compute_irls_components(
+                    y, mu, eta, family, sample_weight, enable_spu_cache
+                )
+                return solve_weighted_least_squares(
+                    X_train,
+                    z,
+                    w,
+                    n_features,
+                    l2,
+                    fit_intercept,
+                    enable_spu_cache,
+                    enable_spu_reveal,
+                )
+
+            beta_final = jax.lax.fori_loop(0, max_iter, fixed_iter_body, beta)
+            converged, n_iter = False, max_iter
+
+        # 4. Estimate Dispersion (not implemented yet)
+        dispersion = None
+
+        # 5. Build history (not implemented the full history yet)
         history = {
             "n_iter": n_iter,
             "converged": converged,
-            "final_deviance": dev_final,
         }
+
+        if enable_spu_cache:
+            X_train = sml_drop_cached_var(X_train)
 
         return beta_final, dispersion, history

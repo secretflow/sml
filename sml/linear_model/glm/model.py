@@ -16,17 +16,19 @@ from collections.abc import Sequence
 from typing import Any
 
 import jax
+import jax.numpy as jnp
 
-from sml.linear_model.glm.core.distribution import Distribution
+from sml.linear_model.glm.core.distribution import Distribution, Bernoulli
 from sml.linear_model.glm.core.family import Family
 from sml.linear_model.glm.core.link import Link
-from sml.linear_model.glm.formula.base import Formula
-from sml.linear_model.glm.formula.dispatch import dispatcher
 from sml.linear_model.glm.metrics import metrics as metric_funcs
-from sml.linear_model.glm.solvers.base import Solver
-from sml.linear_model.glm.solvers.irls import IRLSSolver
-from sml.linear_model.glm.solvers.sgd import SGDSolver
-from sml.linear_model.glm.solvers.utils import split_coef
+from sml.linear_model.glm.solvers import (
+    IRLSSolver,
+    SGDSolver,
+    split_coef,
+    Solver,
+    get_registered_solver,
+)
 
 
 class GLM:
@@ -50,20 +52,23 @@ class GLM:
         Maximum number of iterations for the solver (or epochs for SGD).
     tol : float, default=1e-3
         Convergence tolerance for the solver.
+        If 0, then the early stopping based on tolerance is disabled.
+    stopping_rule : str, default='beta'
+        The stopping rule to use for convergence. Options:
+        - 'beta': based on coefficient change.
     learning_rate : float, default=1e-1
         Learning rate for SGD solver.
     decay_rate : float, default=1.0
         Learning rate decay factor for SGD (1.0 means no decay).
-    decay_steps : int, default=100
-        Decay steps for SGD learning rate schedule.
+    decay_steps : int, default=1
+        Decay steps for SGD learning rate schedule, counted by epochs.
     batch_size : int, default=1024
         Batch size for SGD solver.
     l2 : float, default=0.0
         L2 regularization strength (Ridge penalty).
+        Note: we assume the dispersion of the distribution is always 1, and the functionality of dispersion will be added by l2 regularization.
     fit_intercept : bool, default=True
         Whether to calculate the intercept for this model.
-    formula : Formula, optional
-        Custom formula implementation. If None, it is resolved via the dispatcher.
     """
 
     def __init__(
@@ -73,41 +78,53 @@ class GLM:
         solver: str = "irls",
         max_iter: int = 10,
         tol: float = 1e-3,
+        stopping_rule: str = "beta",
         learning_rate: float = 1e-1,
         decay_rate: float = 1.0,
-        decay_steps: int = 100,
+        decay_steps: int = 1,
         batch_size: int = 1024,
         l2: float = 0.0,
         fit_intercept: bool = True,
-        formula: Formula | None = None,
     ):
         self.dist = dist
         self.link = link
         self.solver_name = solver
         self.max_iter = max_iter
         self.tol = tol
+        self.stopping_rule = stopping_rule
         self.learning_rate = learning_rate
         self.decay_rate = decay_rate
         self.decay_steps = decay_steps
         self.batch_size = batch_size
         self.l2 = l2
         self.fit_intercept = fit_intercept
-        self.formula = formula
+
+        self.family_: Family = Family(self.dist, self.link)
 
         # Fitted attributes
-        self.family_: Family | None = None
         self.coef_: jax.Array | None = None
         self.intercept_: jax.Array | None = None
-        self.dispersion_: jax.Array | None = None
-        self.history_: dict[str, Any] | None = None
 
         # other attributes
         self._enable_spu_cache = False
+        self._enable_spu_reveal = False
+        self.history_: dict[str, Any] | None = None
+        self.dispersion_: jax.Array | None = None
+        self.scale_: float | jax.Array = 1.0
+
+        # todo: add more parameter checks
+        assert max_iter >= 1, "max_iter must be at least 1"
 
     def _get_solver(self) -> Solver:
         if self.solver_name == "irls":
+            solver = get_registered_solver(self.family_)
+            if solver is not None:
+                return solver
+
+            # fall back to default IRLS if no registered solver
             return IRLSSolver()
         elif self.solver_name == "sgd":
+            # no registered solver for sgd yet
             return SGDSolver()
         else:
             raise ValueError(f"Unknown solver: {self.solver_name}")
@@ -118,8 +135,9 @@ class GLM:
         y: jax.Array,
         offset: jax.Array | None = None,
         sample_weight: jax.Array | None = None,
-        scale: float = 1.0,
+        y_scale: float | None = None,
         enable_spu_cache: bool = False,
+        enable_spu_reveal: bool = False,
     ) -> "GLM":
         """
         Fit the GLM model.
@@ -128,17 +146,17 @@ class GLM:
         ----------------------------------
         In MPC (Secure Multi-Party Computation) environments, such as SecretFlow SPU,
         fixed-point arithmetic can lead to overflows if 'y' has a large range.
-        It is HIGHLY RECOMMENDED to normalize 'y' manually (e.g., y_scaled = y / scale)
+        It is HIGHLY RECOMMENDED to normalize 'y' manually (e.g., y_scaled = y / y_scale)
         so that values are within a small range (e.g., [0, 1] or mean approx 1).
 
-        Impact of Scaling (y_new = y / scale) on Coefficients:
+        Impact of Scaling (y_new = y / y_scale) on Coefficients:
         1. Log Link (Tweedie, Gamma, Poisson):
            - Slopes (beta_i, i>0): INVARIANT. They remain exactly the same as training on raw y.
-           - Intercept (beta_0): Shifts by -log(scale).
+           - Intercept (beta_0): Shifts by -log(y_scale).
            - Regularization: Usually no need to adjust `l2`.
         2. Identity Link (Gaussian):
-           - All Coefficients: Scaled by 1/scale.
-           - Regularization: `l2` should be scaled down approx by 1/scale^2 to avoid underfitting.
+           - All Coefficients: Scaled by 1/y_scale.
+           - Regularization: `l2` should be scaled down approx by 1/y_scale^2 to avoid underfitting.
         3. Logit Link:
            - NOT RECOMMENDED. Keep y in {0, 1}.
 
@@ -153,53 +171,91 @@ class GLM:
             Shape must be broadcastable to (n_samples,).
         sample_weight : jax.Array, optional
             Individual weights for each sample.
-        scale : float, default=1.0
+        y_scale : float, optional, if None defaults to jnp.max(y)/2
             Scaling factor for 'y' (target variable).
-            The model will be trained on `y / scale`.
-            Predictions will be automatically rescaled by `mu * scale`.
+            The model will be trained on `y / y_scale`.
+            Predictions will be automatically rescaled by `mu * y_scale`.
         enable_spu_cache : bool, default=False
             Whether to enable SPU cached variables for intermediate computations.
+        enable_spu_reveal : bool, default=False
+            Whether to reveal intermediate results in SPU for higher performance.
+            EXPERIMENTAL ONLY: will leak some information.
 
         Returns
         -------
         self : GLM
             Fitted estimator.
         """
-        # 1. Setup Family
-        self.family_ = Family(self.dist, self.link)
+        assert X.ndim == 2, "X must be a 2D array"
+        assert X.shape[0] == y.shape[0], "X and y must have the same number of samples"
+        assert y.ndim in (1, 2), "y must be a 1D or 2D array"
+        if y.ndim == 2:
+            assert y.shape[1] == 1, "y must be a column vector if 2D"
+        if y.ndim == 1:
+            y = y.reshape((-1, 1))
+        if offset is not None:
+            assert (
+                offset.shape[0] == X.shape[0]
+            ), "offset must have the same number of samples as X"
+            assert offset.ndim in (1, 2), "offset must be 1D or 2D array"
+            if offset.ndim == 2:
+                assert offset.shape[1] == 1, "offset must be a column vector if 2D"
+            if offset.ndim == 1:
+                offset = offset.reshape((-1, 1))
+        if sample_weight is not None:
+            assert (
+                sample_weight.shape[0] == X.shape[0]
+            ), "sample_weight must have the same number of samples as X"
+            assert sample_weight.ndim in (1, 2), "sample_weight must be 1D or 2D array"
+            if sample_weight.ndim == 2:
+                assert (
+                    sample_weight.shape[1] == 1
+                ), "sample_weight must be a column vector if 2D"
+            if sample_weight.ndim == 1:
+                sample_weight = sample_weight.reshape((-1, 1))
+
         self._enable_spu_cache = enable_spu_cache
-
-        # 2. Resolve Formula
-        if self.formula is None:
-            formula_impl = dispatcher.resolve(
-                self.family_.distribution, self.family_.link
-            )
-        else:
-            formula_impl = self.formula
-
-        # 3. Get Solver
+        self._enable_spu_reveal = enable_spu_reveal
         solver_impl = self._get_solver()
 
-        # 4. Apply Scaling
-        # We train on y / scale
-        y_scaled = y / scale
+        # We train on y / y_scale
+        y_scaled = None
+        if isinstance(self.dist, Bernoulli):
+            # For Bernoulli, scaling y does not make sense
+            self.scale_ = 1.0
+            y_scaled = y
+        else:
+            if y_scale is None:
+                scale = jnp.max(y) / 2
+            else:
+                scale = y_scale
+            self.scale_ = scale
+            y_scaled = y / scale
+
+        if offset is not None:
+            offset = offset.reshape((-1, 1))
+
+        if sample_weight is not None:
+            sample_weight = sample_weight.reshape((-1, 1))
 
         # 5. Solve
         beta, dispersion, history = solver_impl.solve(
             X=X,
             y=y_scaled,
             family=self.family_,
-            formula=formula_impl,
             fit_intercept=self.fit_intercept,
             offset=offset,
             sample_weight=sample_weight,
             l2=self.l2,
             max_iter=self.max_iter,
             tol=self.tol,
+            stopping_rule=self.stopping_rule,
             learning_rate=self.learning_rate,
             decay_rate=self.decay_rate,
             decay_steps=self.decay_steps,
             batch_size=self.batch_size,
+            enable_spu_cache=self._enable_spu_cache,
+            enable_spu_reveal=self._enable_spu_reveal,
         )
 
         # 6. Store results
@@ -209,9 +265,7 @@ class GLM:
 
         return self
 
-    def predict(
-        self, X: jax.Array, offset: jax.Array | None = None, scale: float = 1.0
-    ) -> jax.Array:
+    def predict(self, X: jax.Array, offset: jax.Array | None = None) -> jax.Array:
         """
         Predict mean values.
 
@@ -223,9 +277,6 @@ class GLM:
             Samples to predict.
         offset : jax.Array, optional
             Offset to add to the linear predictor.
-        scale : float, default=1.0
-            Scaling factor to denormalize the prediction.
-            Should match the scale used in `fit`.
 
         Returns
         -------
@@ -240,7 +291,7 @@ class GLM:
         mu_scaled = self.family_.link.inverse(eta)
 
         # Rescale back to original scale
-        return mu_scaled * scale
+        return mu_scaled * self.scale_
 
     def predict_linear(
         self, X: jax.Array, offset: jax.Array | None = None
@@ -278,15 +329,20 @@ class GLM:
         y: jax.Array,
         offset: jax.Array | None = None,
         sample_weight: jax.Array | None = None,
-        scale: float = 1.0,
     ) -> jax.Array:
         """
         Compute the deviance score (lower is better).
 
         Parameters
         ----------
-        scale : float, default=1.0
-            Scale used for prediction denormalization.
+        X : jax.Array
+            Data to score.
+        y : jax.Array
+            True targets.
+        offset : jax.Array, optional
+            Offset.
+        sample_weight : jax.Array, optional
+            Weights.
 
         Returns
         -------
@@ -297,7 +353,7 @@ class GLM:
             raise RuntimeError("Model is not fitted yet.")
 
         # Predict uses scale to return mu in original space
-        mu = self.predict(X, offset=offset, scale=scale)
+        mu = self.predict(X, offset=offset)
 
         # Calculate deviance in original space
         deviance = self.family_.distribution.deviance(y, mu, sample_weight)
@@ -310,7 +366,6 @@ class GLM:
         metrics: Sequence[str] = ("deviance", "aic", "rmse"),
         offset: jax.Array | None = None,
         sample_weight: jax.Array | None = None,
-        scale: float = 1.0,
     ) -> dict[str, jax.Array]:
         """
         Evaluate the model using multiple metrics.
@@ -327,8 +382,6 @@ class GLM:
             Offset.
         sample_weight : jax.Array, optional
             Weights.
-        scale : float, default=1.0
-            Scaling factor to denormalize the prediction.
 
         Returns
         -------
@@ -339,7 +392,7 @@ class GLM:
             raise RuntimeError("Model is not fitted yet.")
 
         # Get predictions in original space
-        mu = self.predict(X, offset=offset, scale=scale)
+        mu = self.predict(X, offset=offset)
         n_samples = X.shape[0]
         # Rank = features + intercept
         rank = self.coef_.shape[0] + (1 if self.fit_intercept else 0)

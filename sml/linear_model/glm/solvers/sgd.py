@@ -18,10 +18,101 @@ import jax
 import jax.numpy as jnp
 
 from sml.linear_model.glm.core.family import Family
-from sml.linear_model.glm.formula.base import Formula
+from sml.linear_model.glm.solvers.utils import check_convergence
+from sml.utils import sml_drop_cached_var, sml_make_cached_var, sml_reveal
 
 from .base import Solver
 from .utils import add_intercept
+
+
+def sgd_epoch_update(
+    beta: jax.Array,
+    epoch: int,
+    xs: list,
+    ys: list,
+    offs: list,
+    sws: list,
+    family: Family,
+    n_features: int,
+    l2: float,
+    fit_intercept: bool,
+    learning_rate: float,
+    decay_rate: float,
+    decay_steps: int,
+) -> jax.Array:
+    """
+    Perform one epoch of SGD updates over all batches.
+
+    Parameters
+    ----------
+    beta : jax.Array
+        Current coefficient estimates, shape (n_features, 1).
+    epoch : int
+        Current epoch number (for learning rate decay).
+    xs : list
+        List of feature batches.
+    ys : list
+        List of target batches.
+    offs : list
+        List of offset batches (or None).
+    sws : list
+        List of sample weight batches (or None).
+    family : Family
+        GLM family containing distribution and link function.
+    n_features : int
+        Number of features (including intercept if applicable).
+    l2 : float
+        L2 regularization strength.
+    fit_intercept : bool
+        Whether intercept is included.
+    learning_rate : float
+        Base learning rate.
+    decay_rate : float
+        Learning rate decay rate.
+    decay_steps : int
+        Learning rate decay steps.
+
+    Returns
+    -------
+    beta : jax.Array
+        Updated coefficient estimates.
+    """
+    cur_lr = learning_rate * decay_rate ** (epoch / decay_steps)
+
+    for x_batch, y_batch, offset_batch, sample_weight_batch in zip(xs, ys, offs, sws):
+        actual_batch_size = x_batch.shape[0]
+        eta = jnp.matmul(x_batch, beta)
+        if offset_batch is not None:
+            eta = eta + offset_batch
+
+        # Compute mu from eta
+        mu = family.link.inverse(eta)
+
+        # Compute Error = mu - y
+        err = mu - y_batch
+
+        # Compute gradient components: (mu - y) / (g'(mu) * V(mu))
+        g_prime_inv = 1 / family.link.link_deriv(mu)
+        unit_var = family.distribution.unit_variance(mu)
+        grad_components = err * g_prime_inv / unit_var
+
+        if sample_weight_batch is not None:
+            grad_components = grad_components * sample_weight_batch
+
+        grad = jnp.matmul(x_batch.T, grad_components)
+
+        # Apply L2 regularization (not on intercept)
+        if l2 > 0:
+            grad = grad + l2 * beta
+            if fit_intercept:
+                grad = grad.at[n_features - 1].set(
+                    grad[n_features - 1, 0] - l2 * beta[n_features - 1, 0]
+                )
+
+        # Gradient descent update
+        beta = beta - cur_lr * grad / actual_batch_size
+
+    return beta
 
 
 class SGDSolver(Solver):
@@ -69,18 +160,22 @@ class SGDSolver(Solver):
         X: jax.Array,
         y: jax.Array,
         family: Family,
-        formula: Formula,
         fit_intercept: bool = True,
         offset: jax.Array | None = None,
         sample_weight: jax.Array | None = None,
         l2: float = 0.0,
         max_iter: int = 100,  # Interpreted as Epochs
         tol: float = 1e-4,
+        stopping_rule: str = "beta",
         learning_rate: float = 1e-2,
-        decay_rate: float = 1.0,  # New: LR decay
-        decay_steps: int = 100,  # New: LR decay steps
+        decay_rate: float = 1.0,
+        decay_steps: int = 1,
         batch_size: int = 128,
-    ) -> tuple[jax.Array, jax.Array, dict[str, Any]]:
+        enable_spu_cache: bool = False,
+        enable_spu_reveal: bool = False,  # used in IRLS
+    ) -> tuple[jax.Array, jax.Array | None, dict[str, Any] | None]:
+        is_early_stop_enabled = tol > 0.0
+
         # 1. Preprocessing
         if fit_intercept:
             X_train = add_intercept(X)
@@ -88,10 +183,24 @@ class SGDSolver(Solver):
             X_train = X
 
         n_samples, n_features = X_train.shape
+        if enable_spu_cache:
+            X_train = sml_make_cached_var(X_train)
 
         # Handle batch size
         batch_size = min(batch_size, n_samples)
         n_batches = n_samples // batch_size
+
+        # Pre-split data into batches
+        xs = jnp.array_split(X_train, n_batches, axis=0)
+        ys = jnp.array_split(y, n_batches, axis=0)
+        if offset is not None:
+            offs = jnp.array_split(offset, n_batches, axis=0)
+        else:
+            offs = [None] * n_batches
+        if sample_weight is not None:
+            sws = jnp.array_split(sample_weight, n_batches, axis=0)
+        else:
+            sws = [None] * n_batches
 
         # 2. Intercept-Only Initialization (sklearn/H2O style)
         # Initialize all coefficients to 0, then set intercept to link(mean(y))
@@ -109,107 +218,76 @@ class SGDSolver(Solver):
             # Set intercept (last element in beta when fit_intercept=True)
             beta_init = beta_init.at[n_features - 1].set(intercept_init)
 
-        # State: (beta, converged, epoch, deviance)
-        init_val = (beta_init, False, 0, jnp.inf)
+        beta_init = beta_init.reshape((-1, 1))
 
-        # 3. Define Batch Step function
-        def batch_step(batch_idx, val):
-            beta, epoch = val
+        # 3. Main optimization loop
+        if is_early_stop_enabled:
+            # State: (beta, converged, epoch)
+            init_val = (beta_init, False, 0)
 
-            # Calculate current step (global) for decay
-            global_step = epoch * n_batches + batch_idx
+            def epoch_body(val):
+                old_beta, _, epoch = val
+                beta = sgd_epoch_update(
+                    old_beta,
+                    epoch,
+                    xs,
+                    ys,
+                    offs,
+                    sws,
+                    family,
+                    n_features,
+                    l2,
+                    fit_intercept,
+                    learning_rate,
+                    decay_rate,
+                    decay_steps,
+                )
 
-            # Decay learning rate
-            # lr = base_lr * decay_rate ^ (step / decay_steps)
-            decay_factor = jnp.power(decay_rate, global_step / decay_steps)
-            current_lr = learning_rate * decay_factor
+                # Check convergence
+                converged = check_convergence(beta, old_beta, stopping_rule, tol)
+                converged = sml_reveal(converged)  # type: ignore
 
-            start = batch_idx * batch_size
-            # Use dynamic_slice for JIT compatibility
-            X_batch = jax.lax.dynamic_slice(
-                X_train, (start, 0), (batch_size, n_features)
+                return beta, converged, epoch + 1
+
+            def cond_fun(val):
+                _, converged, epoch = val
+                return jnp.logical_and(epoch < max_iter, jnp.logical_not(converged))
+
+            beta_final, converged, n_epochs = jax.lax.while_loop(
+                cond_fun, epoch_body, init_val
             )
-            y_batch = jax.lax.dynamic_slice(y, (start,), (batch_size,))
+        else:
+            # No early stopping: run fixed max_iter epochs
+            def fixed_epoch_body(epoch, beta):
+                return sgd_epoch_update(
+                    beta,
+                    epoch,
+                    xs,
+                    ys,
+                    offs,
+                    sws,
+                    family,
+                    n_features,
+                    l2,
+                    fit_intercept,
+                    learning_rate,
+                    decay_rate,
+                    decay_steps,
+                )
 
-            off_batch = None
-            if offset is not None:
-                off_batch = jax.lax.dynamic_slice(offset, (start,), (batch_size,))
+            beta_final = jax.lax.fori_loop(0, max_iter, fixed_epoch_body, beta_init)
+            converged, n_epochs = False, max_iter
 
-            sw_batch = None
-            if sample_weight is not None:
-                sw_batch = jax.lax.dynamic_slice(sample_weight, (start,), (batch_size,))
+        # 4. Estimate Dispersion (not implemented yet)
+        dispersion = None
 
-            # Compute components on batch
-            w, z_resid, _, _, _, _ = formula.compute_components(
-                X=X_batch,
-                y=y_batch,
-                beta=beta,
-                offset=off_batch,
-                family=family,
-                sample_weight=sw_batch,
-            )
-
-            # Gradient Calculation
-            # We are performing Gradient Ascent on Log-Likelihood.
-            # Gradient_L = X^T * (W * z_resid) = X^T * (y - mu) / (V * g')
-            grad_components = w * z_resid
-            grad = X_batch.T @ grad_components
-
-            # L2 Regularization
-            # Objective: Maximize L(beta) - 0.5 * lambda * ||beta||^2
-            # Gradient: Grad_L - lambda * beta
-            if l2 > 0:
-                l2_grad = l2 * beta
-                if fit_intercept:
-                    l2_grad = l2_grad.at[n_features - 1].set(0.0)
-                grad -= l2_grad
-
-            # Update (Ascent)
-            beta_new = beta + current_lr * grad
-            return (beta_new, epoch)
-
-        # 4. Define Epoch Loop (iterates over batches)
-        def epoch_body(val):
-            beta, _, epoch, _ = val
-
-            # Loop over batches
-            # carry is (beta, epoch) because we need epoch for global step calculation
-            beta_next, _ = jax.lax.fori_loop(0, n_batches, batch_step, (beta, epoch))
-
-            # Calculate full deviance for convergence check
-            _, _, _, _, dev_full, _ = formula.compute_components(
-                X=X_train,
-                y=y,
-                beta=beta_next,
-                offset=offset,
-                family=family,
-                sample_weight=sample_weight,
-            )
-
-            beta_diff = jnp.linalg.norm(beta_next - beta)
-            beta_norm = jnp.linalg.norm(beta)
-            rel_change = beta_diff / (beta_norm + 1e-12)
-            converged = rel_change < tol
-
-            return beta_next, converged, epoch + 1, dev_full
-
-        # 5. Define Cond function
-        def cond_fun(val):
-            _, converged, epoch, _ = val
-            return jnp.logical_and(epoch < max_iter, jnp.logical_not(converged))
-
-        # 6. Run
-        beta_final, converged, n_epochs, dev_final = jax.lax.while_loop(
-            cond_fun, epoch_body, init_val
-        )
-
-        # 7. Dispersion
-        dispersion = dev_final / (n_samples - n_features)
-
+        # 5. Build history (not implemented the full history yet)
         history = {
             "n_iter": n_epochs,
             "converged": converged,
-            "final_deviance": dev_final,
         }
+
+        if enable_spu_cache:
+            X_train = sml_drop_cached_var(X_train)
 
         return beta_final, dispersion, history
