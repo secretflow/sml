@@ -101,6 +101,9 @@ class GLM:
         self.dispersion_: jax.Array | None = None
         self.history_: dict[str, Any] | None = None
 
+        # other attributes
+        self._enable_spu_cache = False
+
     def _get_solver(self) -> Solver:
         if self.solver_name == "irls":
             return IRLSSolver()
@@ -116,6 +119,7 @@ class GLM:
         offset: jax.Array | None = None,
         sample_weight: jax.Array | None = None,
         scale: float = 1.0,
+        enable_spu_cache: bool = False,
     ) -> "GLM":
         """
         Fit the GLM model.
@@ -153,6 +157,8 @@ class GLM:
             Scaling factor for 'y' (target variable).
             The model will be trained on `y / scale`.
             Predictions will be automatically rescaled by `mu * scale`.
+        enable_spu_cache : bool, default=False
+            Whether to enable SPU cached variables for intermediate computations.
 
         Returns
         -------
@@ -161,6 +167,7 @@ class GLM:
         """
         # 1. Setup Family
         self.family_ = Family(self.dist, self.link)
+        self._enable_spu_cache = enable_spu_cache
 
         # 2. Resolve Formula
         if self.formula is None:

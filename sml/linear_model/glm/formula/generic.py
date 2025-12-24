@@ -46,11 +46,11 @@ class GenericFormula(Formula):
         # 1. Compute atomic math components
         v_mu = family.distribution.unit_variance(mu)
         g_prime = family.link.link_deriv(mu)
+        # TODO: add cache here for g_prime if needed
 
         # 2. Compute Working Weights W
         # Fisher Information W = 1 / (V(mu) * (g'(mu))^2)
-        eps = 1e-12
-        w = 1.0 / (v_mu * (g_prime**2) + eps)
+        w = 1.0 / (v_mu * (g_prime**2))
 
         # Apply sample weights
         if sample_weight is not None:
