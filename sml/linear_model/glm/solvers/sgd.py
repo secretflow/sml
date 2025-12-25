@@ -79,7 +79,9 @@ def sgd_epoch_update(
     """
     cur_lr = learning_rate * decay_rate ** (epoch / decay_steps)
 
-    for x_batch, y_batch, offset_batch, sample_weight_batch in zip(xs, ys, offs, sws):
+    for x_batch, y_batch, offset_batch, sample_weight_batch in zip(
+        xs, ys, offs, sws, strict=True
+    ):
         actual_batch_size = x_batch.shape[0]
         eta = jnp.matmul(x_batch, beta)
         if offset_batch is not None:

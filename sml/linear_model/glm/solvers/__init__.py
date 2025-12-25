@@ -14,9 +14,9 @@
 
 from sml.linear_model.glm.solvers.base import Solver
 from sml.linear_model.glm.solvers.irls import IRLSSolver
-from sml.linear_model.glm.solvers.sgd import SGDSolver
-from sml.linear_model.glm.solvers.utils import split_coef, add_intercept, invert_matrix
 from sml.linear_model.glm.solvers.optimized_irls import get_registered_solver
+from sml.linear_model.glm.solvers.sgd import SGDSolver
+from sml.linear_model.glm.solvers.utils import add_intercept, invert_matrix, split_coef
 
 __all__ = [
     "Solver",

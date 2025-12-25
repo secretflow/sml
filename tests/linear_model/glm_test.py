@@ -34,7 +34,6 @@ from sml.linear_model.glm.core.distribution import (
     Tweedie,
 )
 from sml.linear_model.glm.core.link import (
-    CLogLogLink,
     IdentityLink,
     LogitLink,
     LogLink,
@@ -591,11 +590,11 @@ class TestGLMvsStatsmodelsPlaintext:
 
     def test_optimized_solver_registry(self):
         """Test that optimized solvers are properly registered."""
+        from sml.linear_model.glm.core.family import Family
         from sml.linear_model.glm.solvers.optimized_irls import (
             get_registered_solver,
             list_registered_solvers,
         )
-        from sml.linear_model.glm.core.family import Family
 
         # Check Gamma+Log is registered
         gamma_log_family = Family(Gamma(), LogLink())
@@ -615,7 +614,7 @@ class TestGLMvsStatsmodelsPlaintext:
             ), f"TweedieLogIRLSSolver should have power={power}"
 
         # Check all new solvers are registered
-        from sml.linear_model.glm.core.distribution import Normal, Poisson, Bernoulli
+        from sml.linear_model.glm.core.distribution import Bernoulli, Normal, Poisson
         from sml.linear_model.glm.core.link import (
             IdentityLink,
             LogitLink,

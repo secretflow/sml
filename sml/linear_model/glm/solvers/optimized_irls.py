@@ -35,7 +35,7 @@ Usage:
    >>> print(list_registered_solvers())
 """
 
-from typing import Callable
+from collections.abc import Callable
 
 from sml.linear_model.glm.core.distribution import (
     Bernoulli,
@@ -48,7 +48,6 @@ from sml.linear_model.glm.core.distribution import (
 from sml.linear_model.glm.core.family import Family
 from sml.linear_model.glm.core.link import (
     IdentityLink,
-    Link,
     LogitLink,
     LogLink,
     ReciprocalLink,
@@ -62,7 +61,6 @@ from sml.linear_model.glm.solvers.irls import (
     PoissonLogIRLSSolver,
     TweedieLogIRLSSolver,
 )
-
 
 # Type for solver factory functions
 SolverFactory = Callable[[Distribution], Solver]

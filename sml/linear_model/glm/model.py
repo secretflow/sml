@@ -18,16 +18,16 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
-from sml.linear_model.glm.core.distribution import Distribution, Bernoulli
+from sml.linear_model.glm.core.distribution import Bernoulli, Distribution
 from sml.linear_model.glm.core.family import Family
 from sml.linear_model.glm.core.link import Link
 from sml.linear_model.glm.metrics import metrics as metric_funcs
 from sml.linear_model.glm.solvers import (
     IRLSSolver,
     SGDSolver,
-    split_coef,
     Solver,
     get_registered_solver,
+    split_coef,
 )
 
 

@@ -53,10 +53,10 @@ from sml.linear_model.glm.solvers.utils import (
     solve_wls,
 )
 from sml.utils import (
+    sigmoid_remez_fast,
     sml_drop_cached_var,
     sml_make_cached_var,
     sml_reveal,
-    sigmoid_remez_fast,
 )
 
 
