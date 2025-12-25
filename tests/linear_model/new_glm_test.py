@@ -243,7 +243,7 @@ def compare_with_statsmodels(
 
 
 @pytest.mark.skipif(not HAS_STATSMODELS, reason="statsmodels not installed")
-class TestGLMvsStatsmodels:
+class TestGLMvsStatsmodelsPlaintext:
     """Test GLM by comparing with statsmodels."""
 
     # ==================== IRLS Tests ====================
