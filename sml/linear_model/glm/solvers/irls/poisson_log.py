@@ -155,6 +155,8 @@ class PoissonLogIRLSSolver(Solver):
         else:
             w = mu_init
         z = eta + y / mu_init - 1.0
+        if offset is not None:
+            z = z - offset
 
         beta = solve_wls(
             X_train,
@@ -185,6 +187,8 @@ class PoissonLogIRLSSolver(Solver):
 
                 # Compute optimized components
                 w, z = compute_poisson_log_components(y, eta, sample_weight)
+                if offset is not None:
+                    z = z - offset
 
                 # Solve WLS
                 beta_new = solve_wls(
@@ -215,6 +219,8 @@ class PoissonLogIRLSSolver(Solver):
                     eta = eta + offset
 
                 w, z = compute_poisson_log_components(y, eta, sample_weight)
+                if offset is not None:
+                    z = z - offset
                 return solve_wls(
                     X_train,
                     z,

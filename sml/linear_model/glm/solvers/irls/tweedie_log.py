@@ -171,6 +171,8 @@ class TweedieLogIRLSSolver(Solver):
 
         # Compute initial components and solve
         w, z = compute_tweedie_log_components(y, eta, power, sample_weight)
+        if offset is not None:
+            z = z - offset
         beta = solve_wls(
             X_train,
             z,
@@ -200,6 +202,8 @@ class TweedieLogIRLSSolver(Solver):
 
                 # Compute optimized components
                 w, z = compute_tweedie_log_components(y, eta, power, sample_weight)
+                if offset is not None:
+                    z = z - offset
 
                 # Solve WLS
                 beta_new = solve_wls(
@@ -230,6 +234,8 @@ class TweedieLogIRLSSolver(Solver):
                     eta = eta + offset
 
                 w, z = compute_tweedie_log_components(y, eta, power, sample_weight)
+                if offset is not None:
+                    z = z - offset
                 return solve_wls(
                     X_train,
                     z,

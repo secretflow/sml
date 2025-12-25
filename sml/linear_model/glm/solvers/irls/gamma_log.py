@@ -128,6 +128,8 @@ class GammaLogIRLSSolver(Solver):
 
         # Compute initial z and solve
         z = eta + y * jnp.exp(-eta) - 1.0
+        if offset is not None:
+            z = z - offset
         score = jnp.matmul(xtw, z)
         beta = jnp.matmul(H_inv, score)
 
@@ -151,6 +153,8 @@ class GammaLogIRLSSolver(Solver):
                 z = eta + y * jnp.exp(-eta) - 1.0
 
                 # Solve: beta_new = H_inv @ X'Wz
+                if offset is not None:
+                    z = z - offset
                 score = jnp.matmul(xtw, z)
                 beta_new = jnp.matmul(H_inv, score)
 
@@ -171,6 +175,8 @@ class GammaLogIRLSSolver(Solver):
                     eta = eta + offset
 
                 z = eta + y * jnp.exp(-eta) - 1.0
+                if offset is not None:
+                    z = z - offset
                 score = jnp.matmul(xtw, z)
                 return jnp.matmul(H_inv, score)
 

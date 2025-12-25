@@ -169,6 +169,11 @@ class IRLSSolver(Solver):
         w, z = compute_irls_components(
             y, mu, eta, family, sample_weight, enable_spu_cache
         )
+
+        # subtract offset from z if provided
+        if offset is not None:
+            z = z - offset
+
         beta = solve_wls(
             X_train,
             z,
@@ -204,6 +209,10 @@ class IRLSSolver(Solver):
                 w, z = compute_irls_components(
                     y, mu, eta, family, sample_weight, enable_spu_cache
                 )
+
+                if offset is not None:
+                    z = z - offset
+
                 beta_new = solve_wls(
                     X_train,
                     z,
@@ -239,6 +248,10 @@ class IRLSSolver(Solver):
                 w, z = compute_irls_components(
                     y, mu, eta, family, sample_weight, enable_spu_cache
                 )
+
+                if offset is not None:
+                    z = z - offset
+
                 return solve_wls(
                     X_train,
                     z,

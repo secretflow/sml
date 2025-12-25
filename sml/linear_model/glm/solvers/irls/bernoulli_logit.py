@@ -169,6 +169,8 @@ class BernoulliLogitIRLSSolver(Solver):
         else:
             w = var_mu
         z = eta + (y - mu_init) / var_mu
+        if offset is not None:
+            z = z - offset
 
         beta = solve_wls(
             X_train,
@@ -199,6 +201,8 @@ class BernoulliLogitIRLSSolver(Solver):
 
                 # Compute optimized components
                 w, z = compute_bernoulli_logit_components(y, eta, sample_weight)
+                if offset is not None:
+                    z = z - offset
 
                 # Solve WLS
                 beta_new = solve_wls(
@@ -229,6 +233,8 @@ class BernoulliLogitIRLSSolver(Solver):
                     eta = eta + offset
 
                 w, z = compute_bernoulli_logit_components(y, eta, sample_weight)
+                if offset is not None:
+                    z = z - offset
                 return solve_wls(
                     X_train,
                     z,
