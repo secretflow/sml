@@ -108,7 +108,7 @@ class GLM:
         # other attributes
         self._enable_spu_cache = False
         self._enable_spu_reveal = False
-        self.history_: dict[str, Any] | None = None
+        self.history_: dict[str, Any] = {}
         self.dispersion_: jax.Array | None = None
         self.scale_: float | jax.Array = 1.0
 

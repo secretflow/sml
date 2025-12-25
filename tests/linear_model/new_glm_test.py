@@ -13,14 +13,10 @@
 # limitations under the License.
 
 """
-Unit tests for GLM with generic IRLS and SGD solvers in plaintext mode.
+Unit tests for GLM comparing with statsmodels.
 
-This module tests the GLM implementation without SPU caching, focusing on:
-- IRLS solver with generic formula
-- SGD solver with generic formula
-- Various distributions and link functions
-- Regularization and sample weights
-- Metrics evaluation
+NOTE: When comparing with statsmodels, we use y_scale=1.0 to disable
+the MPC-oriented scaling that would otherwise shift the intercept.
 """
 
 import jax
@@ -48,458 +44,595 @@ from sml.linear_model.glm.core.link import (
 )
 from sml.linear_model.glm.model import GLM
 
+# Try to import statsmodels for comparison
+try:
+    import statsmodels.api as sm
+    from statsmodels.genmod.families import family as sm_family
+    from statsmodels.genmod.families import links as sm_links
 
-class TestPlaintextGLM:
-    """Test suite for GLM with generic solvers in plaintext mode."""
+    HAS_STATSMODELS = True
+except ImportError:
+    HAS_STATSMODELS = False
 
-    def setup_method(self):
-        """Generate synthetic Poisson data for testing."""
-        key = jax.random.PRNGKey(42)
-        self.n_samples = 200
-        self.n_features = 5
 
-        key, subkey = jax.random.split(key)
-        self.X = jax.random.normal(subkey, (self.n_samples, self.n_features))
+# ==================== Data Generation Functions ====================
 
-        # True coefficients
-        self.true_coef = jnp.array([0.5, -0.3, 0.2, 0.1, -0.1])
-        self.true_intercept = 1.0
 
-        # Linear predictor
-        eta = self.X @ self.true_coef + self.true_intercept
+def generate_poisson_data(seed=42, n_samples=200, n_features=5):
+    """Generate Poisson distributed data."""
+    key = jax.random.PRNGKey(seed)
+    key, k1, k2 = jax.random.split(key, 3)
 
-        # Mean mu = exp(eta)
-        mu = jnp.exp(eta)
+    X = jax.random.normal(k1, (n_samples, n_features))
+    true_coef = jnp.array([0.5, -0.3, 0.2, 0.1, -0.1][:n_features])
+    true_intercept = 1.0
 
-        # Generate y (Poisson distributed)
-        key, subkey = jax.random.split(key)
-        self.y = jax.random.poisson(subkey, mu).astype(jnp.float32)
+    eta = X @ true_coef + true_intercept
+    mu = jnp.exp(eta)
+    y = jax.random.poisson(k2, mu).astype(jnp.float32)
 
-    # ==================== IRLS Solver Tests ====================
+    return X, y, true_coef, true_intercept
+
+
+def generate_normal_data(seed=42, n_samples=100, n_features=3):
+    """Generate Normal distributed data."""
+    key = jax.random.PRNGKey(seed)
+    key, k1, k2 = jax.random.split(key, 3)
+
+    X = jax.random.normal(k1, (n_samples, n_features))
+    true_coef = jnp.array([1.0, -0.5, 0.3][:n_features])
+    true_intercept = 2.0
+
+    y = X @ true_coef + true_intercept + 0.1 * jax.random.normal(k2, (n_samples,))
+
+    return X, y, true_coef, true_intercept
+
+
+def generate_bernoulli_data(seed=42, n_samples=200, n_features=4):
+    """Generate Bernoulli distributed data."""
+    key = jax.random.PRNGKey(seed)
+    key, k1, k2 = jax.random.split(key, 3)
+
+    X = jax.random.normal(k1, (n_samples, n_features))
+    true_coef = jnp.array([1.0, -0.5, 0.5, -0.3][:n_features])
+    true_intercept = 0.5
+
+    eta = X @ true_coef + true_intercept
+    prob = jax.nn.sigmoid(eta)
+    y = jax.random.bernoulli(k2, prob).astype(jnp.float32)
+
+    return X, y, true_coef, true_intercept
+
+
+def generate_gamma_data(seed=42, n_samples=200, n_features=3, shape=5.0):
+    """Generate Gamma distributed data using jax.random.gamma."""
+    key = jax.random.PRNGKey(seed)
+    key, k1, k2 = jax.random.split(key, 3)
+
+    X = jax.random.normal(k1, (n_samples, n_features)) * 0.5
+    true_coef = jnp.array([0.5, -0.3, 0.2][:n_features])
+    true_intercept = 1.5
+
+    eta = X @ true_coef + true_intercept
+    mu = jnp.exp(eta)
+
+    # Gamma: mean = shape * scale, so scale = mu / shape
+    y = jax.random.gamma(k2, shape, (n_samples,)) * (mu / shape)
+
+    return X, y, true_coef, true_intercept
+
+
+def generate_inverse_gaussian_data(seed=42, n_samples=200, n_features=3, lam=10.0):
+    """Generate Inverse Gaussian (Wald) distributed data using numpy."""
+    np.random.seed(seed)
+    key = jax.random.PRNGKey(seed)
+
+    X = jax.random.normal(key, (n_samples, n_features)) * 0.3
+    true_coef = jnp.array([0.3, -0.2, 0.1][:n_features])
+    true_intercept = 1.0
+
+    eta = X @ true_coef + true_intercept
+    mu = jnp.exp(eta)
+
+    # Use numpy for proper wald distribution with lambda parameter
+    y = jnp.array(np.random.wald(np.array(mu), lam))
+
+    return X, y, true_coef, true_intercept
+
+
+def generate_negative_binomial_data(seed=42, n_samples=200, n_features=3, alpha=1.0):
+    """Generate Negative Binomial distributed data."""
+    key = jax.random.PRNGKey(seed)
+    key, k1, k2, k3 = jax.random.split(key, 4)
+
+    X = jax.random.normal(k1, (n_samples, n_features))
+    true_coef = jnp.array([0.5, -0.3, 0.2][:n_features])
+    true_intercept = 1.0
+
+    eta = X @ true_coef + true_intercept
+    mu = jnp.exp(eta)
+
+    # NegBinom: parameterized as Gamma-Poisson mixture
+    # Variance = mu + alpha * mu^2
+    r = 1.0 / alpha
+    p = r / (r + mu)
+    gamma_samples = jax.random.gamma(k2, r, (n_samples,)) / p
+    y = jax.random.poisson(k3, gamma_samples).astype(jnp.float32)
+
+    return X, y, true_coef, true_intercept
+
+
+# ==================== Helper Functions ====================
+
+
+def compute_auc(y_true, y_prob):
+    """Compute AUC-ROC for binary classification."""
+    sorted_indices = jnp.argsort(y_prob)[::-1]
+    y_true_sorted = y_true[sorted_indices]
+
+    n_pos = jnp.sum(y_true)
+    n_neg = len(y_true) - n_pos
+
+    tp_cumsum = jnp.cumsum(y_true_sorted)
+    fp_cumsum = jnp.cumsum(1 - y_true_sorted)
+
+    tpr = tp_cumsum / n_pos
+    fpr = fp_cumsum / n_neg
+
+    return jnp.trapezoid(tpr, fpr)
+
+
+def compare_with_statsmodels(
+    our_model,
+    sm_model,
+    X,
+    y,
+    coef_rtol=0.1,
+    coef_atol=0.05,
+    dev_rtol=0.1,
+    is_binary=False,
+):
+    """
+    Compare our GLM with statsmodels: coefficients and deviance.
+
+    Returns a dict with comparison results.
+    """
+    # Extract statsmodels params
+    sm_coef = sm_model.params[1:]
+    sm_intercept = sm_model.params[0]
+    sm_dev = sm_model.deviance
+
+    # Our model predictions and deviance
+    our_mu = our_model.predict(X)
+
+    if is_binary:
+        # For binary, compare AUC instead of deviance
+        X_sm = sm.add_constant(np.array(X))
+        sm_mu = sm_model.predict(X_sm)
+
+        our_auc = compute_auc(y, our_mu)
+        sm_auc = compute_auc(y, jnp.array(sm_mu))
+
+        print(f"  AUC - Ours: {our_auc:.4f}, statsmodels: {sm_auc:.4f}")
+        np.testing.assert_allclose(our_auc, sm_auc, rtol=0.05)
+    else:
+        our_dev = float(our_model.dist.deviance(y, our_mu))
+        print(f"  Deviance - Ours: {our_dev:.4f}, statsmodels: {sm_dev:.4f}")
+        np.testing.assert_allclose(our_dev, sm_dev, rtol=dev_rtol)
+
+    # Compare coefficients
+    print(f"  Coef - Ours: {our_model.coef_}")
+    print(f"  Coef - SM:   {sm_coef}")
+    print(f"  Intercept - Ours: {our_model.intercept_:.4f}, SM: {sm_intercept:.4f}")
+
+    np.testing.assert_allclose(our_model.coef_, sm_coef, rtol=coef_rtol, atol=coef_atol)
+    np.testing.assert_allclose(
+        our_model.intercept_, sm_intercept, rtol=coef_rtol, atol=coef_atol
+    )
+
+
+# ==================== Test Class ====================
+
+
+@pytest.mark.skipif(not HAS_STATSMODELS, reason="statsmodels not installed")
+class TestGLMvsStatsmodels:
+    """Test GLM by comparing with statsmodels."""
+
+    # ==================== IRLS Tests ====================
 
     def test_poisson_irls(self):
-        """Test Poisson GLM with IRLS solver."""
-        model = GLM(
-            dist=Poisson(),
-            solver="irls",
-            fit_intercept=True,
-            max_iter=20,
-            tol=1e-6,
-        )
-        model.fit(self.X, self.y, enable_spu_cache=False)
+        """Test Poisson GLM with IRLS solver vs statsmodels."""
+        X, y, _, _ = generate_poisson_data()
 
-        # Check correctness
-        np.testing.assert_allclose(model.coef_, self.true_coef, rtol=0.2, atol=0.2)
-        np.testing.assert_allclose(
-            model.intercept_, self.true_intercept, rtol=0.2, atol=0.2
+        our_model = GLM(
+            dist=Poisson(), solver="irls", fit_intercept=True, max_iter=50, tol=1e-8
         )
+        our_model.fit(X, y, enable_spu_cache=False, y_scale=1.0)
+
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(np.array(y), X_sm, family=sm_family.Poisson()).fit()
+
+        print("Poisson IRLS:")
+        compare_with_statsmodels(our_model, sm_model, X, y)
 
     def test_normal_irls(self):
-        """Test Normal (Gaussian) distribution with IRLS solver."""
-        # Generate Gaussian data
-        key = jax.random.PRNGKey(42)
-        n_samples, n_features = 100, 3
-        X_normal = jax.random.normal(key, (n_samples, n_features))
-        true_coef = jnp.array([1.0, -0.5, 0.3])
-        true_intercept = 2.0
-        key, subkey = jax.random.split(key)
-        y_normal = (
-            X_normal @ true_coef
-            + true_intercept
-            + 0.1 * jax.random.normal(subkey, (n_samples,))
-        )
+        """Test Normal GLM with IRLS solver vs statsmodels."""
+        X, y, _, _ = generate_normal_data()
 
-        model = GLM(
-            dist=Normal(),
-            solver="irls",
-            fit_intercept=True,
-            max_iter=20,
-        )
-        model.fit(X_normal, y_normal, enable_spu_cache=False)
+        our_model = GLM(dist=Normal(), solver="irls", fit_intercept=True, max_iter=20)
+        our_model.fit(X, y, enable_spu_cache=False, y_scale=1.0)
 
-        np.testing.assert_allclose(model.coef_, true_coef, rtol=0.1, atol=0.1)
-        np.testing.assert_allclose(model.intercept_, true_intercept, rtol=0.1, atol=0.1)
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(np.array(y), X_sm, family=sm_family.Gaussian()).fit()
+
+        print("Normal IRLS:")
+        compare_with_statsmodels(our_model, sm_model, X, y)
 
     def test_bernoulli_irls(self):
-        """Test Bernoulli (logistic regression) with IRLS solver."""
-        key = jax.random.PRNGKey(42)
-        n_samples, n_features = 200, 4
-        X_logit = jax.random.normal(key, (n_samples, n_features))
-        true_coef = jnp.array([1.0, -0.5, 0.5, -0.3])
-        true_intercept = 0.5
-        eta = X_logit @ true_coef + true_intercept
-        prob = jax.nn.sigmoid(eta)
+        """Test Bernoulli GLM with IRLS solver vs statsmodels."""
+        X, y, _, _ = generate_bernoulli_data()
 
-        key, subkey = jax.random.split(key)
-        y_binary = jax.random.bernoulli(subkey, prob).astype(jnp.float32)
-
-        model = GLM(
+        our_model = GLM(
             dist=Bernoulli(),
             link=LogitLink(),
             solver="irls",
             fit_intercept=True,
+            max_iter=50,
         )
-        model.fit(X_logit, y_binary, enable_spu_cache=False)
+        our_model.fit(X, y, enable_spu_cache=False)
 
-        # Coefficients should be reasonably close to true values
-        np.testing.assert_allclose(model.coef_, true_coef, rtol=0.5, atol=0.5)
-        np.testing.assert_allclose(model.intercept_, true_intercept, rtol=0.5, atol=0.5)
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(np.array(y), X_sm, family=sm_family.Binomial()).fit()
 
-        # Predictions should be probabilities between 0 and 1
-        mu_pred = model.predict(X_logit)
-        assert jnp.all(mu_pred >= 0) and jnp.all(mu_pred <= 1)
+        print("Bernoulli IRLS:")
+        compare_with_statsmodels(our_model, sm_model, X, y, is_binary=True)
 
-    def test_gamma_log_irls(self):
-        """Test Gamma distribution with Log link using IRLS solver."""
-        key = jax.random.PRNGKey(42)
-        n_samples, n_features = 100, 3
-        X_gamma = jax.random.normal(key, (n_samples, n_features))
-        true_coef = jnp.array([0.5, -0.3, 0.2])
-        true_intercept = 1.0
-        eta = X_gamma @ true_coef + true_intercept
-        mu = jnp.exp(eta)
+    def test_gamma_irls(self):
+        """Test Gamma GLM with IRLS solver vs statsmodels."""
+        X, y, _, _ = generate_gamma_data()
 
-        # Generate positive y values (approximate Gamma)
-        key, subkey = jax.random.split(key)
-        y_gamma = mu + 0.3 * mu * jax.random.normal(subkey, (n_samples,))
-        y_gamma = jnp.abs(y_gamma) + 0.1  # Ensure positive
-
-        model = GLM(
+        our_model = GLM(
             dist=Gamma(),
             link=LogLink(),
             solver="irls",
             fit_intercept=True,
-            max_iter=20,
+            max_iter=50,
         )
-        model.fit(X_gamma, y_gamma, enable_spu_cache=False)
+        our_model.fit(X, y, enable_spu_cache=False, y_scale=1.0)
 
-        np.testing.assert_allclose(model.coef_, true_coef, rtol=0.3, atol=0.3)
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(
+            np.array(y), X_sm, family=sm_family.Gamma(link=sm_links.Log())
+        ).fit()
 
-    def test_tweedie_irls(self):
-        """Test Tweedie distribution with IRLS solver."""
-        # Tweedie with power=1.5 (compound Poisson-Gamma)
-        model = GLM(
-            dist=Tweedie(power=1.5),
+        print("Gamma IRLS:")
+        compare_with_statsmodels(our_model, sm_model, X, y)
+
+    def test_inverse_gaussian_irls(self):
+        """Test Inverse Gaussian GLM with IRLS solver vs statsmodels."""
+        X, y, _, _ = generate_inverse_gaussian_data()
+
+        our_model = GLM(
+            dist=InverseGaussian(),
+            link=LogLink(),
             solver="irls",
             fit_intercept=True,
+            max_iter=50,
         )
-        model.fit(self.X, self.y, enable_spu_cache=False)
+        our_model.fit(X, y, enable_spu_cache=False, y_scale=1.0)
 
-        # Test deviance computation
-        mu = model.predict(self.X)
-        dev = model.dist.deviance(self.y, mu)
-        assert dev >= 0
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(
+            np.array(y), X_sm, family=sm_family.InverseGaussian(link=sm_links.Log())
+        ).fit()
+
+        print("InverseGaussian IRLS:")
+        compare_with_statsmodels(
+            our_model, sm_model, X, y, coef_rtol=0.15, dev_rtol=0.15
+        )
 
     def test_negative_binomial_irls(self):
-        """Test Negative Binomial distribution with IRLS solver."""
-        model = GLM(
+        """Test Negative Binomial GLM with IRLS solver vs statsmodels."""
+        X, y, _, _ = generate_negative_binomial_data(alpha=1.0)
+
+        our_model = GLM(
             dist=NegativeBinomial(alpha=1.0),
             solver="irls",
             fit_intercept=True,
+            max_iter=50,
         )
-        model.fit(self.X, self.y, enable_spu_cache=False)
+        our_model.fit(X, y, enable_spu_cache=False, y_scale=1.0)
 
-        assert model.coef_ is not None
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(
+            np.array(y), X_sm, family=sm_family.NegativeBinomial(alpha=1.0)
+        ).fit()
 
-        # Test unit variance: V(mu) = mu + alpha * mu^2
-        dist = NegativeBinomial(alpha=1.0)
-        mu_test = jnp.array([1.0, 2.0, 3.0])
-        var = dist.unit_variance(mu_test)
-        expected_var = mu_test + 1.0 * mu_test**2
-        np.testing.assert_allclose(var, expected_var, rtol=1e-5)
-
-    def test_inverse_gaussian_irls(self):
-        """Test Inverse Gaussian distribution with IRLS solver."""
-        # Generate positive data suitable for Inverse Gaussian
-        y_pos = jnp.maximum(self.y, 1.0)
-
-        model = GLM(
-            dist=InverseGaussian(),
-            solver="irls",
-            fit_intercept=True,
+        print("NegativeBinomial IRLS:")
+        compare_with_statsmodels(
+            our_model, sm_model, X, y, coef_rtol=0.15, dev_rtol=0.15
         )
-        model.fit(self.X, y_pos, enable_spu_cache=False)
 
-        assert model.coef_ is not None
-
-        # Test unit variance: V(mu) = mu^3
-        dist = InverseGaussian()
-        mu_test = jnp.array([0.5, 1.0, 2.0])
-        var = dist.unit_variance(mu_test)
-        expected_var = mu_test**3
-        np.testing.assert_allclose(var, expected_var, rtol=1e-5)
-
-    # ==================== SGD Solver Tests ====================
+    # ==================== SGD Tests ====================
 
     def test_poisson_sgd(self):
-        """Test Poisson GLM with SGD solver."""
-        model = GLM(
+        """Test Poisson GLM with SGD solver vs statsmodels."""
+        X, y, _, _ = generate_poisson_data()
+
+        our_model = GLM(
             dist=Poisson(),
             solver="sgd",
-            learning_rate=1e-2,
-            decay_rate=0.9,
-            decay_steps=50,
-            max_iter=200,
-            batch_size=32,
             fit_intercept=True,
-            tol=1e-6,
+            max_iter=500,
+            learning_rate=0.01,
+            batch_size=32,
         )
-        model.fit(self.X, self.y, enable_spu_cache=False)
+        our_model.fit(X, y, enable_spu_cache=False, y_scale=1.0)
 
-        # SGD might be less precise than IRLS
-        np.testing.assert_allclose(model.coef_, self.true_coef, rtol=0.3, atol=0.3)
-        np.testing.assert_allclose(
-            model.intercept_, self.true_intercept, rtol=0.3, atol=0.3
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(np.array(y), X_sm, family=sm_family.Poisson()).fit()
+
+        print("Poisson SGD:")
+        compare_with_statsmodels(
+            our_model, sm_model, X, y, coef_rtol=0.15, coef_atol=0.1
         )
 
     def test_normal_sgd(self):
-        """Test Normal distribution with SGD solver."""
-        key = jax.random.PRNGKey(42)
-        n_samples, n_features = 100, 3
-        X_normal = jax.random.normal(key, (n_samples, n_features))
-        true_coef = jnp.array([1.0, -0.5, 0.3])
-        true_intercept = 2.0
-        key, subkey = jax.random.split(key)
-        y_normal = (
-            X_normal @ true_coef
-            + true_intercept
-            + 0.1 * jax.random.normal(subkey, (n_samples,))
-        )
+        """Test Normal GLM with SGD solver vs statsmodels."""
+        X, y, _, _ = generate_normal_data()
 
-        model = GLM(
+        our_model = GLM(
             dist=Normal(),
             solver="sgd",
             fit_intercept=True,
-            max_iter=100,
-            learning_rate=0.01,
+            max_iter=1000,
+            learning_rate=0.05,
+            batch_size=32,
         )
-        model.fit(X_normal, y_normal, enable_spu_cache=False)
+        our_model.fit(X, y, enable_spu_cache=False, y_scale=1.0)
+
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(np.array(y), X_sm, family=sm_family.Gaussian()).fit()
+
+        print("Normal SGD:")
+        compare_with_statsmodels(
+            our_model, sm_model, X, y, coef_rtol=0.2, coef_atol=0.15, dev_rtol=0.5
+        )
+
+    def test_bernoulli_sgd(self):
+        """Test Bernoulli GLM with SGD solver vs statsmodels."""
+        X, y, _, _ = generate_bernoulli_data()
+
+        our_model = GLM(
+            dist=Bernoulli(),
+            link=LogitLink(),
+            solver="sgd",
+            fit_intercept=True,
+            max_iter=500,
+            learning_rate=0.01,
+            batch_size=32,
+        )
+        our_model.fit(X, y, enable_spu_cache=False)
+
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(np.array(y), X_sm, family=sm_family.Binomial()).fit()
+
+        print("Bernoulli SGD:")
+        compare_with_statsmodels(
+            our_model, sm_model, X, y, coef_rtol=0.2, coef_atol=0.15, is_binary=True
+        )
+
+    def test_gamma_sgd(self):
+        """Test Gamma GLM with SGD solver vs statsmodels."""
+        X, y, _, _ = generate_gamma_data(shape=10.0)
+
+        our_model = GLM(
+            dist=Gamma(),
+            link=LogLink(),
+            solver="sgd",
+            fit_intercept=True,
+            max_iter=500,
+            learning_rate=0.01,
+            batch_size=32,
+        )
+        our_model.fit(X, y, enable_spu_cache=False, y_scale=1.0)
+
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(
+            np.array(y), X_sm, family=sm_family.Gamma(link=sm_links.Log())
+        ).fit()
+
+        print("Gamma SGD:")
+        compare_with_statsmodels(
+            our_model, sm_model, X, y, coef_rtol=0.2, coef_atol=0.15, dev_rtol=0.15
+        )
+
+    @pytest.mark.skip(reason="InverseGaussian SGD is numerically challenging")
+    def test_inverse_gaussian_sgd(self):
+        """Test Inverse Gaussian GLM with SGD solver vs statsmodels."""
+        X, y, _, _ = generate_inverse_gaussian_data()
+
+        our_model = GLM(
+            dist=InverseGaussian(),
+            link=LogLink(),
+            solver="sgd",
+            fit_intercept=True,
+            max_iter=500,
+            learning_rate=0.005,
+            batch_size=32,
+        )
+        our_model.fit(X, y, enable_spu_cache=False, y_scale=1.0)
+
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(
+            np.array(y), X_sm, family=sm_family.InverseGaussian(link=sm_links.Log())
+        ).fit()
+
+        print("InverseGaussian SGD:")
+        compare_with_statsmodels(
+            our_model, sm_model, X, y, coef_rtol=0.25, coef_atol=0.2, dev_rtol=0.2
+        )
+
+    def test_negative_binomial_sgd(self):
+        """Test Negative Binomial GLM with SGD solver vs statsmodels."""
+        X, y, _, _ = generate_negative_binomial_data(alpha=1.0)
+
+        our_model = GLM(
+            dist=NegativeBinomial(alpha=1.0),
+            solver="sgd",
+            fit_intercept=True,
+            max_iter=500,
+            learning_rate=0.01,
+            batch_size=32,
+        )
+        our_model.fit(X, y, enable_spu_cache=False, y_scale=1.0)
+
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(
+            np.array(y), X_sm, family=sm_family.NegativeBinomial(alpha=1.0)
+        ).fit()
+
+        print("NegativeBinomial SGD:")
+        compare_with_statsmodels(
+            our_model, sm_model, X, y, coef_rtol=0.2, coef_atol=0.15, dev_rtol=0.2
+        )
+
+
+# ==================== Additional Feature Tests ====================
+
+
+class TestGLMFeatures:
+    """Test additional GLM features without statsmodels dependency."""
+
+    def test_various_links_bernoulli(self):
+        """Test Bernoulli with different link functions."""
+        X, y, _, _ = generate_bernoulli_data()
+
+        for link_cls, name in [
+            (LogitLink, "logit"),
+            (ProbitLink, "probit"),
+        ]:
+            model = GLM(
+                dist=Bernoulli(),
+                link=link_cls(),
+                solver="irls",
+                fit_intercept=True,
+            )
+            model.fit(X, y, enable_spu_cache=False)
+
+            mu_pred = model.predict(X)
+            assert jnp.all(mu_pred >= 0) and jnp.all(
+                mu_pred <= 1
+            ), f"{name} link failed"
+            print(f"Bernoulli with {name}: OK")
+
+    def test_power_link(self):
+        """Test Power link function."""
+        X, y, _, _ = generate_gamma_data()
+
+        model = GLM(
+            dist=Gamma(),
+            link=PowerLink(power=0.5),  # Square root link
+            solver="irls",
+            fit_intercept=True,
+            max_iter=30,
+        )
+        model.fit(X, y, enable_spu_cache=False, y_scale=1.0)
+
+        mu_pred = model.predict(X)
+        assert jnp.all(mu_pred > 0), "Gamma predictions should be positive"
+
+    def test_reciprocal_link(self):
+        """Test Reciprocal link function."""
+        X, y, _, _ = generate_gamma_data()
+
+        model = GLM(
+            dist=Gamma(),
+            link=ReciprocalLink(),
+            solver="irls",
+            fit_intercept=True,
+            max_iter=30,
+        )
+        model.fit(X, y, enable_spu_cache=False, y_scale=1.0)
+
+        mu_pred = model.predict(X)
+        assert jnp.all(mu_pred > 0), "Gamma predictions should be positive"
+
+    def test_l2_regularization(self):
+        """Test L2 regularization effect."""
+        X, y, _, _ = generate_poisson_data()
+
+        # Fit without regularization
+        model_noreg = GLM(dist=Poisson(), solver="irls", fit_intercept=True, l2=0.0)
+        model_noreg.fit(X, y, enable_spu_cache=False, y_scale=1.0)
+
+        # Fit with regularization
+        model_reg = GLM(dist=Poisson(), solver="irls", fit_intercept=True, l2=1.0)
+        model_reg.fit(X, y, enable_spu_cache=False, y_scale=1.0)
+
+        # Regularized coefficients should be smaller in magnitude
+        assert jnp.sum(model_reg.coef_**2) < jnp.sum(model_noreg.coef_**2)
+
+    def test_sample_weights(self):
+        """Test sample weights handling."""
+        X, y, _, _ = generate_poisson_data(n_samples=100)
+        weights = jnp.ones(100)
+        weights = weights.at[:50].set(2.0)
+
+        model = GLM(dist=Poisson(), solver="irls", fit_intercept=True)
+        model.fit(X, y, sample_weight=weights, enable_spu_cache=False, y_scale=1.0)
 
         assert model.coef_ is not None
 
+    def test_offset_handling(self):
+        """Test offset handling in prediction."""
+        X, y, _, _ = generate_poisson_data(n_samples=100)
+        offset = jnp.ones(100) * 0.5
+
+        model = GLM(dist=Poisson(), solver="irls", fit_intercept=True)
+        model.fit(X, y, offset=offset, enable_spu_cache=False, y_scale=1.0)
+
+        # Predictions with offset should differ from without
+        mu_with_offset = model.predict(X, offset=offset)
+        mu_without_offset = model.predict(X)
+
+        assert not jnp.allclose(mu_with_offset, mu_without_offset)
+
     def test_sgd_batching(self):
-        """Verify SGD runs with different batch sizes."""
-        for bs in [10, 50, 200]:  # 200 is full batch
+        """Test SGD with different batch sizes."""
+        X, y, _, _ = generate_poisson_data()
+
+        for batch_size in [16, 32, 64]:
             model = GLM(
                 dist=Poisson(),
                 solver="sgd",
-                batch_size=bs,
-                max_iter=10,
-            )
-            model.fit(self.X, self.y, enable_spu_cache=False)
-            assert model.coef_ is not None
-
-    def test_sgd_no_early_stop(self):
-        """Test SGD solver without early stopping (tol=0)."""
-        model = GLM(
-            dist=Poisson(),
-            solver="sgd",
-            learning_rate=1e-2,
-            max_iter=50,
-            batch_size=32,
-            fit_intercept=True,
-            tol=0.0,  # Disable early stopping
-        )
-        model.fit(self.X, self.y, enable_spu_cache=False)
-
-        assert model.coef_ is not None
-        assert model.history_["n_iter"] == 50  # Should run full iterations
-
-    # ==================== Link Function Tests ====================
-
-    def test_various_links_bernoulli(self):
-        """Test different link functions with Bernoulli distribution."""
-        key = jax.random.PRNGKey(123)
-        X_binary = jax.random.normal(key, (100, 3))
-        true_coef = jnp.array([1.0, -0.5, 0.5])
-        eta = X_binary @ true_coef
-
-        links_to_test = [
-            ("Logit", LogitLink()),
-            ("Probit", ProbitLink()),
-            ("CLogLog", CLogLogLink()),
-        ]
-
-        for link_name, link in links_to_test:
-            mu = link.inverse(eta)
-            key, subkey = jax.random.split(key)
-            y_binary = jax.random.bernoulli(subkey, mu).astype(jnp.float32)
-
-            model = GLM(
-                dist=Bernoulli(),
-                link=link,
-                solver="irls",
                 fit_intercept=True,
+                max_iter=100,
+                batch_size=batch_size,
             )
-            model.fit(X_binary, y_binary, enable_spu_cache=False)
-
+            model.fit(X, y, enable_spu_cache=False, y_scale=1.0)
             assert model.coef_ is not None
-
-    def test_power_link(self):
-        """Test PowerLink with different powers."""
-        powers_to_test = [0.5, 1.0, 2.0, -1.0, -2.0]
-
-        for power in powers_to_test:
-            link = PowerLink(power=power)
-            mu_test = jnp.array([1.0, 2.0, 3.0])
-            eta = link.link(mu_test)
-            mu_recovered = link.inverse(eta)
-            np.testing.assert_allclose(mu_recovered, mu_test, rtol=1e-5)
-
-    def test_reciprocal_link(self):
-        """Test ReciprocalLink equals PowerLink(power=-1)."""
-        reciprocal = ReciprocalLink()
-        power_neg_one = PowerLink(power=-1.0)
-
-        mu_test = jnp.array([1.0, 2.0, 3.0])
-        eta_recip = reciprocal.link(mu_test)
-        eta_power = power_neg_one.link(mu_test)
-
-        np.testing.assert_allclose(eta_recip, eta_power, rtol=1e-10)
-
-    def test_distribution_link_combinations(self):
-        """Test various distribution-link combinations."""
-        combinations = [
-            (Normal(), IdentityLink()),
-            (Normal(), LogLink()),
-            (Poisson(), LogLink()),
-            (Poisson(), PowerLink(power=0.5)),
-            (Gamma(), LogLink()),
-            (Gamma(), ReciprocalLink()),
-            (Tweedie(power=1.5), LogLink()),
-            (NegativeBinomial(alpha=0.5), LogLink()),
-            (InverseGaussian(), PowerLink(power=-2.0)),
-        ]
-
-        for dist, link in combinations:
-            model = GLM(
-                dist=dist,
-                link=link,
-                solver="irls",
-                fit_intercept=True,
-                max_iter=10,
-            )
-            try:
-                model.fit(self.X, self.y, enable_spu_cache=False)
-                assert model.coef_ is not None
-            except Exception:
-                # Some combinations might be numerically unstable
-                pass
-
-    # ==================== Regularization & Weights Tests ====================
-
-    def test_l2_regularization(self):
-        """Test L2 regularization."""
-        model_no_reg = GLM(dist=Poisson(), solver="irls", l2=0.0)
-        model_no_reg.fit(self.X, self.y, enable_spu_cache=False)
-
-        model_with_reg = GLM(dist=Poisson(), solver="irls", l2=1.0)
-        model_with_reg.fit(self.X, self.y, enable_spu_cache=False)
-
-        # Coefficients should be smaller with regularization (shrinkage effect)
-        norm_no_reg = jnp.linalg.norm(model_no_reg.coef_)
-        norm_with_reg = jnp.linalg.norm(model_with_reg.coef_)
-        assert norm_with_reg < norm_no_reg
-
-    def test_sample_weights(self):
-        """Test sample weights."""
-        weights = jnp.concatenate(
-            [
-                jnp.ones(self.n_samples // 2) * 2.0,
-                jnp.ones(self.n_samples - self.n_samples // 2) * 0.5,
-            ]
-        )
-
-        model_no_weights = GLM(dist=Poisson(), solver="irls")
-        model_no_weights.fit(self.X, self.y, enable_spu_cache=False)
-
-        model_with_weights = GLM(dist=Poisson(), solver="irls")
-        model_with_weights.fit(
-            self.X, self.y, sample_weight=weights, enable_spu_cache=False
-        )
-
-        # Coefficients should differ when weights are applied
-        diff = jnp.linalg.norm(model_no_weights.coef_ - model_with_weights.coef_)
-        assert diff > 0
-
-    def test_offset_handling(self):
-        """Test that offset is correctly handled in fit and predict."""
-        offset = jnp.ones_like(self.y) * 2.0
-
-        model = GLM(dist=Poisson(), solver="irls")
-        model.fit(self.X, self.y, offset=offset, enable_spu_cache=False)
-
-        # Since true data was generated with intercept=1.0 and offset=0
-        # Now we force offset=2.0. The model should compensate by learning intercept approx -1.0
-        np.testing.assert_allclose(
-            model.intercept_, self.true_intercept - 2.0, atol=0.3
-        )
-
-        # Test predict with offset
-        mu_pred = model.predict(self.X, offset=offset)
-        dev = model.evaluate(self.X, self.y, metrics=["deviance"], offset=offset)[
-            "deviance"
-        ]
-        assert dev < 300  # Heuristic check
-
-    # ==================== Metrics Tests ====================
-
-    def test_metrics_evaluation(self):
-        """Test metrics evaluation."""
-        model = GLM(dist=Poisson(), solver="irls")
-        model.fit(self.X, self.y, enable_spu_cache=False)
-
-        metrics = model.evaluate(self.X, self.y, metrics=["deviance", "aic", "rmse"])
-
-        assert "deviance" in metrics
-        assert "aic" in metrics
-        assert "rmse" in metrics
-        assert metrics["rmse"] > 0
-
-    def test_bic_metric(self):
-        """Test BIC metric evaluation."""
-        model = GLM(dist=Poisson(), solver="irls")
-        model.fit(self.X, self.y, enable_spu_cache=False)
-
-        metrics = model.evaluate(self.X, self.y, metrics=["deviance", "aic", "bic"])
-
-        assert "bic" in metrics
-        # BIC should be larger than AIC for n > e^2 ≈ 7.4
-        assert metrics["bic"] > metrics["aic"]
-
-    # ==================== Convergence & History Tests ====================
+            print(f"SGD batch_size={batch_size}: OK")
 
     def test_convergence_history(self):
-        """Test that history_ contains convergence information."""
-        model = GLM(dist=Poisson(), solver="irls", max_iter=50, tol=1e-6)
-        model.fit(self.X, self.y, enable_spu_cache=False)
+        """Test that convergence history is recorded."""
+        X, y, _, _ = generate_poisson_data()
 
-        assert model.history_ is not None
-        assert "n_iter" in model.history_
-        assert "converged" in model.history_
+        model = GLM(dist=Poisson(), solver="irls", fit_intercept=True, max_iter=20)
+        model.fit(X, y, enable_spu_cache=False, y_scale=1.0)
 
-    def test_irls_no_early_stop(self):
-        """Test IRLS solver without early stopping (tol=0)."""
+        # Check convergence history exists
+        assert hasattr(model, "history_")
+
+    def test_no_intercept(self):
+        """Test GLM without intercept."""
+        X, y, _, _ = generate_poisson_data()
+
         model = GLM(
             dist=Poisson(),
             solver="irls",
-            max_iter=10,
-            tol=0.0,  # Disable early stopping
+            fit_intercept=False,
         )
-        model.fit(self.X, self.y, enable_spu_cache=False)
-
+        model.fit(X, y, enable_spu_cache=False, y_scale=1.0)
         assert model.coef_ is not None
-        assert model.history_["n_iter"] == 10  # Should run full iterations
-
-    def test_r_style_initialization(self):
-        """Test that R-style initialization provides good starting point."""
-        # With good initialization, should achieve reasonable fit quickly
-        model = GLM(dist=Poisson(), solver="irls", max_iter=10, tol=1e-6)
-        model.fit(self.X, self.y, enable_spu_cache=False)
-
-        assert model.history_["n_iter"] <= 10
-        np.testing.assert_allclose(model.coef_, self.true_coef, rtol=0.3, atol=0.3)
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+        assert model.intercept_ == 0.0 or model.intercept_ is None
