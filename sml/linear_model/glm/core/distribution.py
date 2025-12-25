@@ -167,25 +167,34 @@ class Bernoulli(Distribution):
 
     def unit_variance(self, mu: jax.Array) -> jax.Array:
         # V(mu) = mu * (1 - mu)
-        return mu * (1.0 - mu)
+        # Add eps protection to avoid zero variance at boundaries
+        eps = 1e-10
+        mu_safe = jnp.clip(mu, eps, 1.0 - eps)
+        return mu_safe * (1.0 - mu_safe)
 
     def deviance(
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
         # Deviance formula for Bernoulli
         # D = 2 * sum(y * log(y/mu) + (1-y) * log((1-y)/(1-mu)))
+        # Handle y=0 and y=1 cases properly using jnp.where
         eps = 1e-10
-        dev = 2.0 * (
-            y * jnp.log(y / mu + eps)
-            + (1.0 - y) * jnp.log((1.0 - y) / (1.0 - mu) + eps)
-        )
+        mu_safe = jnp.clip(mu, eps, 1.0 - eps)
+
+        # When y=0: first term is 0; when y=1: second term is 0
+        term1 = jnp.where(y > 0, y * jnp.log(y / mu_safe), 0.0)
+        term2 = jnp.where(y < 1, (1.0 - y) * jnp.log((1.0 - y) / (1.0 - mu_safe)), 0.0)
+        dev = 2.0 * (term1 + term2)
+
         return jnp.sum(dev * weights) if weights is not None else jnp.sum(dev)
 
     def log_likelihood(
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
         # LL = y * log(mu) + (1-y) * log(1-mu)
-        ll = y * jnp.log(mu) + (1.0 - y) * jnp.log(1.0 - mu)
+        eps = 1e-10
+        mu_safe = jnp.clip(mu, eps, 1.0 - eps)
+        ll = y * jnp.log(mu_safe) + (1.0 - y) * jnp.log(1.0 - mu_safe)
         return jnp.sum(ll * weights) if weights is not None else jnp.sum(ll)
 
     def starting_mu(self, y: jax.Array) -> jax.Array:
@@ -210,8 +219,12 @@ class Poisson(Distribution):
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
         # Deviance formula for Poisson: D = 2 * sum(y * log(y/mu) - (y - mu))
+        # When y=0, the term y*log(y/mu) should be 0 (limit as y->0)
         eps = 1e-10
-        dev = 2.0 * (y * jnp.log(y / mu + eps) - (y - mu))
+        mu_safe = jnp.maximum(mu, eps)
+        # Handle y=0 case: 0*log(0/mu) = 0
+        term1 = jnp.where(y > 0, y * jnp.log(y / mu_safe), 0.0)
+        dev = 2.0 * (term1 - (y - mu))
         return jnp.sum(dev * weights) if weights is not None else jnp.sum(dev)
 
     def log_likelihood(
@@ -219,7 +232,9 @@ class Poisson(Distribution):
     ) -> jax.Array:
         # LL = y * log(mu) - mu - log(y!)
         # We omit log(y!) here as it is constant w.r.t parameters.
-        ll = y * jnp.log(mu) - mu
+        eps = 1e-10
+        mu_safe = jnp.maximum(mu, eps)
+        ll = y * jnp.log(mu_safe) - mu
         return jnp.sum(ll * weights) if weights is not None else jnp.sum(ll)
 
     def starting_mu(self, y: jax.Array) -> jax.Array:
@@ -245,14 +260,18 @@ class Gamma(Distribution):
     ) -> jax.Array:
         # Deviance = 2 * sum( (y - mu)/mu - log(y/mu) )
         eps = 1e-10
-        dev = 2.0 * ((y - mu) / mu - jnp.log(y / mu + eps))
+        mu_safe = jnp.maximum(mu, eps)
+        y_safe = jnp.maximum(y, eps)
+        dev = 2.0 * ((y - mu) / mu_safe - jnp.log(y_safe / mu_safe))
         return jnp.sum(dev * weights) if weights is not None else jnp.sum(dev)
 
     def log_likelihood(
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
         # Simplified LL: -(y/mu + log(mu))
-        ll = -1.0 * (y / mu + jnp.log(mu))
+        eps = 1e-10
+        mu_safe = jnp.maximum(mu, eps)
+        ll = -1.0 * (y / mu_safe + jnp.log(mu_safe))
         return jnp.sum(ll * weights) if weights is not None else jnp.sum(ll)
 
     def starting_mu(self, y: jax.Array) -> jax.Array:
@@ -299,25 +318,28 @@ class Tweedie(Distribution):
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
         p = self.power
+        eps = 1e-10
+        mu_safe = jnp.maximum(mu, eps)
+        y_safe = jnp.maximum(y, eps)
 
         if abs(p - 0) < 1e-10:  # Normal
             dev = (y - mu) ** 2
         elif abs(p - 1) < 1e-10:  # Poisson
-            term1 = y * jnp.log(y / mu)
-            term1 = jnp.where(y == 0, 0.0, term1)
+            # Handle y=0 case: 0*log(0/mu) = 0
+            term1 = jnp.where(y > 0, y * jnp.log(y / mu_safe), 0.0)
             dev = 2.0 * (term1 - (y - mu))
         elif abs(p - 2) < 1e-10:  # Gamma
-            dev = 2.0 * ((y - mu) / mu - jnp.log(y / mu))
+            dev = 2.0 * ((y - mu) / mu_safe - jnp.log(y_safe / mu_safe))
         else:
             # Statsmodels style formula
             # Term 1: y^(2-p) / ((1-p)(2-p))
-            term1 = (y ** (2 - p)) / ((1 - p) * (2 - p))
+            term1 = jnp.where(y > 0, (y ** (2 - p)) / ((1 - p) * (2 - p)), 0.0)
 
             # Term 2: - y * mu^(1-p) / (1-p)
-            term2 = -y * (mu ** (1 - p)) / (1 - p)
+            term2 = -y * (mu_safe ** (1 - p)) / (1 - p)
 
             # Term 3: mu^(2-p) / (2-p)
-            term3 = (mu ** (2 - p)) / (2 - p)
+            term3 = (mu_safe ** (2 - p)) / (2 - p)
 
             dev = 2.0 * (term1 + term2 + term3)
 
@@ -388,14 +410,18 @@ class NegativeBinomial(Distribution):
         eps = 1e-10
         alpha = self.alpha
 
+        mu_safe = jnp.maximum(mu, eps)
+        y_safe = jnp.maximum(y, eps)
+
         # Avoid division by zero
-        mu_alpha = mu * alpha
+        mu_alpha = mu_safe * alpha
         y_alpha = y * alpha
 
-        dev = 2.0 * (
-            y * jnp.log(y / mu + eps)
-            - (y + 1.0 / alpha) * jnp.log((y_alpha + 1.0) / (mu_alpha + 1.0) + eps)
-        )
+        # Handle y=0 case for the first term
+        term1 = jnp.where(y > 0, y * jnp.log(y_safe / mu_safe), 0.0)
+        term2 = (y + 1.0 / alpha) * jnp.log((y_alpha + 1.0) / (mu_alpha + 1.0))
+
+        dev = 2.0 * (term1 - term2)
 
         return jnp.sum(dev * weights) if weights is not None else jnp.sum(dev)
 
@@ -405,7 +431,8 @@ class NegativeBinomial(Distribution):
         # Log-likelihood for Negative Binomial
         eps = 1e-10
         alpha = self.alpha
-        alpha_mu = alpha * mu
+        mu_safe = jnp.maximum(mu, eps)
+        alpha_mu = alpha * mu_safe
 
         # Simplified log-likelihood (omitting constant terms)
         ll = y * jnp.log(alpha_mu / (1.0 + alpha_mu) + eps) - (1.0 / alpha) * jnp.log(
@@ -437,17 +464,24 @@ class InverseGaussian(Distribution):
     def deviance(
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
-        # Deviance for Inverse Gaussian
+        # Deviance for Inverse Gaussian: D = (y - mu)^2 / (mu^2 * y)
         eps = 1e-10
-        dev = (y - mu) ** 2 / (mu**2 * y + eps)
+        mu_safe = jnp.maximum(mu, eps)
+        y_safe = jnp.maximum(y, eps)
+        dev = (y - mu) ** 2 / (mu_safe**2 * y_safe)
         return jnp.sum(dev * weights) if weights is not None else jnp.sum(dev)
 
     def log_likelihood(
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
         # Log-likelihood for Inverse Gaussian (simplified)
+        eps = 1e-10
+        mu_safe = jnp.maximum(mu, eps)
+        y_safe = jnp.maximum(y, eps)
         ll = -0.5 * (
-            (y - mu) ** 2 / (mu**2 * y + 1e-10) + 1.5 * jnp.log(y) + jnp.log(mu)
+            (y - mu) ** 2 / (mu_safe**2 * y_safe)
+            + 1.5 * jnp.log(y_safe)
+            + jnp.log(mu_safe)
         )
         return jnp.sum(ll * weights) if weights is not None else jnp.sum(ll)
 
