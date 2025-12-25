@@ -62,10 +62,11 @@ except ImportError:
 def generate_poisson_data(seed=42, n_samples=200, n_features=5):
     """Generate Poisson distributed data."""
     key = jax.random.PRNGKey(seed)
-    key, k1, k2 = jax.random.split(key, 3)
+    key, k1, k2, k3 = jax.random.split(key, 4)
 
     X = jax.random.normal(k1, (n_samples, n_features))
-    true_coef = jnp.array([0.5, -0.3, 0.2, 0.1, -0.1][:n_features])
+    # Dynamically generate coefficients based on n_features
+    true_coef = jax.random.uniform(k3, (n_features,), minval=-0.5, maxval=0.5)
     true_intercept = 1.0
 
     eta = X @ true_coef + true_intercept
@@ -78,10 +79,11 @@ def generate_poisson_data(seed=42, n_samples=200, n_features=5):
 def generate_normal_data(seed=42, n_samples=100, n_features=3):
     """Generate Normal distributed data."""
     key = jax.random.PRNGKey(seed)
-    key, k1, k2 = jax.random.split(key, 3)
+    key, k1, k2, k3 = jax.random.split(key, 4)
 
     X = jax.random.normal(k1, (n_samples, n_features))
-    true_coef = jnp.array([1.0, -0.5, 0.3][:n_features])
+    # Dynamically generate coefficients based on n_features
+    true_coef = jax.random.uniform(k3, (n_features,), minval=-1.0, maxval=1.0)
     true_intercept = 2.0
 
     y = X @ true_coef + true_intercept + 0.1 * jax.random.normal(k2, (n_samples,))
@@ -92,10 +94,11 @@ def generate_normal_data(seed=42, n_samples=100, n_features=3):
 def generate_bernoulli_data(seed=42, n_samples=200, n_features=4):
     """Generate Bernoulli distributed data."""
     key = jax.random.PRNGKey(seed)
-    key, k1, k2 = jax.random.split(key, 3)
+    key, k1, k2, k3 = jax.random.split(key, 4)
 
     X = jax.random.normal(k1, (n_samples, n_features))
-    true_coef = jnp.array([1.0, -0.5, 0.5, -0.3][:n_features])
+    # Dynamically generate coefficients based on n_features
+    true_coef = jax.random.uniform(k3, (n_features,), minval=-1.0, maxval=1.0)
     true_intercept = 0.5
 
     eta = X @ true_coef + true_intercept
@@ -108,10 +111,11 @@ def generate_bernoulli_data(seed=42, n_samples=200, n_features=4):
 def generate_gamma_data(seed=42, n_samples=200, n_features=3, shape=5.0):
     """Generate Gamma distributed data using jax.random.gamma."""
     key = jax.random.PRNGKey(seed)
-    key, k1, k2 = jax.random.split(key, 3)
+    key, k1, k2, k3 = jax.random.split(key, 4)
 
     X = jax.random.normal(k1, (n_samples, n_features)) * 0.5
-    true_coef = jnp.array([0.5, -0.3, 0.2][:n_features])
+    # Dynamically generate coefficients based on n_features (smaller range for stability)
+    true_coef = jax.random.uniform(k3, (n_features,), minval=-0.5, maxval=0.5)
     true_intercept = 1.5
 
     eta = X @ true_coef + true_intercept
@@ -127,9 +131,11 @@ def generate_inverse_gaussian_data(seed=42, n_samples=200, n_features=3, lam=10.
     """Generate Inverse Gaussian (Wald) distributed data using numpy."""
     np.random.seed(seed)
     key = jax.random.PRNGKey(seed)
+    key, k1, k2 = jax.random.split(key, 3)
 
-    X = jax.random.normal(key, (n_samples, n_features)) * 0.3
-    true_coef = jnp.array([0.3, -0.2, 0.1][:n_features])
+    X = jax.random.normal(k1, (n_samples, n_features)) * 0.3
+    # Dynamically generate coefficients based on n_features (smaller range for stability)
+    true_coef = jax.random.uniform(k2, (n_features,), minval=-0.3, maxval=0.3)
     true_intercept = 1.0
 
     eta = X @ true_coef + true_intercept
@@ -144,10 +150,11 @@ def generate_inverse_gaussian_data(seed=42, n_samples=200, n_features=3, lam=10.
 def generate_negative_binomial_data(seed=42, n_samples=200, n_features=3, alpha=1.0):
     """Generate Negative Binomial distributed data (Corrected)."""
     key = jax.random.PRNGKey(seed)
-    key, k1, k2, k3 = jax.random.split(key, 4)
+    key, k1, k2, k3, k4 = jax.random.split(key, 5)
 
     X = jax.random.normal(k1, (n_samples, n_features))
-    true_coef = jnp.array([0.5, -0.3, 0.2][:n_features])
+    # Dynamically generate coefficients based on n_features
+    true_coef = jax.random.uniform(k4, (n_features,), minval=-0.5, maxval=0.5)
     true_intercept = 1.0
 
     eta = X @ true_coef + true_intercept
