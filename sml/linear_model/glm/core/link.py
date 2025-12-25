@@ -214,8 +214,8 @@ class CLogLogLink(Link):
         return 1.0 - jnp.exp(-jnp.exp(eta))
 
     def link_deriv(self, mu: jax.Array) -> jax.Array:
-        # Derivative of CLogLog: 1 / ((1 - mu) * log(1 - mu))
-        return 1.0 / ((1.0 - mu) * jnp.log(1.0 - mu))
+        # Derivative of CLogLog: -1 / ((1 - mu) * log(1 - mu))
+        return -1.0 / ((1.0 - mu) * jnp.log(1.0 - mu))
 
     def inverse_deriv(self, eta: jax.Array) -> jax.Array:
         # Derivative of inverse CLogLog: exp(eta - exp(eta))

@@ -298,49 +298,42 @@ class Tweedie(Distribution):
     def deviance(
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
-        # Deviance for Tweedie depends on power parameter
-        eps = 1e-10
         p = self.power
 
         if abs(p - 0) < 1e-10:  # Normal
             dev = (y - mu) ** 2
         elif abs(p - 1) < 1e-10:  # Poisson
-            dev = 2.0 * (y * jnp.log(y / mu + eps) - (y - mu))
+            term1 = y * jnp.log(y / mu)
+            term1 = jnp.where(y == 0, 0.0, term1)
+            dev = 2.0 * (term1 - (y - mu))
         elif abs(p - 2) < 1e-10:  # Gamma
-            dev = 2.0 * ((y - mu) / mu - jnp.log(y / mu + eps))
-        elif abs(p - 3) < 1e-10:  # Inverse Gaussian
-            dev = (y - mu) ** 2 / (mu**2 * y + eps)
-        elif 1 < p < 2:  # Compound Poisson-Gamma
-            # Use approximation for compound distribution
-            # This is generalized deviance
-            dev = 2.0 * (
-                y ** (2 - p) / ((2 - p) * mu ** (1 - p) + eps)
-                - y ** (2 - p) / ((1 - p) * mu ** (2 - p) + eps)
-                + mu ** (2 - p) / ((2 - p) * (1 - p))
-            )
+            dev = 2.0 * ((y - mu) / mu - jnp.log(y / mu))
         else:
-            # General case using approximation
-            dev = jnp.abs(y - mu) ** (2 - p) / (mu ** (1 - p) + eps)
+            # Statsmodels style formula
+            # Term 1: y^(2-p) / ((1-p)(2-p))
+            term1 = (y ** (2 - p)) / ((1 - p) * (2 - p))
 
-        return jnp.sum(dev * weights) if weights is not None else jnp.sum(dev)
+            # Term 2: - y * mu^(1-p) / (1-p)
+            term2 = -y * (mu ** (1 - p)) / (1 - p)
+
+            # Term 3: mu^(2-p) / (2-p)
+            term3 = (mu ** (2 - p)) / (2 - p)
+
+            dev = 2.0 * (term1 + term2 + term3)
+
+        if weights is not None:
+            return jnp.sum(dev * weights)
+        return jnp.sum(dev)
 
     def log_likelihood(
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
-        # Log-likelihood approximation for Tweedie
-        p = self.power
+        dev = self.deviance(y, mu, weights=None)
+        ll = -0.5 * dev
 
-        if abs(p - 0) < 1e-10:  # Normal
-            ll = -0.5 * (y - mu) ** 2 - 0.5 * jnp.log(2 * jnp.pi)
-        elif abs(p - 1) < 1e-10:  # Poisson
-            ll = y * jnp.log(mu) - mu
-        elif abs(p - 2) < 1e-10:  # Gamma
-            ll = -y / mu - jnp.log(mu)
-        else:
-            # Approximation for other powers
-            ll = -(y ** (2 - p)) / ((2 - p) * mu ** (1 - p) + 1e-10)
-
-        return jnp.sum(ll * weights) if weights is not None else jnp.sum(ll)
+        if weights is not None:
+            return jnp.sum(ll * weights)
+        return jnp.sum(ll)
 
     def starting_mu(self, y: jax.Array) -> jax.Array:
         # R-style initialization
