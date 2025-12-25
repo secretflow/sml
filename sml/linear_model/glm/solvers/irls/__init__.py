@@ -17,7 +17,19 @@
 from sml.linear_model.glm.solvers.irls_generic import IRLSSolver
 
 # Import optimized solvers
+from .bernoulli_logit import BernoulliLogitIRLSSolver
+from .gamma_inverse import GammaInverseIRLSSolver
 from .gamma_log import GammaLogIRLSSolver
+from .gaussian_identity import GaussianIdentityIRLSSolver
+from .poisson_log import PoissonLogIRLSSolver
 from .tweedie_log import TweedieLogIRLSSolver
 
-__all__ = ["IRLSSolver", "GammaLogIRLSSolver", "TweedieLogIRLSSolver"]
+__all__ = [
+    "IRLSSolver",
+    "GaussianIdentityIRLSSolver",
+    "PoissonLogIRLSSolver",
+    "BernoulliLogitIRLSSolver",
+    "GammaLogIRLSSolver",
+    "GammaInverseIRLSSolver",
+    "TweedieLogIRLSSolver",
+]

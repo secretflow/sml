@@ -633,10 +633,235 @@ class TestGLMvsStatsmodelsPlaintext:
         solver = get_registered_solver(tweedie_log_family)
         assert solver is not None, "Tweedie+Log(p=1.5) solver should be registered"
 
+        # Check all new solvers are registered
+        from sml.linear_model.glm.core.distribution import Normal, Poisson, Bernoulli
+        from sml.linear_model.glm.core.link import (
+            IdentityLink,
+            LogitLink,
+            ReciprocalLink,
+        )
+
+        gaussian_identity_family = Family(Normal(), IdentityLink())
+        assert get_registered_solver(gaussian_identity_family) is not None
+
+        poisson_log_family = Family(Poisson(), LogLink())
+        assert get_registered_solver(poisson_log_family) is not None
+
+        bernoulli_logit_family = Family(Bernoulli(), LogitLink())
+        assert get_registered_solver(bernoulli_logit_family) is not None
+
+        gamma_inverse_family = Family(Gamma(), ReciprocalLink())
+        assert get_registered_solver(gamma_inverse_family) is not None
+
         # List all registered solvers
         registered = list_registered_solvers()
         print(f"Registered optimized solvers: {registered}")
-        assert len(registered) >= 2
+        assert len(registered) >= 6  # Updated from 2 to 6
+
+    def test_gaussian_identity_optimized_irls(self):
+        """Test optimized Gaussian+Identity IRLS solver vs statsmodels."""
+        from sml.linear_model.glm.solvers.irls import GaussianIdentityIRLSSolver
+        from sml.linear_model.glm.core.family import Family
+
+        X, y, _, _ = generate_normal_data()
+
+        # Use the optimized solver directly
+        solver = GaussianIdentityIRLSSolver()
+        family = Family(Normal(), IdentityLink())
+
+        # Fit using the optimized solver
+        beta, phi, history = solver.solve(
+            X,
+            y,
+            family,
+            fit_intercept=True,
+            max_iter=50,
+            tol=1e-8,
+        )
+
+        # Extract coef and intercept
+        our_coef = beta[:-1]
+        our_intercept = beta[-1]
+
+        # Compute predictions and deviance
+        X_with_intercept = jnp.hstack([X, jnp.ones((X.shape[0], 1))])
+        eta = jnp.matmul(X_with_intercept, beta)
+        mu = eta  # Identity link
+        our_dev = float(Normal().deviance(y, mu))
+
+        # Fit statsmodels
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(np.array(y), X_sm, family=sm_family.Gaussian()).fit()
+
+        sm_coef = sm_model.params[1:]
+        sm_intercept = sm_model.params[0]
+        sm_dev = sm_model.deviance
+
+        print("Gaussian+Identity Optimized IRLS:")
+        print(f"  Deviance - Ours: {our_dev:.4f}, statsmodels: {sm_dev:.4f}")
+        print(f"  Coef - Ours: {our_coef}")
+        print(f"  Coef - SM:   {sm_coef}")
+        print(f"  Intercept - Ours: {our_intercept:.4f}, SM: {sm_intercept:.4f}")
+        print(f"  Converged in {history['n_iter']} iteration(s)")
+
+        np.testing.assert_allclose(our_dev, sm_dev, rtol=0.01)
+        np.testing.assert_allclose(our_coef, sm_coef, rtol=0.01, atol=0.001)
+        np.testing.assert_allclose(our_intercept, sm_intercept, rtol=0.01, atol=0.001)
+
+    def test_poisson_log_optimized_irls(self):
+        """Test optimized Poisson+Log IRLS solver vs statsmodels."""
+        from sml.linear_model.glm.solvers.irls import PoissonLogIRLSSolver
+        from sml.linear_model.glm.core.family import Family
+
+        X, y, _, _ = generate_poisson_data()
+
+        # Use the optimized solver directly
+        solver = PoissonLogIRLSSolver()
+        family = Family(Poisson(), LogLink())
+
+        # Fit using the optimized solver
+        beta, phi, history = solver.solve(
+            X,
+            y,
+            family,
+            fit_intercept=True,
+            max_iter=50,
+            tol=1e-8,
+        )
+
+        # Extract coef and intercept
+        our_coef = beta[:-1]
+        our_intercept = beta[-1]
+
+        # Compute predictions and deviance
+        X_with_intercept = jnp.hstack([X, jnp.ones((X.shape[0], 1))])
+        eta = jnp.matmul(X_with_intercept, beta)
+        mu = jnp.exp(eta)
+        our_dev = float(Poisson().deviance(y, mu))
+
+        # Fit statsmodels
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(np.array(y), X_sm, family=sm_family.Poisson()).fit()
+
+        sm_coef = sm_model.params[1:]
+        sm_intercept = sm_model.params[0]
+        sm_dev = sm_model.deviance
+
+        print("Poisson+Log Optimized IRLS:")
+        print(f"  Deviance - Ours: {our_dev:.4f}, statsmodels: {sm_dev:.4f}")
+        print(f"  Coef - Ours: {our_coef}")
+        print(f"  Coef - SM:   {sm_coef}")
+        print(f"  Intercept - Ours: {our_intercept:.4f}, SM: {sm_intercept:.4f}")
+
+        np.testing.assert_allclose(our_dev, sm_dev, rtol=0.1)
+        np.testing.assert_allclose(our_coef, sm_coef, rtol=0.05, atol=0.01)
+        np.testing.assert_allclose(our_intercept, sm_intercept, rtol=0.05, atol=0.01)
+
+    def test_bernoulli_logit_optimized_irls(self):
+        """Test optimized Bernoulli+Logit IRLS solver vs statsmodels."""
+        from sml.linear_model.glm.solvers.irls import BernoulliLogitIRLSSolver
+        from sml.linear_model.glm.core.family import Family
+
+        X, y, _, _ = generate_bernoulli_data()
+
+        # Use the optimized solver directly
+        solver = BernoulliLogitIRLSSolver()
+        family = Family(Bernoulli(), LogitLink())
+
+        # Fit using the optimized solver
+        beta, phi, history = solver.solve(
+            X,
+            y,
+            family,
+            fit_intercept=True,
+            max_iter=50,
+            tol=1e-8,
+        )
+
+        # Extract coef and intercept
+        our_coef = beta[:-1]
+        our_intercept = beta[-1]
+
+        # Compute predictions for AUC
+        X_with_intercept = jnp.hstack([X, jnp.ones((X.shape[0], 1))])
+        eta = jnp.matmul(X_with_intercept, beta)
+        our_mu = jax.nn.sigmoid(eta)
+
+        # Fit statsmodels
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(np.array(y), X_sm, family=sm_family.Binomial()).fit()
+
+        sm_coef = sm_model.params[1:]
+        sm_intercept = sm_model.params[0]
+        sm_mu = sm_model.predict(X_sm)
+
+        # Compare AUC instead of deviance for binary
+        our_auc = compute_auc(y, our_mu)
+        sm_auc = compute_auc(y, jnp.array(sm_mu))
+
+        print("Bernoulli+Logit Optimized IRLS:")
+        print(f"  AUC - Ours: {our_auc:.4f}, statsmodels: {sm_auc:.4f}")
+        print(f"  Coef - Ours: {our_coef}")
+        print(f"  Coef - SM:   {sm_coef}")
+        print(f"  Intercept - Ours: {our_intercept:.4f}, SM: {sm_intercept:.4f}")
+
+        np.testing.assert_allclose(our_auc, sm_auc, rtol=0.05)
+        np.testing.assert_allclose(our_coef, sm_coef, rtol=0.1, atol=0.05)
+        np.testing.assert_allclose(our_intercept, sm_intercept, rtol=0.1, atol=0.05)
+
+    def test_gamma_inverse_optimized_irls(self):
+        """Test optimized Gamma+Inverse IRLS solver vs statsmodels."""
+        from sml.linear_model.glm.solvers.irls import GammaInverseIRLSSolver
+        from sml.linear_model.glm.core.family import Family
+
+        # Use data with less variance for numerical stability
+        X, y, _, _ = generate_gamma_data(shape=20.0)
+
+        # Use the optimized solver directly
+        solver = GammaInverseIRLSSolver()
+        family = Family(Gamma(), ReciprocalLink())
+
+        # Fit using the optimized solver
+        beta, phi, history = solver.solve(
+            X,
+            y,
+            family,
+            fit_intercept=True,
+            max_iter=100,
+            tol=1e-6,
+        )
+
+        # Extract coef and intercept
+        our_coef = beta[:-1]
+        our_intercept = beta[-1]
+
+        # Compute predictions and deviance
+        X_with_intercept = jnp.hstack([X, jnp.ones((X.shape[0], 1))])
+        eta = jnp.matmul(X_with_intercept, beta)
+        eta = jnp.maximum(eta, 1e-6)
+        mu = 1.0 / eta  # Inverse link
+        our_dev = float(Gamma().deviance(y, mu))
+
+        # Fit statsmodels
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(
+            np.array(y), X_sm, family=sm_family.Gamma(link=sm_links.InversePower())
+        ).fit()
+
+        sm_coef = sm_model.params[1:]
+        sm_intercept = sm_model.params[0]
+        sm_dev = sm_model.deviance
+
+        print("Gamma+Inverse Optimized IRLS:")
+        print(f"  Deviance - Ours: {our_dev:.4f}, statsmodels: {sm_dev:.4f}")
+        print(f"  Coef - Ours: {our_coef}")
+        print(f"  Coef - SM:   {sm_coef}")
+        print(f"  Intercept - Ours: {our_intercept:.4f}, SM: {sm_intercept:.4f}")
+
+        # Relaxed tolerances due to numerical challenges with inverse link
+        np.testing.assert_allclose(our_dev, sm_dev, rtol=0.2)
+        np.testing.assert_allclose(our_coef, sm_coef, rtol=0.2, atol=0.1)
+        np.testing.assert_allclose(our_intercept, sm_intercept, rtol=0.2, atol=0.1)
 
 
 # ==================== Additional Feature Tests ====================

@@ -32,11 +32,29 @@ Usage:
    ...     # Fall back to generic solver
 """
 
-from sml.linear_model.glm.core.distribution import Gamma, Tweedie
+from sml.linear_model.glm.core.distribution import (
+    Bernoulli,
+    Gamma,
+    Normal,
+    Poisson,
+    Tweedie,
+)
 from sml.linear_model.glm.core.family import Family
-from sml.linear_model.glm.core.link import LogLink
+from sml.linear_model.glm.core.link import (
+    IdentityLink,
+    LogitLink,
+    LogLink,
+    ReciprocalLink,
+)
 from sml.linear_model.glm.solvers.base import Solver
-from sml.linear_model.glm.solvers.irls import GammaLogIRLSSolver, TweedieLogIRLSSolver
+from sml.linear_model.glm.solvers.irls import (
+    BernoulliLogitIRLSSolver,
+    GammaInverseIRLSSolver,
+    GammaLogIRLSSolver,
+    GaussianIdentityIRLSSolver,
+    PoissonLogIRLSSolver,
+    TweedieLogIRLSSolver,
+)
 
 _REGISTRY: dict[str, Solver] = {}
 
@@ -96,12 +114,32 @@ def register_default_optimized_solvers() -> None:
     Register default optimized solvers for common family combinations.
 
     Currently registers:
+    - Gaussian + Identity: One-iteration weighted least squares
+    - Poisson + Log: Canonical link optimization
+    - Bernoulli + Logit: Canonical link optimization
     - Gamma + Log: Constant working weights optimization
+    - Gamma + Inverse: Canonical link (warning: numerically challenging)
     - Tweedie + Log: Direct exp(eta*(2-p)) computation
     """
+    # Gaussian + Identity (Linear Regression)
+    gaussian_identity_family = Family(Normal(), IdentityLink())
+    register_solver(gaussian_identity_family, GaussianIdentityIRLSSolver())
+
+    # Poisson + Log (Canonical)
+    poisson_log_family = Family(Poisson(), LogLink())
+    register_solver(poisson_log_family, PoissonLogIRLSSolver())
+
+    # Bernoulli + Logit (Logistic Regression, Canonical)
+    bernoulli_logit_family = Family(Bernoulli(), LogitLink())
+    register_solver(bernoulli_logit_family, BernoulliLogitIRLSSolver())
+
     # Gamma + Log
     gamma_log_family = Family(Gamma(), LogLink())
     register_solver(gamma_log_family, GammaLogIRLSSolver())
+
+    # Gamma + Inverse (Canonical, numerically challenging)
+    gamma_inverse_family = Family(Gamma(), ReciprocalLink())
+    register_solver(gamma_inverse_family, GammaInverseIRLSSolver())
 
     # Tweedie + Log with common power values
     for power in [1.5]:  # Add more power values as needed
