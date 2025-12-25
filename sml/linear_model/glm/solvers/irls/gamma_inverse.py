@@ -133,6 +133,8 @@ class GammaInverseIRLSSolver(Solver):
         enable_spu_cache: bool = False,
         enable_spu_reveal: bool = False,
     ) -> tuple[jax.Array, jax.Array | None, dict[str, Any] | None]:
+        # DEBUG: print solver type for verification
+        print(f"[DEBUG] Using solver: GammaInverseIRLSSolver (optimized)")
 
         is_early_stop_enabled = tol > 0.0
 

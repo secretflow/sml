@@ -125,7 +125,16 @@ class TweedieLogIRLSSolver(Solver):
             - 1<p<2: Compound Poisson-Gamma (most common for insurance)
             - p=2: Gamma
             - p=3: Inverse Gaussian
+
+        Raises
+        ------
+        ValueError
+            If power is not in a valid range.
         """
+        if not (power <= 0 or power == 1 or power >= 2 or (1 < power < 2)):
+            raise ValueError(
+                f"Tweedie power must be <= 0, = 1, >= 2, or between 1 and 2. Got {power}"
+            )
         self.power = power
 
     def solve(
@@ -147,6 +156,10 @@ class TweedieLogIRLSSolver(Solver):
         enable_spu_cache: bool = False,
         enable_spu_reveal: bool = False,
     ) -> tuple[jax.Array, jax.Array | None, dict[str, Any] | None]:
+        # DEBUG: print solver type for verification
+        print(
+            f"[DEBUG] Using solver: TweedieLogIRLSSolver (optimized, power={self.power})"
+        )
 
         is_early_stop_enabled = tol > 0.0
         power = self.power

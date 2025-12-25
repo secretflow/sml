@@ -86,6 +86,40 @@ class GLM:
         l2: float = 0.0,
         fit_intercept: bool = True,
     ):
+        # Parameter validation
+        if not isinstance(dist, Distribution):
+            raise TypeError(
+                f"dist must be a Distribution instance, got {type(dist).__name__}"
+            )
+        if link is not None and not isinstance(link, Link):
+            raise TypeError(
+                f"link must be a Link instance or None, got {type(link).__name__}"
+            )
+        if solver not in ("irls", "sgd"):
+            raise ValueError(f"solver must be 'irls' or 'sgd', got '{solver}'")
+        if max_iter < 1:
+            raise ValueError(f"max_iter must be at least 1, got {max_iter}")
+        if tol < 0:
+            raise ValueError(f"tol must be non-negative, got {tol}")
+        if stopping_rule not in ("beta",):
+            raise ValueError(
+                f"stopping_rule must be one of ('beta',), got '{stopping_rule}'"
+            )
+        if learning_rate <= 0:
+            raise ValueError(f"learning_rate must be positive, got {learning_rate}")
+        if decay_rate <= 0 or decay_rate > 1:
+            raise ValueError(f"decay_rate must be in (0, 1], got {decay_rate}")
+        if decay_steps < 1:
+            raise ValueError(f"decay_steps must be at least 1, got {decay_steps}")
+        if batch_size < 1:
+            raise ValueError(f"batch_size must be at least 1, got {batch_size}")
+        if l2 < 0:
+            raise ValueError(f"l2 must be non-negative, got {l2}")
+        if not isinstance(fit_intercept, bool):
+            raise TypeError(
+                f"fit_intercept must be a boolean, got {type(fit_intercept).__name__}"
+            )
+
         self.dist = dist
         self.link = link
         self.solver_name = solver
@@ -111,9 +145,6 @@ class GLM:
         self.history_: dict[str, Any] = {}
         self.dispersion_: jax.Array | None = None
         self.scale_: float | jax.Array = 1.0
-
-        # todo: add more parameter checks
-        assert max_iter >= 1, "max_iter must be at least 1"
 
     def _get_solver(self) -> Solver:
         if self.solver_name == "irls":

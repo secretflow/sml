@@ -95,8 +95,7 @@ def compute_poisson_log_components(
 
 
 class PoissonLogIRLSSolver(Solver):
-    """
-    Optimized IRLS solver for Poisson distribution with Log link.
+    """Optimized IRLS solver for Poisson distribution with Log link.
 
     Unlike Gamma + Log, the working weights W are NOT constant for Poisson.
     W = w * mu changes with each iteration as mu updates.
@@ -126,6 +125,8 @@ class PoissonLogIRLSSolver(Solver):
         enable_spu_cache: bool = False,
         enable_spu_reveal: bool = False,
     ) -> tuple[jax.Array, jax.Array | None, dict[str, Any] | None]:
+        # DEBUG: print solver type for verification
+        print(f"[DEBUG] Using solver: PoissonLogIRLSSolver (optimized)")
 
         is_early_stop_enabled = tol > 0.0
 
