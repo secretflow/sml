@@ -69,6 +69,9 @@ class GLM:
         Note: we assume the dispersion of the distribution is always 1, and the functionality of dispersion will be added by l2 regularization.
     fit_intercept : bool, default=True
         Whether to calculate the intercept for this model.
+    force_generic_solver : bool, default=False
+        If True, forces the use of the generic solver instead of any optimized solver
+        registered for the given family.
     """
 
     def __init__(
@@ -85,6 +88,7 @@ class GLM:
         batch_size: int = 1024,
         l2: float = 0.0,
         fit_intercept: bool = True,
+        force_generic_solver: bool = False,
     ):
         # Parameter validation
         if not isinstance(dist, Distribution):
@@ -119,6 +123,10 @@ class GLM:
             raise TypeError(
                 f"fit_intercept must be a boolean, got {type(fit_intercept).__name__}"
             )
+        if not isinstance(force_generic_solver, bool):
+            raise TypeError(
+                f"force_generic_solver must be a boolean, got {type(force_generic_solver).__name__}"
+            )
 
         self.dist = dist
         self.link = link
@@ -132,6 +140,7 @@ class GLM:
         self.batch_size = batch_size
         self.l2 = l2
         self.fit_intercept = fit_intercept
+        self.force_generic_solver = force_generic_solver
 
         self.family_: Family = Family(self.dist, self.link)
 
@@ -148,9 +157,10 @@ class GLM:
 
     def _get_solver(self) -> Solver:
         if self.solver_name == "irls":
-            solver = get_registered_solver(self.family_)
-            if solver is not None:
-                return solver
+            if not self.force_generic_solver:
+                solver = get_registered_solver(self.family_)
+                if solver is not None:
+                    return solver
 
             # fall back to default IRLS if no registered solver
             return IRLSSolver()

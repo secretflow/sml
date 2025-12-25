@@ -886,13 +886,17 @@ def test_glm_gamma_log_irls_spu():
 
     config = libspu.RuntimeConfig(
         protocol=libspu.ProtocolKind.SEMI2K,
-        field=libspu.FieldType.FM64,
+        field=libspu.FieldType.FM128,
+        fxp_fraction_bits=30,
     )
     config.enable_hal_profile = True
     config.enable_pphlo_profile = True
     # for FM64, EXP_PADE is more stable
     # for FM128, EXP_PRIME would be better
-    config.fxp_exp_mode = libspu.RuntimeConfig.ExpMode.EXP_PADE
+    # config.fxp_exp_mode = libspu.RuntimeConfig.ExpMode.EXP_PADE
+    config.fxp_exp_mode = libspu.RuntimeConfig.ExpMode.EXP_PRIME
+    config.experimental_enable_exp_prime = True
+    config.experimental_exp_prime_disable_lower_bound = True
 
     sim = spsim.Simulator(2, config)
 
@@ -905,6 +909,7 @@ def test_glm_gamma_log_irls_spu():
             max_iter=10,
             tol=0,  # no early stopping
             l2=0.01,
+            force_generic_solver=False,
         )
         model.fit(x, y, enable_spu_cache=True, y_scale=1.0, enable_spu_reveal=True)
         return model.coef_, model.intercept_
