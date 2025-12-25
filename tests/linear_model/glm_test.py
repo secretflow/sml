@@ -880,53 +880,345 @@ class TestGLMFeatures:
 # ==================== Test with SPU Class ====================
 
 
-def test_glm_gamma_log_irls_spu():
-    """Test Gamma GLM with Log link and IRLS solver in SPU."""
-    X, y, _, _ = generate_gamma_data()
+def _create_spu_config(field: libspu.FieldType) -> libspu.RuntimeConfig:
+    """
+    Create SPU runtime config based on field type.
 
+    FM64 uses EXP_PADE for stability, FM128 uses EXP_PRIME for better precision.
+    """
     config = libspu.RuntimeConfig(
         protocol=libspu.ProtocolKind.SEMI2K,
-        field=libspu.FieldType.FM128,
-        fxp_fraction_bits=30,
+        field=field,
+        fxp_fraction_bits=30 if field == libspu.FieldType.FM128 else 18,
     )
     config.enable_hal_profile = True
     config.enable_pphlo_profile = True
-    # for FM64, EXP_PADE is more stable
-    # for FM128, EXP_PRIME would be better
-    # config.fxp_exp_mode = libspu.RuntimeConfig.ExpMode.EXP_PADE
-    config.fxp_exp_mode = libspu.RuntimeConfig.ExpMode.EXP_PRIME
-    config.experimental_enable_exp_prime = True
-    config.experimental_exp_prime_disable_lower_bound = True
 
-    sim = spsim.Simulator(2, config)
+    if field == libspu.FieldType.FM64:
+        # FM64: EXP_PADE is more stable
+        config.fxp_exp_mode = libspu.RuntimeConfig.ExpMode.EXP_PADE
+    else:
+        # FM128: EXP_PRIME is better
+        config.fxp_exp_mode = libspu.RuntimeConfig.ExpMode.EXP_PRIME
+        config.experimental_enable_exp_prime = True
+        config.experimental_exp_prime_disable_lower_bound = True
 
-    def proc(x, y):
-        model = GLM(
-            dist=Gamma(),
-            link=LogLink(),
-            solver="irls",
-            fit_intercept=True,
-            max_iter=10,
-            tol=0,  # no early stopping
-            l2=0.01,
-            force_generic_solver=False,
-        )
-        model.fit(x, y, enable_spu_cache=True, y_scale=1.0, enable_spu_reveal=True)
-        return model.coef_, model.intercept_
+    return config
 
-    our_coef, our_intercept = spsim.sim_jax(sim, proc)(X, y)
 
-    X_sm = sm.add_constant(np.array(X))
-    sm_model = sm.GLM(
-        np.array(y), X_sm, family=sm_family.Gamma(link=sm_links.Log())
-    ).fit()
+# Pre-create simulators for both field types (module-level for reuse)
+_SIM_FM64 = None
+_SIM_FM128 = None
 
-    sm_coef = sm_model.params[1:]
-    sm_intercept = sm_model.params[0]
 
-    print("Gamma+Log IRLS (SPU) vs statsmodels:")
-    print(f"SPU Gamma+Log IRLS Coef: {our_coef}, Intercept: {our_intercept}")
-    print(f"SM Gamma+Log Coef: {sm_coef}, Intercept: {sm_intercept}")
+def _get_simulator(field: libspu.FieldType) -> spsim.Simulator:
+    """Get or create simulator for the given field type."""
+    global _SIM_FM64, _SIM_FM128
 
-    np.testing.assert_allclose(our_coef, sm_coef, rtol=0.1, atol=0.05)
-    np.testing.assert_allclose(our_intercept, sm_intercept, rtol=0.1, atol=0.05)
+    if field == libspu.FieldType.FM64:
+        if _SIM_FM64 is None:
+            _SIM_FM64 = spsim.Simulator(2, _create_spu_config(field))
+        return _SIM_FM64
+    else:
+        if _SIM_FM128 is None:
+            _SIM_FM128 = spsim.Simulator(2, _create_spu_config(field))
+        return _SIM_FM128
+
+
+# Test parameters: (field, force_generic_solver)
+SPU_TEST_PARAMS = [
+    pytest.param(libspu.FieldType.FM64, False, id="FM64-optimized"),
+    pytest.param(libspu.FieldType.FM64, True, id="FM64-generic"),
+    pytest.param(libspu.FieldType.FM128, False, id="FM128-optimized"),
+    pytest.param(libspu.FieldType.FM128, True, id="FM128-generic"),
+]
+
+
+@pytest.mark.skipif(not HAS_STATSMODELS, reason="statsmodels not installed")
+class TestGLMwithSPU:
+    """Test GLM with SPU simulation for all registered optimized solvers."""
+
+    @pytest.mark.parametrize("field,force_generic", SPU_TEST_PARAMS)
+    def test_gaussian_identity_spu(self, field, force_generic):
+        """Test Gaussian+Identity IRLS solver in SPU."""
+        X, y, _, _ = generate_normal_data()
+        sim = _get_simulator(field)
+
+        def proc(x, y):
+            model = GLM(
+                dist=Normal(),
+                link=IdentityLink(),
+                solver="irls",
+                fit_intercept=True,
+                max_iter=10,
+                tol=0,
+                l2=0.01,
+                force_generic_solver=force_generic,
+            )
+            model.fit(x, y, enable_spu_cache=True, y_scale=1.0, enable_spu_reveal=True)
+            return model.coef_, model.intercept_
+
+        our_coef, our_intercept = spsim.sim_jax(sim, proc)(X, y)
+
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(np.array(y), X_sm, family=sm_family.Gaussian()).fit()
+
+        sm_coef = sm_model.params[1:]
+        sm_intercept = sm_model.params[0]
+
+        field_name = "FM64" if field == libspu.FieldType.FM64 else "FM128"
+        solver_type = "generic" if force_generic else "optimized"
+        print(f"\nGaussian+Identity IRLS (SPU {field_name}, {solver_type}):")
+        print(f"  SPU Coef: {our_coef}, Intercept: {our_intercept:.4f}")
+        print(f"  SM Coef: {sm_coef}, Intercept: {sm_intercept:.4f}")
+
+        # Relaxed tolerance for FM64
+        rtol, atol = (0.15, 0.1) if field == libspu.FieldType.FM64 else (0.1, 0.05)
+        np.testing.assert_allclose(our_coef, sm_coef, rtol=rtol, atol=atol)
+        np.testing.assert_allclose(our_intercept, sm_intercept, rtol=rtol, atol=atol)
+
+    @pytest.mark.parametrize("field,force_generic", SPU_TEST_PARAMS)
+    def test_poisson_log_spu(self, field, force_generic):
+        """Test Poisson+Log IRLS solver in SPU."""
+        X, y, _, _ = generate_poisson_data()
+        sim = _get_simulator(field)
+
+        def proc(x, y):
+            model = GLM(
+                dist=Poisson(),
+                link=LogLink(),
+                solver="irls",
+                fit_intercept=True,
+                max_iter=10,
+                tol=0,
+                l2=0.01,
+                force_generic_solver=force_generic,
+            )
+            model.fit(x, y, enable_spu_cache=True, y_scale=1.0, enable_spu_reveal=True)
+            return model.coef_, model.intercept_
+
+        our_coef, our_intercept = spsim.sim_jax(sim, proc)(X, y)
+
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(np.array(y), X_sm, family=sm_family.Poisson()).fit()
+
+        sm_coef = sm_model.params[1:]
+        sm_intercept = sm_model.params[0]
+
+        field_name = "FM64" if field == libspu.FieldType.FM64 else "FM128"
+        solver_type = "generic" if force_generic else "optimized"
+        print(f"\nPoisson+Log IRLS (SPU {field_name}, {solver_type}):")
+        print(f"  SPU Coef: {our_coef}, Intercept: {our_intercept:.4f}")
+        print(f"  SM Coef: {sm_coef}, Intercept: {sm_intercept:.4f}")
+
+        rtol, atol = (0.15, 0.1) if field == libspu.FieldType.FM64 else (0.1, 0.05)
+        np.testing.assert_allclose(our_coef, sm_coef, rtol=rtol, atol=atol)
+        np.testing.assert_allclose(our_intercept, sm_intercept, rtol=rtol, atol=atol)
+
+    @pytest.mark.parametrize("field,force_generic", SPU_TEST_PARAMS)
+    def test_bernoulli_logit_spu(self, field, force_generic):
+        """Test Bernoulli+Logit IRLS solver in SPU."""
+        X, y, _, _ = generate_bernoulli_data()
+        sim = _get_simulator(field)
+
+        def proc(x, y):
+            model = GLM(
+                dist=Bernoulli(),
+                link=LogitLink(),
+                solver="irls",
+                fit_intercept=True,
+                max_iter=15,
+                tol=0,
+                l2=0.01,
+                force_generic_solver=force_generic,
+            )
+            model.fit(x, y, enable_spu_cache=True, y_scale=1.0, enable_spu_reveal=True)
+            return model.coef_, model.intercept_
+
+        our_coef, our_intercept = spsim.sim_jax(sim, proc)(X, y)
+
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(np.array(y), X_sm, family=sm_family.Binomial()).fit()
+
+        sm_coef = sm_model.params[1:]
+        sm_intercept = sm_model.params[0]
+
+        field_name = "FM64" if field == libspu.FieldType.FM64 else "FM128"
+        solver_type = "generic" if force_generic else "optimized"
+        print(f"\nBernoulli+Logit IRLS (SPU {field_name}, {solver_type}):")
+        print(f"  SPU Coef: {our_coef}, Intercept: {our_intercept:.4f}")
+        print(f"  SM Coef: {sm_coef}, Intercept: {sm_intercept:.4f}")
+
+        # Logistic regression may need more tolerance
+        rtol, atol = (0.2, 0.15) if field == libspu.FieldType.FM64 else (0.15, 0.1)
+        np.testing.assert_allclose(our_coef, sm_coef, rtol=rtol, atol=atol)
+        np.testing.assert_allclose(our_intercept, sm_intercept, rtol=rtol, atol=atol)
+
+    @pytest.mark.parametrize("field,force_generic", SPU_TEST_PARAMS)
+    def test_gamma_log_spu(self, field, force_generic):
+        """Test Gamma+Log IRLS solver in SPU."""
+        X, y, _, _ = generate_gamma_data()
+        sim = _get_simulator(field)
+
+        def proc(x, y):
+            model = GLM(
+                dist=Gamma(),
+                link=LogLink(),
+                solver="irls",
+                fit_intercept=True,
+                max_iter=10,
+                tol=0,
+                l2=0.01,
+                force_generic_solver=force_generic,
+            )
+            model.fit(x, y, enable_spu_cache=True, y_scale=1.0, enable_spu_reveal=True)
+            return model.coef_, model.intercept_
+
+        our_coef, our_intercept = spsim.sim_jax(sim, proc)(X, y)
+
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(
+            np.array(y), X_sm, family=sm_family.Gamma(link=sm_links.Log())
+        ).fit()
+
+        sm_coef = sm_model.params[1:]
+        sm_intercept = sm_model.params[0]
+
+        field_name = "FM64" if field == libspu.FieldType.FM64 else "FM128"
+        solver_type = "generic" if force_generic else "optimized"
+        print(f"\nGamma+Log IRLS (SPU {field_name}, {solver_type}):")
+        print(f"  SPU Coef: {our_coef}, Intercept: {our_intercept:.4f}")
+        print(f"  SM Coef: {sm_coef}, Intercept: {sm_intercept:.4f}")
+
+        rtol, atol = (0.15, 0.1) if field == libspu.FieldType.FM64 else (0.1, 0.05)
+        np.testing.assert_allclose(our_coef, sm_coef, rtol=rtol, atol=atol)
+        np.testing.assert_allclose(our_intercept, sm_intercept, rtol=rtol, atol=atol)
+
+    @pytest.mark.parametrize("field,force_generic", SPU_TEST_PARAMS)
+    def test_gamma_inverse_spu(self, field, force_generic):
+        """Test Gamma+Inverse IRLS solver in SPU."""
+        # Use data with less variance for numerical stability with inverse link
+        X, y, _, _ = generate_gamma_data(shape=20.0)
+        sim = _get_simulator(field)
+
+        def proc(x, y):
+            model = GLM(
+                dist=Gamma(),
+                link=ReciprocalLink(),
+                solver="irls",
+                fit_intercept=True,
+                max_iter=15,
+                tol=0,
+                l2=0.05,  # Stronger regularization for stability
+                force_generic_solver=force_generic,
+            )
+            model.fit(x, y, enable_spu_cache=True, y_scale=1.0, enable_spu_reveal=True)
+            return model.coef_, model.intercept_
+
+        our_coef, our_intercept = spsim.sim_jax(sim, proc)(X, y)
+
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(
+            np.array(y), X_sm, family=sm_family.Gamma(link=sm_links.InversePower())
+        ).fit()
+
+        sm_coef = sm_model.params[1:]
+        sm_intercept = sm_model.params[0]
+
+        field_name = "FM64" if field == libspu.FieldType.FM64 else "FM128"
+        solver_type = "generic" if force_generic else "optimized"
+        print(f"\nGamma+Inverse IRLS (SPU {field_name}, {solver_type}):")
+        print(f"  SPU Coef: {our_coef}, Intercept: {our_intercept:.4f}")
+        print(f"  SM Coef: {sm_coef}, Intercept: {sm_intercept:.4f}")
+
+        # Inverse link is numerically challenging, use relaxed tolerance
+        rtol, atol = (0.3, 0.2) if field == libspu.FieldType.FM64 else (0.2, 0.15)
+        np.testing.assert_allclose(our_coef, sm_coef, rtol=rtol, atol=atol)
+        np.testing.assert_allclose(our_intercept, sm_intercept, rtol=rtol, atol=atol)
+
+    @pytest.mark.parametrize("field,force_generic", SPU_TEST_PARAMS)
+    def test_tweedie_log_spu(self, field, force_generic):
+        """Test Tweedie+Log IRLS solver in SPU (power=1.5)."""
+        # Use Gamma-like data for Tweedie
+        X, y, _, _ = generate_gamma_data(shape=10.0)
+        sim = _get_simulator(field)
+        power = 1.5
+
+        def proc(x, y):
+            model = GLM(
+                dist=Tweedie(power=power),
+                link=LogLink(),
+                solver="irls",
+                fit_intercept=True,
+                max_iter=10,
+                tol=0,
+                l2=0.01,
+                force_generic_solver=force_generic,
+            )
+            model.fit(x, y, enable_spu_cache=True, y_scale=1.0, enable_spu_reveal=True)
+            return model.coef_, model.intercept_
+
+        our_coef, our_intercept = spsim.sim_jax(sim, proc)(X, y)
+
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(
+            np.array(y),
+            X_sm,
+            family=sm_family.Tweedie(var_power=power, link=sm_links.Log()),
+        ).fit()
+
+        sm_coef = sm_model.params[1:]
+        sm_intercept = sm_model.params[0]
+
+        field_name = "FM64" if field == libspu.FieldType.FM64 else "FM128"
+        solver_type = "generic" if force_generic else "optimized"
+        print(f"\nTweedie(p={power})+Log IRLS (SPU {field_name}, {solver_type}):")
+        print(f"  SPU Coef: {our_coef}, Intercept: {our_intercept:.4f}")
+        print(f"  SM Coef: {sm_coef}, Intercept: {sm_intercept:.4f}")
+
+        rtol, atol = (0.15, 0.1) if field == libspu.FieldType.FM64 else (0.1, 0.05)
+        np.testing.assert_allclose(our_coef, sm_coef, rtol=rtol, atol=atol)
+        np.testing.assert_allclose(our_intercept, sm_intercept, rtol=rtol, atol=atol)
+
+    @pytest.mark.parametrize("field,force_generic", SPU_TEST_PARAMS)
+    def test_tweedie_log_power_1_7_spu(self, field, force_generic):
+        """Test Tweedie+Log IRLS solver in SPU with different power (1.7)."""
+        X, y, _, _ = generate_gamma_data(shape=8.0)
+        sim = _get_simulator(field)
+        power = 1.7
+
+        def proc(x, y):
+            model = GLM(
+                dist=Tweedie(power=power),
+                link=LogLink(),
+                solver="irls",
+                fit_intercept=True,
+                max_iter=10,
+                tol=0,
+                l2=0.01,
+                force_generic_solver=force_generic,
+            )
+            model.fit(x, y, enable_spu_cache=True, y_scale=1.0, enable_spu_reveal=True)
+            return model.coef_, model.intercept_
+
+        our_coef, our_intercept = spsim.sim_jax(sim, proc)(X, y)
+
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(
+            np.array(y),
+            X_sm,
+            family=sm_family.Tweedie(var_power=power, link=sm_links.Log()),
+        ).fit()
+
+        sm_coef = sm_model.params[1:]
+        sm_intercept = sm_model.params[0]
+
+        field_name = "FM64" if field == libspu.FieldType.FM64 else "FM128"
+        solver_type = "generic" if force_generic else "optimized"
+        print(f"\nTweedie(p={power})+Log IRLS (SPU {field_name}, {solver_type}):")
+        print(f"  SPU Coef: {our_coef}, Intercept: {our_intercept:.4f}")
+        print(f"  SM Coef: {sm_coef}, Intercept: {sm_intercept:.4f}")
+
+        rtol, atol = (0.15, 0.1) if field == libspu.FieldType.FM64 else (0.1, 0.05)
+        np.testing.assert_allclose(our_coef, sm_coef, rtol=rtol, atol=atol)
+        np.testing.assert_allclose(our_intercept, sm_intercept, rtol=rtol, atol=atol)
