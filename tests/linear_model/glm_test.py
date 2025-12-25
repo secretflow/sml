@@ -1321,3 +1321,68 @@ class TestGLMwithSPU:
         rtol, atol = (0.3, 0.25) if field == libspu.FieldType.FM64 else (0.2, 0.15)
         np.testing.assert_allclose(our_coef, sm_coef, rtol=rtol, atol=atol)
         np.testing.assert_allclose(our_intercept, sm_intercept, rtol=rtol, atol=atol)
+
+    # ==================== Tests with Offset and Sample Weights ====================
+
+    @pytest.mark.parametrize("field,force_generic", SPU_TEST_PARAMS)
+    def test_gamma_log_with_offset_and_weights_spu(self, field, force_generic):
+        """Test Gamma+Log IRLS solver in SPU with offset and sample_weight."""
+        X, y, _, _ = generate_gamma_data(shape=10.0)
+        n_samples = X.shape[0]
+        sim = _get_simulator(field)
+
+        # Create offset and sample weights
+        key = jax.random.PRNGKey(123)
+        offset = jax.random.uniform(key, (n_samples,), minval=-0.5, maxval=0.5)
+        # Sample weights: some samples weighted more than others
+        weights = jnp.ones(n_samples)
+        weights = weights.at[: n_samples // 2].set(2.0)
+
+        def proc(x, y, offset, weights):
+            model = GLM(
+                dist=Gamma(),
+                link=LogLink(),
+                solver="irls",
+                fit_intercept=True,
+                max_iter=10,
+                tol=0,
+                l2=0.01,
+                force_generic_solver=force_generic,
+            )
+            model.fit(
+                x,
+                y,
+                offset=offset,
+                sample_weight=weights,
+                enable_spu_cache=True,
+                y_scale=1.0,
+                enable_spu_reveal=True,
+            )
+            return model.coef_, model.intercept_
+
+        our_coef, our_intercept = spsim.sim_jax(sim, proc)(X, y, offset, weights)
+
+        # Fit statsmodels with offset and weights
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(
+            np.array(y),
+            X_sm,
+            family=sm_family.Gamma(link=sm_links.Log()),
+            offset=np.array(offset),
+            freq_weights=np.array(weights),
+        ).fit()
+
+        sm_coef = sm_model.params[1:]
+        sm_intercept = sm_model.params[0]
+
+        field_name = "FM64" if field == libspu.FieldType.FM64 else "FM128"
+        solver_type = "generic" if force_generic else "optimized"
+        print(
+            f"\nGamma+Log IRLS with offset+weights (SPU {field_name}, {solver_type}):"
+        )
+        print(f"  SPU Coef: {our_coef}, Intercept: {our_intercept:.4f}")
+        print(f"  SM Coef: {sm_coef}, Intercept: {sm_intercept:.4f}")
+
+        rtol, atol = (0.2, 0.15) if field == libspu.FieldType.FM64 else (0.15, 0.1)
+        np.testing.assert_allclose(our_coef, sm_coef, rtol=rtol, atol=atol)
+        np.testing.assert_allclose(our_intercept, sm_intercept, rtol=rtol, atol=atol)
