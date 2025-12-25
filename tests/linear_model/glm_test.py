@@ -612,7 +612,7 @@ class TestGLMvsStatsmodelsPlaintext:
             ), f"Tweedie+Log(p={power}) solver should be registered"
             # Verify the solver has correct power
             assert (
-                solver.power == power
+                solver.power == power  # type: ignore
             ), f"TweedieLogIRLSSolver should have power={power}"
 
         # Check all new solvers are registered
@@ -808,6 +808,8 @@ class TestGLMFeatures:
         # Fit with regularization
         model_reg = GLM(dist=Poisson(), solver="irls", fit_intercept=True, l2=1.0)
         model_reg.fit(X, y, enable_spu_cache=False, y_scale=1.0)
+        assert model_reg.coef_ is not None
+        assert model_noreg.coef_ is not None
 
         # Regularized coefficients should be smaller in magnitude
         assert jnp.sum(model_reg.coef_**2) < jnp.sum(model_noreg.coef_**2)
@@ -1220,5 +1222,102 @@ class TestGLMwithSPU:
         print(f"  SM Coef: {sm_coef}, Intercept: {sm_intercept:.4f}")
 
         rtol, atol = (0.15, 0.1) if field == libspu.FieldType.FM64 else (0.1, 0.05)
+        np.testing.assert_allclose(our_coef, sm_coef, rtol=rtol, atol=atol)
+        np.testing.assert_allclose(our_intercept, sm_intercept, rtol=rtol, atol=atol)
+
+    # ==================== SGD Tests in SPU ====================
+
+    @pytest.mark.parametrize(
+        "field",
+        [
+            pytest.param(libspu.FieldType.FM64, id="FM64"),
+            pytest.param(libspu.FieldType.FM128, id="FM128"),
+        ],
+    )
+    def test_gamma_log_sgd_spu(self, field):
+        """Test Gamma+Log SGD solver in SPU."""
+        X, y, _, _ = generate_gamma_data(shape=10.0)
+        sim = _get_simulator(field)
+
+        def proc(x, y):
+            model = GLM(
+                dist=Gamma(),
+                link=LogLink(),
+                solver="sgd",
+                fit_intercept=True,
+                max_iter=100,
+                learning_rate=0.01,
+                batch_size=32,
+                l2=0.01,
+            )
+            model.fit(x, y, enable_spu_cache=True, y_scale=1.0, enable_spu_reveal=True)
+            return model.coef_, model.intercept_
+
+        our_coef, our_intercept = spsim.sim_jax(sim, proc)(X, y)
+
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(
+            np.array(y), X_sm, family=sm_family.Gamma(link=sm_links.Log())
+        ).fit()
+
+        sm_coef = sm_model.params[1:]
+        sm_intercept = sm_model.params[0]
+
+        field_name = "FM64" if field == libspu.FieldType.FM64 else "FM128"
+        print(f"\nGamma+Log SGD (SPU {field_name}):")
+        print(f"  SPU Coef: {our_coef}, Intercept: {our_intercept:.4f}")
+        print(f"  SM Coef: {sm_coef}, Intercept: {sm_intercept:.4f}")
+
+        # SGD typically has larger variance, use relaxed tolerance
+        rtol, atol = (0.25, 0.2) if field == libspu.FieldType.FM64 else (0.2, 0.15)
+        np.testing.assert_allclose(our_coef, sm_coef, rtol=rtol, atol=atol)
+        np.testing.assert_allclose(our_intercept, sm_intercept, rtol=rtol, atol=atol)
+
+    # ==================== Generic Solver Tests (No Optimized Solver) ====================
+
+    @pytest.mark.parametrize("field,force_generic", SPU_TEST_PARAMS)
+    def test_inverse_gaussian_log_spu(self, field, force_generic):
+        """
+        Test InverseGaussian+Log IRLS solver in SPU.
+
+        This distribution+link combination has NO optimized solver registered,
+        so it always uses the generic IRLS solver regardless of force_generic_solver.
+        We still test both values to verify the fallback mechanism works correctly.
+        """
+        X, y, _, _ = generate_inverse_gaussian_data(lam=20.0)
+        sim = _get_simulator(field)
+
+        def proc(x, y):
+            model = GLM(
+                dist=InverseGaussian(),
+                link=LogLink(),
+                solver="irls",
+                fit_intercept=True,
+                max_iter=10,
+                tol=0.001,
+                l2=0.05,  # Stronger regularization for numerical stability
+                force_generic_solver=force_generic,
+            )
+            model.fit(x, y, enable_spu_cache=True, y_scale=1.0, enable_spu_reveal=True)
+            return model.coef_, model.intercept_
+
+        our_coef, our_intercept = spsim.sim_jax(sim, proc)(X, y)
+
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(
+            np.array(y), X_sm, family=sm_family.InverseGaussian(link=sm_links.Log())
+        ).fit()
+
+        sm_coef = sm_model.params[1:]
+        sm_intercept = sm_model.params[0]
+
+        field_name = "FM64" if field == libspu.FieldType.FM64 else "FM128"
+        solver_type = "generic" if force_generic else "optimized(fallback to generic)"
+        print(f"\nInverseGaussian+Log IRLS (SPU {field_name}, {solver_type}):")
+        print(f"  SPU Coef: {our_coef}, Intercept: {our_intercept:.4f}")
+        print(f"  SM Coef: {sm_coef}, Intercept: {sm_intercept:.4f}")
+
+        # InverseGaussian is numerically challenging, use relaxed tolerance
+        rtol, atol = (0.3, 0.25) if field == libspu.FieldType.FM64 else (0.2, 0.15)
         np.testing.assert_allclose(our_coef, sm_coef, rtol=rtol, atol=atol)
         np.testing.assert_allclose(our_intercept, sm_intercept, rtol=rtol, atol=atol)
