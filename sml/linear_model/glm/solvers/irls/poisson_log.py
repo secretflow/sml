@@ -23,15 +23,19 @@ For Poisson + Log (canonical link):
 - g'(mu) = 1/mu (link derivative)
 
 Working weights: W = w / (V(mu) * g'(mu)^2) = w / (mu * (1/mu)^2) = w * mu
-Working response: z = eta + (y - mu) * g'(mu) = eta + (y - mu) / mu = eta + y/mu - 1
+               = w * exp(eta)
+Working response: z = eta + (y - mu) * g'(mu) = eta + (y - mu) / mu
+                = eta + y * exp(-eta) - 1
 
 Key Optimization:
 -----------------
-The gradient simplifies beautifully for canonical link:
-c_i = w_i (SGD auxiliary vector is just sample weights!)
-gradient = X'(w * (y - mu))
+Unlike Gamma + Log, the working weights W are NOT constant for Poisson.
+W = w * mu changes with each iteration as mu updates.
 
-For IRLS, W = w * mu is computed directly from eta: W = w * exp(eta)
+However, the computation is still optimized by:
+1. Computing W directly from eta: W = w * exp(eta)
+2. Working response z = eta + y * exp(-eta) - 1 avoids intermediate mu division
+3. Using numerically stable formulations with exp(-eta) instead of 1/mu
 """
 
 from typing import Any
@@ -44,7 +48,7 @@ from sml.linear_model.glm.solvers.base import Solver
 from sml.linear_model.glm.solvers.utils import (
     add_intercept,
     check_convergence,
-    invert_matrix,
+    solve_wls,
 )
 from sml.utils import sml_drop_cached_var, sml_make_cached_var, sml_reveal
 
@@ -58,7 +62,7 @@ def compute_poisson_log_components(
     Compute optimized IRLS components for Poisson + Log.
 
     For Poisson + Log:
-    - W = w * mu = w * exp(eta)
+    - W = w * exp(eta)
     - z = eta + y * exp(-eta) - 1
 
     Parameters
@@ -77,16 +81,14 @@ def compute_poisson_log_components(
     z : jax.Array
         Working response.
     """
-    n_samples = y.shape[0]
-
     # Working weights: W = w * mu = w * exp(eta)
-    mu = jnp.exp(eta)
-    if sample_weight is not None:
-        w = sample_weight * mu
-    else:
-        w = mu
+    # We explicitly use jnp.exp because SPU can compute it efficiently
+    w = jnp.exp(eta)
 
-    # Working response: z = eta + y/mu - 1 = eta + y * exp(-eta) - 1
+    if sample_weight is not None:
+        w = w * sample_weight
+
+    # Working response: z = eta + y * exp(-eta) - 1
     z = eta + y * jnp.exp(-eta) - 1.0
 
     return w, z
@@ -96,10 +98,13 @@ class PoissonLogIRLSSolver(Solver):
     """
     Optimized IRLS solver for Poisson distribution with Log link.
 
-    Key Optimization:
-    -----------------
-    - Working weights W = w * exp(eta) computed directly
-    - Working response z = eta + y * exp(-eta) - 1 avoids intermediate mu
+    Unlike Gamma + Log, the working weights W are NOT constant for Poisson.
+    W = w * mu changes with each iteration as mu updates.
+
+    However, the computation is still optimized by:
+    1. Computing W directly from eta: W = w * exp(eta)
+    2. Avoiding intermediate mu calculations where possible
+    3. Using numerically stable formulations
     """
 
     def solve(
@@ -124,104 +129,113 @@ class PoissonLogIRLSSolver(Solver):
 
         is_early_stop_enabled = tol > 0.0
 
-        # 1. Preprocessing - squeeze y/offset/sample_weight if 2D (from model.py)
-        if y.ndim > 1:
-            y = jnp.squeeze(y)
-        if offset is not None and offset.ndim > 1:
-            offset = jnp.squeeze(offset)
-        if sample_weight is not None and sample_weight.ndim > 1:
-            sample_weight = jnp.squeeze(sample_weight)
-
+        # 1. Preprocessing
         if fit_intercept:
             X_train = add_intercept(X)
         else:
             X_train = X
 
-        n_samples, n_features = X_train.shape
+        _, n_features = X_train.shape
 
         if enable_spu_cache:
             X_train = sml_make_cached_var(X_train)
+            y = sml_make_cached_var(y)
+            if sample_weight is not None:
+                sample_weight = sml_make_cached_var(sample_weight)
 
-        # 2. Initialize beta (use log(mean(y)) for intercept)
-        beta = jnp.zeros(n_features)
-        if fit_intercept:
-            y_mean = jnp.mean(y)
-            y_mean = jnp.maximum(y_mean, 1e-6)
-            beta = beta.at[-1].set(jnp.log(y_mean))
+        # 2. R-style Initialization
+        # Directly compute w and z without redundant exp/log
+        # mu_init -> eta = log(mu_init) -> w = exp(eta) = mu_init (redundant!)
+        mu_init = family.distribution.starting_mu(y)
+        eta = jnp.log(mu_init)
 
-        # 3. Setup base sample weights
+        # w = exp(eta) = mu_init, z = eta + y / mu_init - 1
         if sample_weight is not None:
-            base_w = sample_weight
+            w = mu_init * sample_weight
         else:
-            base_w = jnp.ones(n_samples)
+            w = mu_init
+        z = eta + y / mu_init - 1.0
 
-        # 4. L2 regularization matrix
-        reg_matrix = l2 * jnp.eye(n_features)
-        if fit_intercept:
-            reg_matrix = reg_matrix.at[-1, -1].set(0.0)
+        beta = solve_wls(
+            X_train,
+            z,
+            w,
+            n_features,
+            l2,
+            fit_intercept,
+            enable_spu_cache,
+            enable_spu_reveal,
+        )
 
-        # 5. IRLS iterations
-        history = {"deviance": [], "beta_diff": []}
-        converged = False
+        # 3. Main optimization loop
+        if is_early_stop_enabled:
+            init_val = (beta, False, 1)
 
-        for iteration in range(max_iter):
-            beta_old = beta
+            def cond_fun(val):
+                _, converged, iter_num = val
+                return jnp.logical_and(iter_num < max_iter, jnp.logical_not(converged))
 
-            # Compute linear predictor
-            eta = jnp.matmul(X_train, beta)
-            if offset is not None:
-                eta = eta + offset
+            def body_fun(val):
+                beta, _, iter_num = val
 
-            # Clamp eta for numerical stability
-            eta = jnp.clip(eta, -20.0, 20.0)
+                # Compute eta from current beta
+                eta = jnp.matmul(X_train, beta)
+                if offset is not None:
+                    eta = eta + offset
 
-            # Compute working weights and response
-            w, z = compute_poisson_log_components(y, eta, base_w)
+                # Compute optimized components
+                w, z = compute_poisson_log_components(y, eta, sample_weight)
 
-            # Build IRLS system: (X'WX + lambda*phi*I) beta = X'Wz
-            # For Poisson, phi = 1 (theoretically)
-            xtw = jnp.transpose(X_train * w.reshape((-1, 1)))
-            xtwx = jnp.matmul(xtw, X_train)
-            lhs = xtwx + reg_matrix
-            rhs = jnp.matmul(xtw, z)
+                # Solve WLS
+                beta_new = solve_wls(
+                    X_train,
+                    z,
+                    w,
+                    n_features,
+                    l2,
+                    fit_intercept,
+                    enable_spu_cache,
+                    enable_spu_reveal,
+                )
 
-            # Solve
-            H_inv = invert_matrix(
-                lhs, iter_round=20, enable_spu_reveal=enable_spu_reveal
+                # Check convergence
+                converged = check_convergence(beta_new, beta, stopping_rule, tol)
+                converged = sml_reveal(converged)  # type: ignore
+
+                return (beta_new, converged, iter_num + 1)
+
+            beta_final, converged, n_iter = jax.lax.while_loop(
+                cond_fun, body_fun, init_val
             )
-            beta = jnp.matmul(H_inv, rhs)
+        else:
+            # Fixed iterations using fori_loop
+            def fixed_iter_body(_, beta):
+                eta = jnp.matmul(X_train, beta)
+                if offset is not None:
+                    eta = eta + offset
 
-            # Check convergence
-            if is_early_stop_enabled:
-                beta_diff = jnp.max(jnp.abs(beta - beta_old))
-                history["beta_diff"].append(float(beta_diff))
+                w, z = compute_poisson_log_components(y, eta, sample_weight)
+                return solve_wls(
+                    X_train,
+                    z,
+                    w,
+                    n_features,
+                    l2,
+                    fit_intercept,
+                    enable_spu_cache,
+                    enable_spu_reveal,
+                )
 
-                if enable_spu_reveal:
-                    beta_diff_revealed = sml_reveal(beta_diff)
-                    if check_convergence(beta, beta_old, stopping_rule, tol):
-                        converged = True
-                        break
-                else:
-                    if check_convergence(beta, beta_old, stopping_rule, tol):
-                        converged = True
-                        break
+            beta_final = jax.lax.fori_loop(0, max_iter, fixed_iter_body, beta)
+            converged, n_iter = False, max_iter
 
-        # 6. Compute final dispersion (should be ~1 for Poisson)
-        eta = jnp.matmul(X_train, beta)
-        if offset is not None:
-            eta = eta + offset
-        mu = jnp.exp(jnp.clip(eta, -20.0, 20.0))
-
-        # Pearson chi-squared for dispersion
-        pearson_resid = (y - mu) / jnp.sqrt(mu + 1e-10)
-        phi = jnp.sum(base_w * pearson_resid**2) / (n_samples - n_features)
-
-        # 7. Cleanup
+        # 4. Cleanup
         if enable_spu_cache:
-            sml_drop_cached_var(X_train)
+            X_train = sml_drop_cached_var(X_train)
+            y = sml_drop_cached_var(y)
+            if sample_weight is not None:
+                sample_weight = sml_drop_cached_var(sample_weight)
 
-        history["n_iter"] = iteration + 1
-        history["converged"] = converged
-        history["phi"] = float(phi)
+        history = {"n_iter": n_iter, "converged": converged}
 
-        return beta, phi, history
+        return beta_final, None, history

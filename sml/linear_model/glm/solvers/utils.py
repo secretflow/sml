@@ -16,7 +16,7 @@
 import jax
 import jax.numpy as jnp
 
-from sml.utils import sml_reveal
+from sml.utils import sml_drop_cached_var, sml_make_cached_var, sml_reveal
 
 
 def add_intercept(X: jax.Array) -> jax.Array:
@@ -129,3 +129,67 @@ def check_convergence(
         return rel_change < tol
     else:
         raise NotImplementedError(f"Stopping rule {stopping_rule} not implemented.")
+
+
+def solve_wls(
+    X: jax.Array,
+    z: jax.Array,
+    w: jax.Array,
+    n_features: int,
+    l2: float = 0.0,
+    fit_intercept: bool = True,
+    enable_spu_cache: bool = False,
+    enable_spu_reveal: bool = False,
+) -> jax.Array:
+    """
+    Solve weighted least squares: beta = (X'WX + l2*I)^{-1} X'Wz
+
+    This is a common utility function used by optimized IRLS solvers.
+
+    Parameters
+    ----------
+    X : jax.Array
+        Design matrix (with intercept column if fit_intercept=True).
+    z : jax.Array
+        Working response vector.
+    w : jax.Array
+        Working weights vector.
+    n_features : int
+        Number of features (including intercept if applicable).
+    l2 : float
+        L2 regularization strength.
+    fit_intercept : bool
+        Whether intercept is included (last column of X).
+    enable_spu_cache : bool
+        Whether to enable SPU caching for intermediate variables.
+    enable_spu_reveal : bool
+        Whether to reveal intermediate results in SPU for higher performance.
+
+    Returns
+    -------
+    beta : jax.Array
+        Coefficient estimates.
+    """
+    # Compute X'W
+    xtw = jnp.transpose(X * w.reshape((-1, 1)))
+
+    if enable_spu_cache:
+        xtw = sml_make_cached_var(xtw)
+
+    # Compute Hessian H = X'WX and score = X'Wz
+    H = jnp.matmul(xtw, X)
+    score = jnp.matmul(xtw, z)
+
+    if enable_spu_cache:
+        xtw = sml_drop_cached_var(xtw)
+
+    # Apply L2 regularization (not on intercept)
+    if l2 > 0:
+        diag_indices = jnp.diag_indices(n_features)
+        H = H.at[diag_indices].add(l2)
+        if fit_intercept:
+            H = H.at[n_features - 1, n_features - 1].add(-l2)
+
+    # Solve for beta
+    H_inv = invert_matrix(H, iter_round=20, enable_spu_reveal=enable_spu_reveal)
+    return jnp.matmul(H_inv, score)

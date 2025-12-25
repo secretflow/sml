@@ -48,7 +48,7 @@ from sml.linear_model.glm.solvers.base import Solver
 from sml.linear_model.glm.solvers.utils import (
     add_intercept,
     check_convergence,
-    invert_matrix,
+    solve_wls,
 )
 from sml.utils import sml_drop_cached_var, sml_make_cached_var, sml_reveal
 
@@ -92,6 +92,7 @@ def compute_tweedie_log_components(
     if sample_weight is not None:
         w = w * sample_weight
 
+    # we explicitly use jnp.exp because SPU can compute it efficiently for some protocols
     # Working response: z = eta + y * exp(-eta) - 1
     z = eta + y * jnp.exp(-eta) - 1.0
 
@@ -160,17 +161,17 @@ class TweedieLogIRLSSolver(Solver):
 
         if enable_spu_cache:
             X_train = sml_make_cached_var(X_train)
+            y = sml_make_cached_var(y)
+            if sample_weight is not None:
+                sample_weight = sml_make_cached_var(sample_weight)
 
         # 2. R-style Initialization
-        # For Tweedie, starting_mu = max(y, small_value)
-        mu_init = jnp.maximum(y, 1e-4)
+        mu_init = family.distribution.starting_mu(y)
         eta = jnp.log(mu_init)
-        if offset is not None:
-            eta = eta - offset
 
         # Compute initial components and solve
         w, z = compute_tweedie_log_components(y, eta, power, sample_weight)
-        beta = self._solve_wls(
+        beta = solve_wls(
             X_train,
             z,
             w,
@@ -201,7 +202,7 @@ class TweedieLogIRLSSolver(Solver):
                 w, z = compute_tweedie_log_components(y, eta, power, sample_weight)
 
                 # Solve WLS
-                beta_new = self._solve_wls(
+                beta_new = solve_wls(
                     X_train,
                     z,
                     w,
@@ -214,7 +215,7 @@ class TweedieLogIRLSSolver(Solver):
 
                 # Check convergence
                 converged = check_convergence(beta_new, beta, stopping_rule, tol)
-                converged = sml_reveal(converged)
+                converged = sml_reveal(converged)  # type: ignore
 
                 return (beta_new, converged, iter_num + 1)
 
@@ -229,7 +230,7 @@ class TweedieLogIRLSSolver(Solver):
                     eta = eta + offset
 
                 w, z = compute_tweedie_log_components(y, eta, power, sample_weight)
-                return self._solve_wls(
+                return solve_wls(
                     X_train,
                     z,
                     w,
@@ -246,37 +247,10 @@ class TweedieLogIRLSSolver(Solver):
         # 4. Cleanup
         if enable_spu_cache:
             X_train = sml_drop_cached_var(X_train)
+            y = sml_drop_cached_var(y)
+            if sample_weight is not None:
+                sample_weight = sml_drop_cached_var(sample_weight)
 
         history = {"n_iter": n_iter, "converged": converged}
 
         return beta_final, None, history
-
-    def _solve_wls(
-        self,
-        X: jax.Array,
-        z: jax.Array,
-        w: jax.Array,
-        n_features: int,
-        l2: float,
-        fit_intercept: bool,
-        enable_spu_cache: bool,
-        enable_spu_reveal: bool,
-    ) -> jax.Array:
-        """Solve weighted least squares: beta = (X'WX + l2*I)^{-1} X'Wz"""
-        # Compute X'W
-        xtw = jnp.transpose(X * w.reshape((-1, 1)))
-
-        # Compute Hessian H = X'WX and score = X'Wz
-        H = jnp.matmul(xtw, X)
-        score = jnp.matmul(xtw, z)
-
-        # Apply L2 regularization (not on intercept)
-        if l2 > 0:
-            diag_indices = jnp.diag_indices(n_features)
-            H = H.at[diag_indices].add(l2)
-            if fit_intercept:
-                H = H.at[n_features - 1, n_features - 1].add(-l2)
-
-        # Solve for beta
-        H_inv = invert_matrix(H, iter_round=20, enable_spu_reveal=enable_spu_reveal)
-        return jnp.matmul(H_inv, score)

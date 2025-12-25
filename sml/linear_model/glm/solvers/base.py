@@ -40,7 +40,7 @@ class Solver(Protocol):
         batch_size: int = 128,
         enable_spu_cache: bool = False,
         enable_spu_reveal: bool = False,
-    ) -> tuple[jax.Array, jax.Array | None, dict[str, Any] | None]:
+    ) -> tuple[jax.Array, jax.Array | None, dict[str, Any]]:
         """
         Solve the GLM optimization problem.
 

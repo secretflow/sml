@@ -42,7 +42,7 @@ from sml.linear_model.glm.core.family import Family
 from sml.linear_model.glm.solvers.base import Solver
 from sml.linear_model.glm.solvers.utils import (
     add_intercept,
-    invert_matrix,
+    solve_wls,
 )
 from sml.utils import sml_drop_cached_var, sml_make_cached_var
 
@@ -57,7 +57,7 @@ class GaussianIdentityIRLSSolver(Solver):
     This is because W is constant and z = y.
 
     The solution is the standard weighted least squares:
-    beta = (X'WX + lambda*phi*I)^{-1} X'Wy
+    beta = (X'WX + l2*I)^{-1} X'Wy
     """
 
     def solve(
@@ -80,14 +80,7 @@ class GaussianIdentityIRLSSolver(Solver):
         enable_spu_reveal: bool = False,
     ) -> tuple[jax.Array, jax.Array | None, dict[str, Any] | None]:
 
-        # 1. Preprocessing - squeeze y/offset/sample_weight if 2D (from model.py)
-        if y.ndim > 1:
-            y = jnp.squeeze(y)
-        if offset is not None and offset.ndim > 1:
-            offset = jnp.squeeze(offset)
-        if sample_weight is not None and sample_weight.ndim > 1:
-            sample_weight = jnp.squeeze(sample_weight)
-
+        # 1. Preprocessing
         if fit_intercept:
             X_train = add_intercept(X)
         else:
@@ -98,55 +91,34 @@ class GaussianIdentityIRLSSolver(Solver):
         if enable_spu_cache:
             X_train = sml_make_cached_var(X_train)
 
-        # 2. Setup weights
+        # 2. Setup weights (W = w for Gaussian + Identity)
         if sample_weight is not None:
             w = sample_weight
         else:
             w = jnp.ones(n_samples)
 
-        # 3. Handle offset
+        # 3. Handle offset: z = y - offset (since z = y for identity link)
         if offset is not None:
-            y_adjusted = y - offset
+            z = y - offset
         else:
-            y_adjusted = y
+            z = y
 
-        # 4. Compute X'WX (constant)
-        xtw = jnp.transpose(X_train * w.reshape((-1, 1)))
-        xtwx = jnp.matmul(xtw, X_train)
+        # 4. Solve WLS in ONE iteration (Gaussian + Identity converges immediately)
+        beta = solve_wls(
+            X_train,
+            z,
+            w,
+            n_features,
+            l2,
+            fit_intercept,
+            enable_spu_cache,
+            enable_spu_reveal,
+        )
 
-        # 5. Add L2 regularization
-        # For Gaussian, phi = sigma^2. We estimate it after fitting.
-        # Initially use phi = 1.0
-        reg_matrix = l2 * jnp.eye(n_features)
-        if fit_intercept:
-            # Don't regularize intercept
-            reg_matrix = reg_matrix.at[-1, -1].set(0.0)
-
-        lhs = xtwx + reg_matrix
-
-        # 6. Compute X'Wy (z = y for Gaussian+Identity)
-        rhs = jnp.matmul(xtw, y_adjusted)
-
-        # 7. Solve the system (ONE iteration!)
-        H_inv = invert_matrix(lhs, iter_round=20)
-        beta = jnp.matmul(H_inv, rhs)
-
-        # 8. Compute dispersion parameter (sigma^2)
-        eta = jnp.matmul(X_train, beta)
-        if offset is not None:
-            eta = eta + offset
-        mu = eta  # Identity link
-        residuals = y - mu
-        phi = jnp.sum(w * residuals**2) / (n_samples - n_features)
-
-        # 9. Cleanup
+        # 5. Cleanup
         if enable_spu_cache:
-            sml_drop_cached_var(X_train)
+            X_train = sml_drop_cached_var(X_train)
 
-        history = {
-            "n_iter": 1,
-            "converged": True,
-            "phi": float(phi),
-        }
+        history = {"n_iter": 1, "converged": True}
 
-        return beta, phi, history
+        return beta, None, history

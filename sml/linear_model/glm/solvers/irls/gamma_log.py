@@ -47,49 +47,6 @@ from sml.linear_model.glm.solvers.utils import (
 from sml.utils import sml_drop_cached_var, sml_make_cached_var, sml_reveal
 
 
-def compute_gamma_log_components(
-    y: jax.Array,
-    eta: jax.Array,
-    sample_weight: jax.Array | None = None,
-) -> tuple[jax.Array, jax.Array]:
-    """
-    Compute optimized IRLS components for Gamma + Log.
-
-    For Gamma + Log:
-    - W = w (constant, just sample weights)
-    - z = eta + y * exp(-eta) - 1
-
-    Parameters
-    ----------
-    y : jax.Array
-        Response variable.
-    eta : jax.Array
-        Current linear predictor.
-    sample_weight : jax.Array | None
-        Optional sample weights.
-
-    Returns
-    -------
-    w : jax.Array
-        Working weights (constant).
-    z : jax.Array
-        Working response.
-    """
-    n_samples = y.shape[0]
-
-    # Working weights are constant (just sample weights or 1)
-    if sample_weight is not None:
-        w = sample_weight
-    else:
-        w = jnp.ones(n_samples)
-
-    # Working response: z = eta + y * exp(-eta) - 1
-    # This avoids computing mu = exp(eta) and then y/mu
-    z = eta + y * jnp.exp(-eta) - 1.0
-
-    return w, z
-
-
 class GammaLogIRLSSolver(Solver):
     """
     Optimized IRLS solver for Gamma distribution with Log link.
@@ -135,6 +92,9 @@ class GammaLogIRLSSolver(Solver):
 
         if enable_spu_cache:
             X_train = sml_make_cached_var(X_train)
+            y = sml_make_cached_var(y)
+            if sample_weight is not None:
+                sample_weight = sml_make_cached_var(sample_weight)
 
         # 2. Precompute constant working weights
         if sample_weight is not None:
@@ -163,14 +123,11 @@ class GammaLogIRLSSolver(Solver):
             H_inv = sml_make_cached_var(H_inv)
 
         # 4. R-style Initialization
-        # For Gamma, starting_mu = max(y, small_value)
-        mu_init = jnp.maximum(y, 1e-4)
+        mu_init = family.distribution.starting_mu(y)
         eta = jnp.log(mu_init)
-        if offset is not None:
-            eta = eta - offset
 
         # Compute initial z and solve
-        _, z = compute_gamma_log_components(y, eta, sample_weight)
+        z = eta + y * jnp.exp(-eta) - 1.0
         score = jnp.matmul(xtw, z)
         beta = jnp.matmul(H_inv, score)
 
@@ -191,7 +148,7 @@ class GammaLogIRLSSolver(Solver):
                     eta = eta + offset
 
                 # Compute optimized z (W is constant, already in xtw)
-                _, z = compute_gamma_log_components(y, eta, sample_weight)
+                z = eta + y * jnp.exp(-eta) - 1.0
 
                 # Solve: beta_new = H_inv @ X'Wz
                 score = jnp.matmul(xtw, z)
@@ -199,7 +156,7 @@ class GammaLogIRLSSolver(Solver):
 
                 # Check convergence
                 converged = check_convergence(beta_new, beta, stopping_rule, tol)
-                converged = sml_reveal(converged)
+                converged = sml_reveal(converged)  # type: ignore
 
                 return (beta_new, converged, iter_num + 1)
 
@@ -213,7 +170,7 @@ class GammaLogIRLSSolver(Solver):
                 if offset is not None:
                     eta = eta + offset
 
-                _, z = compute_gamma_log_components(y, eta, sample_weight)
+                z = eta + y * jnp.exp(-eta) - 1.0
                 score = jnp.matmul(xtw, z)
                 return jnp.matmul(H_inv, score)
 
@@ -225,6 +182,9 @@ class GammaLogIRLSSolver(Solver):
             X_train = sml_drop_cached_var(X_train)
             xtw = sml_drop_cached_var(xtw)
             H_inv = sml_drop_cached_var(H_inv)
+            y = sml_drop_cached_var(y)
+            if sample_weight is not None:
+                sample_weight = sml_drop_cached_var(sample_weight)
 
         history = {"n_iter": n_iter, "converged": converged}
 

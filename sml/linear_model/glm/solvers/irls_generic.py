@@ -21,7 +21,7 @@ from sml.linear_model.glm.core.family import Family
 from sml.utils import sml_drop_cached_var, sml_make_cached_var, sml_reveal
 
 from .base import Solver
-from .utils import add_intercept, check_convergence, invert_matrix
+from .utils import add_intercept, check_convergence, solve_wls
 
 
 def compute_irls_components(
@@ -83,67 +83,6 @@ def compute_irls_components(
         g_prime = sml_drop_cached_var(g_prime)
 
     return w, z
-
-
-def solve_weighted_least_squares(
-    X: jax.Array,
-    z: jax.Array,
-    w: jax.Array,
-    n_features: int,
-    l2: float = 0.0,
-    fit_intercept: bool = True,
-    enable_spu_cache: bool = False,
-    enable_spu_reveal: bool = False,
-) -> jax.Array:
-    """
-    Solve weighted least squares: beta = (X'WX + l2*I)^{-1} X'Wz
-
-    Parameters
-    ----------
-    X : jax.Array
-        Design matrix (with intercept if fit_intercept=True).
-    z : jax.Array
-        Working response.
-    w : jax.Array
-        Working weights.
-    n_features : int
-        Number of features (including intercept if applicable).
-    l2 : float
-        L2 regularization strength.
-    fit_intercept : bool
-        Whether intercept is included (last column).
-    enable_spu_cache : bool
-        Whether to enable SPU caching.
-    enable_spu_reveal : bool
-        Whether to reveal intermediate results in SPU.
-
-    Returns
-    -------
-    beta : jax.Array
-        Coefficient estimates.
-    """
-    # Compute X'W
-    xtw = jnp.transpose(X * w.reshape((-1, 1)))
-    if enable_spu_cache:
-        xtw = sml_make_cached_var(xtw)
-
-    # Compute Hessian H = X'WX and score = X'Wz
-    H = jnp.matmul(xtw, X)
-    score = jnp.matmul(xtw, z)
-
-    if enable_spu_cache:
-        xtw = sml_drop_cached_var(xtw)
-
-    # Apply L2 regularization (not on intercept)
-    if l2 > 0:
-        diag_indices = jnp.diag_indices(n_features)
-        H = H.at[diag_indices].add(l2)
-        if fit_intercept:
-            H = H.at[n_features - 1, n_features - 1].add(-l2)
-
-    # Solve for beta
-    H_inv = invert_matrix(H, iter_round=20, enable_spu_reveal=enable_spu_reveal)
-    return jnp.matmul(H_inv, score)
 
 
 class IRLSSolver(Solver):
@@ -218,19 +157,19 @@ class IRLSSolver(Solver):
         _, n_features = X_train.shape
         if enable_spu_cache:
             X_train = sml_make_cached_var(X_train)
+            if sample_weight is not None:
+                sample_weight = sml_make_cached_var(sample_weight)
 
         # 2. R-style Initialization (Iteration 0)
         # Use starting_mu(y) to get initial mu, then perform one IRLS update
         mu = family.distribution.starting_mu(y)
         eta = family.link.link(mu)
-        if offset is not None:
-            eta = eta - offset
 
         # Compute IRLS components and solve WLS for initial beta
         w, z = compute_irls_components(
             y, mu, eta, family, sample_weight, enable_spu_cache
         )
-        beta = solve_weighted_least_squares(
+        beta = solve_wls(
             X_train,
             z,
             w,
@@ -265,7 +204,7 @@ class IRLSSolver(Solver):
                 w, z = compute_irls_components(
                     y, mu, eta, family, sample_weight, enable_spu_cache
                 )
-                beta_new = solve_weighted_least_squares(
+                beta_new = solve_wls(
                     X_train,
                     z,
                     w,
@@ -300,7 +239,7 @@ class IRLSSolver(Solver):
                 w, z = compute_irls_components(
                     y, mu, eta, family, sample_weight, enable_spu_cache
                 )
-                return solve_weighted_least_squares(
+                return solve_wls(
                     X_train,
                     z,
                     w,
@@ -325,5 +264,7 @@ class IRLSSolver(Solver):
 
         if enable_spu_cache:
             X_train = sml_drop_cached_var(X_train)
+            if sample_weight is not None:
+                sample_weight = sml_drop_cached_var(sample_weight)
 
         return beta_final, dispersion, history
