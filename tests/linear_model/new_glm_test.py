@@ -505,6 +505,131 @@ class TestGLMvsStatsmodelsPlaintext:
             our_model, sm_model, X, y, coef_rtol=0.2, coef_atol=0.15, dev_rtol=0.2
         )
 
+    # ==================== Optimized Solver Tests ====================
+
+    def test_gamma_log_optimized_irls(self):
+        """Test optimized Gamma+Log IRLS solver vs statsmodels."""
+        from sml.linear_model.glm.solvers.irls import GammaLogIRLSSolver
+
+        X, y, _, _ = generate_gamma_data()
+
+        # Use the optimized solver directly
+        solver = GammaLogIRLSSolver()
+        from sml.linear_model.glm.core.family import Family
+
+        family = Family(Gamma(), LogLink())
+
+        # Fit using the optimized solver
+        beta, _, history = solver.solve(
+            X,
+            y,
+            family,
+            fit_intercept=True,
+            max_iter=50,
+            tol=1e-8,
+        )
+
+        # Extract coef and intercept
+        our_coef = beta[:-1]
+        our_intercept = beta[-1]
+
+        # Compute predictions and deviance
+        X_with_intercept = jnp.hstack([X, jnp.ones((X.shape[0], 1))])
+        eta = jnp.matmul(X_with_intercept, beta)
+        mu = jnp.exp(eta)
+        our_dev = float(Gamma().deviance(y, mu))
+
+        # Fit statsmodels
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(
+            np.array(y), X_sm, family=sm_family.Gamma(link=sm_links.Log())
+        ).fit()
+
+        sm_coef = sm_model.params[1:]
+        sm_intercept = sm_model.params[0]
+        sm_dev = sm_model.deviance
+
+        print("Gamma+Log Optimized IRLS:")
+        print(f"  Deviance - Ours: {our_dev:.4f}, statsmodels: {sm_dev:.4f}")
+        print(f"  Coef - Ours: {our_coef}")
+        print(f"  Coef - SM:   {sm_coef}")
+        print(f"  Intercept - Ours: {our_intercept:.4f}, SM: {sm_intercept:.4f}")
+
+        np.testing.assert_allclose(our_dev, sm_dev, rtol=0.1)
+        np.testing.assert_allclose(our_coef, sm_coef, rtol=0.1, atol=0.05)
+        np.testing.assert_allclose(our_intercept, sm_intercept, rtol=0.1, atol=0.05)
+
+    def test_tweedie_log_optimized_irls(self):
+        """Test optimized Tweedie+Log IRLS solver vs statsmodels."""
+        from sml.linear_model.glm.solvers.irls import TweedieLogIRLSSolver
+
+        # Generate Tweedie-like data (using Gamma as approximation)
+        X, y, _, _ = generate_gamma_data(shape=10.0)
+
+        # Use the optimized solver directly
+        power = 1.5
+        solver = TweedieLogIRLSSolver(power=power)
+        from sml.linear_model.glm.core.family import Family
+
+        family = Family(Tweedie(power=power), LogLink())
+
+        # Fit using the optimized solver
+        beta, _, history = solver.solve(
+            X,
+            y,
+            family,
+            fit_intercept=True,
+            max_iter=50,
+            tol=1e-8,
+        )
+
+        # Extract coef and intercept
+        our_coef = beta[:-1]
+        our_intercept = beta[-1]
+
+        # Fit statsmodels
+        X_sm = sm.add_constant(np.array(X))
+        sm_model = sm.GLM(
+            np.array(y),
+            X_sm,
+            family=sm_family.Tweedie(var_power=power, link=sm_links.Log()),
+        ).fit()
+
+        sm_coef = sm_model.params[1:]
+        sm_intercept = sm_model.params[0]
+
+        print("Tweedie+Log Optimized IRLS:")
+        print(f"  Coef - Ours: {our_coef}")
+        print(f"  Coef - SM:   {sm_coef}")
+        print(f"  Intercept - Ours: {our_intercept:.4f}, SM: {sm_intercept:.4f}")
+
+        # Only compare coefficients (deviance calculation differs between implementations)
+        np.testing.assert_allclose(our_coef, sm_coef, rtol=0.05, atol=0.01)
+        np.testing.assert_allclose(our_intercept, sm_intercept, rtol=0.05, atol=0.01)
+
+    def test_optimized_solver_registry(self):
+        """Test that optimized solvers are properly registered."""
+        from sml.linear_model.glm.solvers.optimized_irls import (
+            get_registered_solver,
+            list_registered_solvers,
+        )
+        from sml.linear_model.glm.core.family import Family
+
+        # Check Gamma+Log is registered
+        gamma_log_family = Family(Gamma(), LogLink())
+        solver = get_registered_solver(gamma_log_family)
+        assert solver is not None, "Gamma+Log solver should be registered"
+
+        # Check Tweedie+Log is registered
+        tweedie_log_family = Family(Tweedie(power=1.5), LogLink())
+        solver = get_registered_solver(tweedie_log_family)
+        assert solver is not None, "Tweedie+Log(p=1.5) solver should be registered"
+
+        # List all registered solvers
+        registered = list_registered_solvers()
+        print(f"Registered optimized solvers: {registered}")
+        assert len(registered) >= 2
+
 
 # ==================== Additional Feature Tests ====================
 

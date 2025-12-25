@@ -11,3 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""IRLS solvers including generic and optimized implementations."""
+
+from sml.linear_model.glm.solvers.irls_generic import IRLSSolver
+
+# Import optimized solvers
+from .gamma_log import GammaLogIRLSSolver
+from .tweedie_log import TweedieLogIRLSSolver
+
+__all__ = ["IRLSSolver", "GammaLogIRLSSolver", "TweedieLogIRLSSolver"]
