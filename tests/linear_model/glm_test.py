@@ -23,6 +23,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+import spu.libspu as libspu
+import spu.utils.simulation as spsim
 
 from sml.linear_model.glm.core.distribution import (
     Bernoulli,
@@ -876,3 +878,50 @@ class TestGLMFeatures:
 
 
 # ==================== Test with SPU Class ====================
+
+
+def test_glm_gamma_log_irls_spu():
+    """Test Gamma GLM with Log link and IRLS solver in SPU."""
+    X, y, _, _ = generate_gamma_data()
+
+    config = libspu.RuntimeConfig(
+        protocol=libspu.ProtocolKind.SEMI2K,
+        field=libspu.FieldType.FM64,
+    )
+    config.enable_hal_profile = True
+    config.enable_pphlo_profile = True
+    # for FM64, EXP_PADE is more stable
+    # for FM128, EXP_PRIME would be better
+    config.fxp_exp_mode = libspu.RuntimeConfig.ExpMode.EXP_PADE
+
+    sim = spsim.Simulator(2, config)
+
+    def proc(x, y):
+        model = GLM(
+            dist=Gamma(),
+            link=LogLink(),
+            solver="irls",
+            fit_intercept=True,
+            max_iter=10,
+            tol=0,  # no early stopping
+            l2=0.01,
+        )
+        model.fit(x, y, enable_spu_cache=True, y_scale=1.0, enable_spu_reveal=True)
+        return model.coef_, model.intercept_
+
+    our_coef, our_intercept = spsim.sim_jax(sim, proc)(X, y)
+
+    X_sm = sm.add_constant(np.array(X))
+    sm_model = sm.GLM(
+        np.array(y), X_sm, family=sm_family.Gamma(link=sm_links.Log())
+    ).fit()
+
+    sm_coef = sm_model.params[1:]
+    sm_intercept = sm_model.params[0]
+
+    print("Gamma+Log IRLS (SPU) vs statsmodels:")
+    print(f"SPU Gamma+Log IRLS Coef: {our_coef}, Intercept: {our_intercept}")
+    print(f"SM Gamma+Log Coef: {sm_coef}, Intercept: {sm_intercept}")
+
+    np.testing.assert_allclose(our_coef, sm_coef, rtol=0.1, atol=0.05)
+    np.testing.assert_allclose(our_intercept, sm_intercept, rtol=0.1, atol=0.05)
