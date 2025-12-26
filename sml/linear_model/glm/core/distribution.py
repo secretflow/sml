@@ -350,12 +350,13 @@ class Tweedie(Distribution):
     def log_likelihood(
         self, y: jax.Array, mu: jax.Array, weights: jax.Array | None = None
     ) -> jax.Array:
-        dev = self.deviance(y, mu, weights=None)
-        ll = -0.5 * dev
-
-        if weights is not None:
-            return jnp.sum(ll * weights)
-        return jnp.sum(ll)
+        """
+        Computes the (quasi) log-likelihood of the model.
+        For GLMs, maximize log-likelihood is equivalent to minimizing deviance.
+        LL ~ -0.5 * Deviance
+        """
+        dev = self.deviance(y, mu, weights=weights)
+        return -0.5 * dev
 
     def starting_mu(self, y: jax.Array) -> jax.Array:
         # R-style initialization
