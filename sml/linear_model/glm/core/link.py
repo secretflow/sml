@@ -119,7 +119,6 @@ class LogLink(Link):
     """
     The log link function: g(mu) = log(mu).
     Canonical link for Poisson, Gamma, Tweedie (often) distributions.
-
     """
 
     def link(self, mu: jax.Array) -> jax.Array:
