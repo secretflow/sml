@@ -16,7 +16,7 @@
 import jax
 import jax.numpy as jnp
 
-from sml.utils import sml_drop_cached_var, sml_make_cached_var, sml_reveal
+from sml.utils import sml_make_cached_var, sml_reveal
 
 
 def add_intercept(X: jax.Array) -> jax.Array:
@@ -124,6 +124,7 @@ def check_convergence(
     """
     if stopping_rule == "beta":
         beta_max_delta = jnp.max(jnp.abs(beta_new - beta_old))
+        # TODO: this can be cached to avoid recomputation
         beta_max = jnp.max(jnp.abs(beta_old))
         rel_change = beta_max_delta / beta_max
         return rel_change < tol
@@ -179,9 +180,6 @@ def solve_wls(
     # Compute Hessian H = X'WX and score = X'Wz
     H = jnp.matmul(xtw, X)
     score = jnp.matmul(xtw, z)
-
-    if enable_spu_cache:
-        xtw = sml_drop_cached_var(xtw)
 
     # Apply L2 regularization (not on intercept)
     if l2 > 0:

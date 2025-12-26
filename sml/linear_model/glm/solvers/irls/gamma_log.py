@@ -44,7 +44,7 @@ from sml.linear_model.glm.solvers.utils import (
     check_convergence,
     invert_matrix,
 )
-from sml.utils import sml_drop_cached_var, sml_make_cached_var, sml_reveal
+from sml.utils import sml_make_cached_var, sml_reveal
 
 
 class GammaLogIRLSSolver(Solver):
@@ -184,15 +184,6 @@ class GammaLogIRLSSolver(Solver):
 
             beta_final = jax.lax.fori_loop(0, max_iter, fixed_iter_body, beta)
             converged, n_iter = False, max_iter
-
-        # 6. Cleanup
-        if enable_spu_cache:
-            X_train = sml_drop_cached_var(X_train)
-            xtw = sml_drop_cached_var(xtw)
-            H_inv = sml_drop_cached_var(H_inv)
-            y = sml_drop_cached_var(y)
-            if sample_weight is not None:
-                sample_weight = sml_drop_cached_var(sample_weight)
 
         history = {"n_iter": n_iter, "converged": converged}
 

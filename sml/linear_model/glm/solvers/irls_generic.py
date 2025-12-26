@@ -18,7 +18,7 @@ import jax
 import jax.numpy as jnp
 
 from sml.linear_model.glm.core.family import Family
-from sml.utils import sml_drop_cached_var, sml_make_cached_var, sml_reveal
+from sml.utils import sml_make_cached_var, sml_reveal
 
 from .base import Solver
 from .utils import add_intercept, check_convergence, solve_wls
@@ -78,9 +78,6 @@ def compute_irls_components(
     # z_resid = (y - mu) * g'(mu), z = eta + z_resid
     z_resid = (y - mu) * g_prime
     z = eta + z_resid
-
-    if enable_spu_cache:
-        g_prime = sml_drop_cached_var(g_prime)
 
     return w, z
 
@@ -276,10 +273,5 @@ class IRLSSolver(Solver):
             "n_iter": n_iter,
             "converged": converged,
         }
-
-        if enable_spu_cache:
-            X_train = sml_drop_cached_var(X_train)
-            if sample_weight is not None:
-                sample_weight = sml_drop_cached_var(sample_weight)
 
         return beta_final, dispersion, history

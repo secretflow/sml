@@ -44,7 +44,7 @@ from sml.linear_model.glm.solvers.utils import (
     add_intercept,
     solve_wls,
 )
-from sml.utils import sml_drop_cached_var, sml_make_cached_var
+from sml.utils import sml_make_cached_var
 
 
 class GaussianIdentityIRLSSolver(Solver):
@@ -116,10 +116,6 @@ class GaussianIdentityIRLSSolver(Solver):
             enable_spu_cache,
             enable_spu_reveal,
         )
-
-        # 5. Cleanup
-        if enable_spu_cache:
-            X_train = sml_drop_cached_var(X_train)
 
         history = {"n_iter": 1, "converged": True}
 

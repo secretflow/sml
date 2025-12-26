@@ -19,7 +19,7 @@ import jax.numpy as jnp
 
 from sml.linear_model.glm.core.family import Family
 from sml.linear_model.glm.solvers.utils import check_convergence
-from sml.utils import sml_drop_cached_var, sml_make_cached_var, sml_reveal
+from sml.utils import sml_make_cached_var, sml_reveal
 
 from .base import Solver
 from .utils import add_intercept
@@ -288,8 +288,5 @@ class SGDSolver(Solver):
             "n_iter": n_epochs,
             "converged": converged,
         }
-
-        if enable_spu_cache:
-            X_train = sml_drop_cached_var(X_train)
 
         return beta_final, dispersion, history
