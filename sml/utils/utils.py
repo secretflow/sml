@@ -16,6 +16,7 @@ import logging
 
 import numpy as np
 from spu.experimental import reveal as spu_reveal
+from spu.experimental import make_cached_var, drop_cached_var
 
 
 def get_logger(name):
@@ -39,3 +40,7 @@ def sml_reveal(
         return [spu_reveal(item) for item in x]
     else:
         return spu_reveal(x)
+
+
+sml_make_cached_var = make_cached_var
+sml_drop_cached_var = drop_cached_var
