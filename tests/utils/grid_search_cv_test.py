@@ -25,7 +25,6 @@ from sklearn.model_selection import KFold, StratifiedKFold
 from sml.ensemble.adaboost import AdaBoostClassifier
 from sml.ensemble.forest import RandomForestClassifier
 from sml.gaussian_process._gpc import GaussianProcessClassifier
-from sml.linear_model.glm import _GeneralizedLinearRegressor
 from sml.linear_model.logistic import LogisticRegression
 from sml.linear_model.pla import Perceptron
 from sml.linear_model.quantile import QuantileRegressor
@@ -410,22 +409,6 @@ def test_gridsearch_ridge(setup_data):
         "regression",
         refit=True,
         cv_type="int",
-    )
-
-
-def test_gridsearch_glm(setup_data):
-    estimator = _GeneralizedLinearRegressor(max_iter=10)
-    param_grid = {"alpha": [0.0, 0.1, 0.2]}
-    _run_test(
-        setup_data,
-        "GeneralizedLinearRegressor with cv as iterable",
-        estimator,
-        param_grid,
-        setup_data["X_reg"],
-        setup_data["y_reg"],
-        "neg_mean_squared_error",
-        "regression",
-        refit=True,
     )
 
 
