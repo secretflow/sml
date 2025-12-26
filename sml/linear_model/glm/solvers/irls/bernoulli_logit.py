@@ -100,6 +100,7 @@ def compute_bernoulli_logit_components(
         w = var_mu
 
     # Working response: z = eta + (y - mu) / var_mu
+    # todo: improve the division performance by using positive intrinsics
     z = eta + (y - mu) / var_mu
 
     return w, z
