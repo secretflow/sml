@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#   http://www.apache.org/licenses/LICENSE-2.0
+#      https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,20 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from sml.linear_model.glm import GLM
-from sml.linear_model.logistic import LogisticRegression
-from sml.linear_model.pla import Perceptron
-from sml.linear_model.quantile import QuantileRegressor
-from sml.linear_model.ridge import Ridge, Solver
-from sml.linear_model.sgd import SGDClassifier, SGDRegressor
+from sml.linear_model.glm.solvers.base import Solver
+from sml.linear_model.glm.solvers.irls import IRLSSolver
+from sml.linear_model.glm.solvers.optimized_irls import get_registered_solver
+from sml.linear_model.glm.solvers.sgd import SGDSolver
+from sml.linear_model.glm.solvers.utils import add_intercept, invert_matrix, split_coef
 
 __all__ = [
-    "GLM",
-    "LogisticRegression",
-    "Perceptron",
-    "QuantileRegressor",
-    "Ridge",
     "Solver",
-    "SGDClassifier",
-    "SGDRegressor",
+    "IRLSSolver",
+    "SGDSolver",
+    "split_coef",
+    "add_intercept",
+    "invert_matrix",
+    "get_registered_solver",
 ]

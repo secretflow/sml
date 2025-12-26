@@ -153,7 +153,7 @@ class EmulationRunner:
         Returns:
             True if main function exists, False otherwise
         """
-        return hasattr(module, "main") and callable(getattr(module, "main"))
+        return hasattr(module, "main") and callable(module.main)
 
     def _run_main_in_process(
         self, module_path: str, result_queue: multiprocessing.Queue
@@ -181,7 +181,7 @@ class EmulationRunner:
                 return
 
             # Get the main function
-            main_func = getattr(module, "main")
+            main_func = module.main
 
             # Prepare arguments for main function
             main_kwargs = {}
