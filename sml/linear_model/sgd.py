@@ -20,7 +20,7 @@ import jax
 import jax.numpy as jnp
 
 from sml.utils.fxp_approx import SigType, sigmoid
-from sml.utils.utils import sml_reveal, sml_drop_cached_var, sml_make_cached_var
+from sml.utils.utils import sml_reveal, sml_make_cached_var
 
 
 class Penalty(Enum):
@@ -202,9 +202,6 @@ class SGDBase:
 
                 pred = activation(dot)
 
-                if enable_activation_cache:
-                    dot = sml_drop_cached_var(dot)
-
                 # Compute error and gradient
                 err = pred - y_batch
                 grad = jnp.matmul(jnp.transpose(x_batch), err)
@@ -248,10 +245,6 @@ class SGDBase:
                 return _one_epoch(w_)
 
             w = jax.lax.fori_loop(0, self._epochs, fori_body_fun, w)
-
-        # Drop cached var with dependency
-        if self._enable_spu_cache:
-            X_with_bias = sml_drop_cached_var(X_with_bias)
 
         self.n_features_ = n_features
         self.weights_ = w
