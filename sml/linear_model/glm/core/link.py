@@ -120,11 +120,6 @@ class LogLink(Link):
     The log link function: g(mu) = log(mu).
     Canonical link for Poisson, Gamma, Tweedie (often) distributions.
 
-    Parameters
-    ----------
-    clip_mu : Tuple[float, float], optional
-        The lower and upper bounds to clip mu for numerical stability,
-        avoiding log(0) or overflow. Default is (1e-7, 1e14).
     """
 
     def link(self, mu: jax.Array) -> jax.Array:
