@@ -14,5 +14,6 @@
 
 from sml.ensemble.adaboost import AdaBoostClassifier
 from sml.ensemble.forest import RandomForestClassifier
+from sml.ensemble.lightgbm import LightGBMClassifier
 
-__all__ = ["AdaBoostClassifier", "RandomForestClassifier"]
+__all__ = ["AdaBoostClassifier", "RandomForestClassifier", "LightGBMClassifier"]
