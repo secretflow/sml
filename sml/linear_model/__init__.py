@@ -12,12 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from sml.linear_model.glm import (
-    GammaRegressor,
-    PoissonRegressor,
-    TweedieRegressor,
-    _GeneralizedLinearRegressor,
-)
+from sml.linear_model.glm import GLM
 from sml.linear_model.logistic import LogisticRegression
 from sml.linear_model.pla import Perceptron
 from sml.linear_model.quantile import QuantileRegressor
@@ -25,10 +20,7 @@ from sml.linear_model.ridge import Ridge, Solver
 from sml.linear_model.sgd import SGDClassifier, SGDRegressor
 
 __all__ = [
-    "GammaRegressor",
-    "PoissonRegressor",
-    "TweedieRegressor",
-    "_GeneralizedLinearRegressor",
+    "GLM",
     "LogisticRegression",
     "Perceptron",
     "QuantileRegressor",

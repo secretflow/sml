@@ -26,7 +26,10 @@ from sml.utils.fxp_approx import (
     sigmoid_t1,
     sigmoid_t3,
     sigmoid_t5,
+    sigmoid_remez_fast,
 )
+from sml.utils.utils import sml_reveal, sml_drop_cached_var, sml_make_cached_var
+
 
 __all__ = [
     "dataset_utils",
@@ -44,4 +47,8 @@ __all__ = [
     "sigmoid_t1",
     "sigmoid_t3",
     "sigmoid_t5",
+    "sigmoid_remez_fast",
+    "sml_reveal",
+    "sml_make_cached_var",
+    "sml_drop_cached_var",
 ]

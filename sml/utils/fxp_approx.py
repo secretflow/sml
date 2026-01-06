@@ -27,6 +27,7 @@ class SigType(Enum):
     LS7 = "ls7"
     # DO NOT use this except in hessian case.
     MIX = "mix"
+    REMEZ_FAST = "remez_fast"
     REAL = "real"
 
 
@@ -116,6 +117,21 @@ def sigmoid_real(x):
     return 1 / (1 + jnp.exp(-x))
 
 
+# Remez algorithm based sigmoid approximation
+# valid range x in [-4, 4], sigmoid(4)~=0.9820
+# f(x) = 0.0003557213593295689x^5 - 0.013012638866364314x^3 + 0.23897898076877397x + 0.5
+# TODO：implement this by SPU intrinsics for better performance
+def sigmoid_remez_fast(x):
+    tmp = (
+        3.557213593295689e-04 * jnp.power(x, 5)
+        - 1.3012638866364314e-02 * jnp.power(x, 3)
+        + 2.3897898076877397e-01 * x
+        + 0.5
+    )
+
+    return jnp.where(x < -4.0, 0.0, jnp.where(x > 4.0, 1.0, tmp))  # type: ignore
+
+
 def sigmoid(x, sig_type: SigType):
     if sig_type is SigType.T1:
         return sigmoid_t1(x)
@@ -133,5 +149,7 @@ def sigmoid(x, sig_type: SigType):
         return sigmoid_ls7(x)
     elif sig_type is SigType.MIX:
         return sigmoid_mix(x)
+    elif sig_type is SigType.REMEZ_FAST:
+        return sigmoid_remez_fast(x)
     elif sig_type is SigType.REAL:
         return sigmoid_real(x)
