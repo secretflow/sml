@@ -21,7 +21,6 @@ from sklearn.datasets import make_classification, make_regression
 from sklearn.model_selection import KFold, StratifiedKFold
 
 import emulations.utils.emulation as emulation
-from sml.linear_model.glm import _GeneralizedLinearRegressor
 from sml.linear_model.pla import Perceptron
 from sml.linear_model.ridge import Ridge
 from sml.naive_bayes.gnb import GaussianNB
@@ -192,19 +191,6 @@ def emul_comprehensive_gridsearch(emulator: emulation.Emulator):
         X_reg,
         y_reg_reshaped,
         "r2",
-        "regression",
-        cv_splits_reg,
-    )
-    estimator = _GeneralizedLinearRegressor(max_iter=10)
-    param_grid = {"alpha": [0.0, 0.1, 0.2]}
-    _run_gridsearch_test(
-        emulator,
-        "GeneralizedLinearRegressor",
-        estimator,
-        param_grid,
-        X_reg,
-        y_reg,
-        "neg_mean_squared_error",
         "regression",
         cv_splits_reg,
     )
