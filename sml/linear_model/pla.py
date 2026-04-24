@@ -19,12 +19,19 @@ from enum import Enum
 import jax
 import jax.numpy as jnp
 
+from sml.utils.utils import sml_reveal
+
 
 class Penalty(Enum):
     NONE = None
     L1 = "l1"
     L2 = "l2"
     EN = "elasticnet"
+
+
+class EarlyStoppingMetric(Enum):
+    HINGE_LOSS = "hinge_loss"
+    WEIGHT = "weight"
 
 
 class Perceptron:
@@ -39,9 +46,6 @@ class Perceptron:
     alpha : float, default=0.0001
         Constant that multiplies the regularization term if regularization is
         used.
-
-    patience: int, default=10
-        How long to wait after last time loss improved.
 
     l1_ratio : float, default=0.15
         The Elastic Net mixing parameter, with `0 <= l1_ratio <= 1`.
@@ -64,22 +68,39 @@ class Perceptron:
         The batch size is a number of samples processed before the model is updated.
         if batch_size = -1, all samples will be processed in an iteration.
 
-    early_stop : bool, default=True
-        When the loss function of the model no longer decreases, the early stop method
-        can avoid the overtraining of the model if True.
+    early_stopping : bool, default=True
+        Whether to enable early stopping to avoid overtraining.
+
+    early_stopping_threshold : float, default=0.0
+        The threshold for early stopping based on weight change.
+        If > 0, training stops when the maximum absolute weight change
+        is below this threshold. Only used when early_stopping_metric='weight'.
+        Default: 0.0 (disabled, rely on hinge_loss patience instead).
+
+    early_stopping_metric : str, default='hinge_loss'
+        The metric for early stopping:
+        - 'hinge_loss': stop when hinge loss hasn't improved for `patience` epochs.
+          Best weights (those achieving lowest loss) are restored.
+        - 'weight': stop when max(|w - w_last|) < early_stopping_threshold.
+
+    patience : int, default=10
+        Number of epochs with no improvement in hinge loss to wait before
+        stopping. Only used when early_stopping_metric='hinge_loss'.
     """
 
     def __init__(
         self,
         penalty=None,
         alpha=0.0001,
-        patience=10,
         l1_ratio=0.15,
         fit_intercept=True,
         max_iter=1000,
         eta0=1.0,
         batch_size=-1,
-        early_stop=True,
+        early_stopping=True,
+        early_stopping_threshold: float = 0.0,
+        early_stopping_metric: str = "hinge_loss",
+        patience=10,
     ):
         # parameter check.
         assert max_iter > 0, f"max_iter should >0"
@@ -87,12 +108,22 @@ class Perceptron:
         assert alpha > 0, f"alpha should >0"
         assert patience > 0, f"patience should >0"
         assert batch_size > 0 or batch_size == -1, f"batch size should >0 or -1"
+        assert early_stopping_threshold >= 0, (
+            f"early_stopping_threshold should >=0, got {early_stopping_threshold}"
+        )
+        assert early_stopping_metric in [e.value for e in EarlyStoppingMetric], (
+            f"early_stopping_metric should in {[e.value for e in EarlyStoppingMetric]}, but got {early_stopping_metric}"
+        )
         assert penalty in [e.value for e in Penalty], (
             f"penalty should in {[e.value for e in Penalty]}, but got {penalty}"
         )
         if penalty == "elasticnet":
             assert l1_ratio > 0 and l1_ratio < 1, (
                 f"l1_ratio should >0 and <1 if use ElasticNet (L1+L2)"
+            )
+        if early_stopping_metric == "weight":
+            assert early_stopping_threshold > 0, (
+                f"early_stopping_threshold should >0 when early_stopping_metric='weight'"
             )
 
         self.max_iter = max_iter
@@ -102,7 +133,10 @@ class Perceptron:
         self.alpha = alpha
         self.patience = patience
         self.bsize = batch_size
-        self.early_stop = early_stop
+        self.early_stopping = early_stopping
+        self.early_stopping_threshold = early_stopping_threshold
+        self.early_stopping_metric = EarlyStoppingMetric(early_stopping_metric)
+
         if self.penalty == Penalty.L1:
             self.l1_ratio = 1
         elif self.penalty == Penalty.L2:
@@ -115,6 +149,9 @@ class Perceptron:
         self._w = None
         self._b = 0.0
 
+        # Track actual training epochs
+        self.actual_epochs_ = 0
+
     def _sign(self, x):
         """
         The sign function in perceptron.
@@ -125,7 +162,7 @@ class Perceptron:
 
     def _hinge_function(self, x, y, w, b):
         """
-        loss = \frac{1}{n} \\sum_{i=1}^{n}max\\{-y_i(wx_i+b), 0\\}.
+        loss = \\frac{1}{n} \\sum_{i=1}^{n}max\\{-y_i(wx_i+b), 0\\}.
         """
         y_hat = jnp.matmul(x, w) + b
         y_hat = y_hat.reshape(y_hat.shape[0], 1)
@@ -151,6 +188,38 @@ class Perceptron:
         dwb = jnp.concatenate((dw, db), axis=0)
 
         return dwb
+
+    def _run_one_epoch(self, x, y, w, b, n_samples):
+        """Run one epoch of perceptron training.
+
+        Args:
+            x: Feature matrix.
+            y: Target values.
+            w: Current weights.
+            b: Current bias.
+            n_samples: Number of samples.
+
+        Returns:
+            Updated (w, b).
+        """
+        total_batch = math.ceil(float(n_samples) / self.bsize)
+        for idx in range(total_batch):
+            begin = idx * self.bsize
+            end = min((idx + 1) * self.bsize, n_samples)
+            x_slice = x[begin:end]
+            y_slice = y[begin:end]
+
+            update_w_b = jax.vmap(
+                self._update_parameters, in_axes=(0, 0, None, None), out_axes=0
+            )(x_slice, y_slice, w, b)
+            mean_w_b = jnp.mean(jnp.array(update_w_b), axis=0)
+
+            w = w + mean_w_b[:-1]
+
+            if self.fit_intercept:
+                b = b + mean_w_b[-1]
+
+        return w, b
 
     def fit(self, x, y):
         """Fit Perceptron classifier.
@@ -178,32 +247,61 @@ class Perceptron:
         w = jnp.zeros(n_features)
         b = jnp.array([0.0])
 
-        not_early_stop = True
+        if not self.early_stopping:
+            # No early stopping: run fixed max_iter epochs
+            for iter in range(self.max_iter):
+                w, b = self._run_one_epoch(x, y, w, b, n_samples)
+            self._w = w
+            self._b = b
+            self.actual_epochs_ = self.max_iter
+            return self
 
-        best_loss = jnp.inf
-        best_w = w
-        best_b = b
-        best_iter = -1
+        if self.early_stopping_metric == EarlyStoppingMetric.WEIGHT:
+            # Weight-based early stopping using while_loop
+            # (similar to logistic.py's approach for SPU compatibility)
+            w_last = w
+            b_last = b
 
-        for iter in range(self.max_iter):
-            total_batch = math.ceil(float(n_samples) / self.bsize)
-            for idx in range(total_batch):
-                begin = idx * self.bsize
-                end = min((idx + 1) * self.bsize, n_samples)
-                x_slice = x[begin:end]
-                y_slice = y[begin:end]
+            def cond_fun(carry):
+                _, _, _, _, need_stop = carry
+                epoch = carry[2]
+                return jnp.logical_and(epoch < self.max_iter, jnp.logical_not(need_stop))
 
-                update_w_b = jax.vmap(
-                    self._update_parameters, in_axes=(0, 0, None, None), out_axes=0
-                )(x_slice, y_slice, w, b)
-                mean_w_b = jnp.mean(jnp.array(update_w_b), axis=0)
+            def body_fun(carry):
+                w, b, epoch, _, _ = carry
+                w_last = w
+                b_last = b
+                w, b = self._run_one_epoch(x, y, w, b, n_samples)
 
-                w += not_early_stop * mean_w_b[:-1]
+                # Check early stopping: max absolute change in weights and bias
+                w_delta = jnp.max(jnp.abs(w - w_last))
+                b_delta = jnp.max(jnp.abs(b - b_last))
+                max_delta = jnp.maximum(w_delta, b_delta)
+                stop = max_delta < self.early_stopping_threshold
 
-                if self.fit_intercept:
-                    b += not_early_stop * mean_w_b[-1]
+                # WARNING: Reveal the need_stop to plaintext here
+                need_stop = sml_reveal(stop)
 
-            if self.early_stop:
+                return (w, b, epoch + 1, max_delta, need_stop)
+
+            w, b, final_epoch, _, _ = jax.lax.while_loop(
+                cond_fun, body_fun, (w, b, 0, jnp.inf, False)
+            )
+            self._w = w
+            self._b = b
+            self.actual_epochs_ = final_epoch
+
+        elif self.early_stopping_metric == EarlyStoppingMetric.HINGE_LOSS:
+            # Hinge loss based early stopping with patience
+            best_loss = jnp.inf
+            best_w = w
+            best_b = b
+            best_iter = -1
+            not_early_stop = True
+
+            for iter in range(self.max_iter):
+                w, b = self._run_one_epoch(x, y, w, b, n_samples)
+
                 sumloss = self._hinge_function(x, y, w, b)
 
                 best_loss_flag = sumloss < best_loss
@@ -214,12 +312,9 @@ class Perceptron:
 
                 not_early_stop *= iter <= best_iter + self.patience
 
-        if self.early_stop:
             self._w = best_w
             self._b = best_b
-        else:
-            self._w = w
-            self._b = b
+            self.actual_epochs_ = int(best_iter) + 1
 
         return self
 
