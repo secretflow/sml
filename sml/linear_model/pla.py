@@ -300,7 +300,12 @@ class Perceptron:
             not_early_stop = True
 
             for iter in range(self.max_iter):
-                w, b = self._run_one_epoch(x, y, w, b, n_samples)
+                new_w, new_b = self._run_one_epoch(x, y, w, b, n_samples)
+
+                # Soft stop: keep w/b unchanged once patience is exceeded
+                # (avoids revealing private loss trend for hard stop)
+                w = jnp.where(not_early_stop, new_w, w)
+                b = jnp.where(not_early_stop, new_b, b)
 
                 sumloss = self._hinge_function(x, y, w, b)
 
@@ -314,7 +319,7 @@ class Perceptron:
 
             self._w = best_w
             self._b = best_b
-            self.actual_epochs_ = int(best_iter) + 1
+            self.actual_epochs_ = best_iter + 1
 
         return self
 
